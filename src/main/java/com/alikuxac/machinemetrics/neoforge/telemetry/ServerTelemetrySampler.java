@@ -217,8 +217,8 @@ public class ServerTelemetrySampler {
             if (hasEnergy && maxEnergy > 0 && currentEnergy == 0) {
                 state = TelemetryData.BottleneckState.STARVED;
             } else {
-                float itemFillRatio = maxItems > 0 ? (float) currentItems / maxItems : 0f;
-                float fluidFillRatio = maxFluid > 0 ? (float) currentFluid / maxFluid : 0f;
+                float itemFillRatio = maxItems > 0 ? (float) currentItems / maxItems : 0.0f;
+                float fluidFillRatio = maxFluid > 0 ? (float) currentFluid / maxFluid : 0.0f;
 
                 if (itemFillRatio > 0.95f || fluidFillRatio > 0.95f) {
                     isOutputClogged = true;
