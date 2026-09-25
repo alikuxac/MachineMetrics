@@ -1,6 +1,6 @@
-# ⚡ Machinemetrics
+# ⚡ Machine Metrics
 
-**Machinemetrics** is a lightweight, pure **client-side & server-sync capable** telemetry and diagnostics HUD for Minecraft. It provides real-time insights into industrial machines, automation lines, and energy networks without relying on external tooltip frameworks.
+**Machine Metrics** is a lightweight, pure **client-side & server-sync capable** telemetry and diagnostics HUD for Minecraft. It provides real-time insights into industrial machines, automation lines, and energy networks without relying on external tooltip frameworks.
 
 > ⚠️ **CAUTION:** This mod is currently in **BETA** state. Features and network protocols are subject to active refinement. **Please remember to backup your worlds and saves before installing or updating!**
 

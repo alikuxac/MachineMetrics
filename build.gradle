@@ -16,7 +16,7 @@ base {
 }
 
 tasks.named('jar', Jar) {
-    archiveFileName = "${mod_id}-${loader}-${minecraft_version}-${mod_version}.jar"
+    archiveFileName = "${mod_id}-${mod_version}+mc${minecraft_version}-${loader}.jar"
 }
 
 java.toolchain.languageVersion = JavaLanguageVersion.of(java_version)
@@ -67,6 +67,7 @@ neoForge {
 sourceSets.main.resources {
     srcDir('src/generated/resources')
     exclude("**/*.bbmodel")
+    exclude("**/*.md")
     exclude("src/generated/**/.cache")
 }
 
