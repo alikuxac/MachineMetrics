@@ -1,0 +1,19 @@
+{
+  "key.categories.machinemetrics": "Телеметрия машин (Machine Metrics)",
+  "key.machinemetrics.toggle_hud": "Переключить HUD телеметрии",
+  "machinemetrics.hud.enabled": "[Machinemetrics] HUD включен",
+  "machinemetrics.hud.disabled": "[Machinemetrics] HUD выключен",
+  "machinemetrics.hud.button": "HUD Machinemetrics",
+  "machinemetrics.hud.reset_button": "Сбросить к прицелу",
+  "machinemetrics.hud.editor_title": "Редактор позиции HUD Machinemetrics",
+  "machinemetrics.hud.drag_instruction": "Нажмите и перетащите блок HUD для смены позиции",
+  "machinemetrics.hud.save_instruction": "Нажмите ESC для сохранения и выхода",
+  "machinemetrics.hud.drag_sample": "Предметы: 12.0 /s (Перетащи)",
+  "machinemetrics.state.optimal": "ОПТИМАЛЬНО",
+  "machinemetrics.state.starved": "ГОЛОДАНИЕ",
+  "machinemetrics.state.clogged": "ЗАСОРЕНИЕ",
+  "machinemetrics.state.unknown": "НЕИЗВЕСТНО",
+  "machinemetrics.metrics.items": "Предметы: %s /s",
+  "machinemetrics.metrics.fluid": "Жидкость: %s мБ/с",
+  "machinemetrics.metrics.energy": "Энергия: %s FE/t"
+}

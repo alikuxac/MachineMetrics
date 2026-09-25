@@ -1,0 +1,19 @@
+{
+  "key.categories.machinemetrics": "Maschinentelemetrie (Machine Metrics)",
+  "key.machinemetrics.toggle_hud": "Telemetrie-HUD umschalten",
+  "machinemetrics.hud.enabled": "[Machinemetrics] HUD aktiviert",
+  "machinemetrics.hud.disabled": "[Machinemetrics] HUD deaktiviert",
+  "machinemetrics.hud.button": "Machinemetrics HUD",
+  "machinemetrics.hud.reset_button": "Auf Fadenkreuz zurücksetzen",
+  "machinemetrics.hud.editor_title": "Machinemetrics HUD-Positionseditor",
+  "machinemetrics.hud.drag_instruction": "Klicken und ziehen Sie das HUD-Feld zum Positionieren",
+  "machinemetrics.hud.save_instruction": "Drücken Sie ESC zum Speichern und Schließen",
+  "machinemetrics.hud.drag_sample": "Items: 12.0 /s (Ziehen)",
+  "machinemetrics.state.optimal": "OPTIMAL",
+  "machinemetrics.state.starved": "MANGEL",
+  "machinemetrics.state.clogged": "VERSTOPFT",
+  "machinemetrics.state.unknown": "UNBEKANNT",
+  "machinemetrics.metrics.items": "Items: %s /s",
+  "machinemetrics.metrics.fluid": "Flüssigkeit: %s mB/s",
+  "machinemetrics.metrics.energy": "Energie: %s FE/t"
+}

@@ -1,0 +1,19 @@
+{
+  "key.categories.machinemetrics": "Telemetría de Maquinaria (Machine Metrics)",
+  "key.machinemetrics.toggle_hud": "Alternar HUD de Telemetría",
+  "machinemetrics.hud.enabled": "[Machinemetrics] HUD Activado",
+  "machinemetrics.hud.disabled": "[Machinemetrics] HUD Desactivado",
+  "machinemetrics.hud.button": "HUD Machinemetrics",
+  "machinemetrics.hud.reset_button": "Restablecer a la mira",
+  "machinemetrics.hud.editor_title": "Editor de Posición del HUD",
+  "machinemetrics.hud.drag_instruction": "Haz clic y arrastra el recuadro para cambiar la posición",
+  "machinemetrics.hud.save_instruction": "Presiona ESC para Guardar y Cerrar",
+  "machinemetrics.hud.drag_sample": "Objetos: 12.0 /s (Arrástrame)",
+  "machinemetrics.state.optimal": "ÓPTIMO",
+  "machinemetrics.state.starved": "SIN INSUMO",
+  "machinemetrics.state.clogged": "OBSTRUIDO",
+  "machinemetrics.state.unknown": "DESCONOCIDO",
+  "machinemetrics.metrics.items": "Objetos: %s /s",
+  "machinemetrics.metrics.fluid": "Fluido: %s mB/s",
+  "machinemetrics.metrics.energy": "Energía: %s FE/t"
+}

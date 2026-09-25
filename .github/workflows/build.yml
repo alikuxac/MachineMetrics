@@ -1,0 +1,48 @@
+name: Build
+
+on: [push, pull_request]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          fetch-tags: true
+
+      - name: Read Properties
+        id: properties
+        run: |
+          MOD_ID=$(grep "^mod_id=" gradle.properties | cut -d'=' -f2)
+          MOD_VERSION=$(grep "^mod_version=" gradle.properties | cut -d'=' -f2)
+          LOADER=$(grep "^loader=" gradle.properties | cut -d'=' -f2)
+          MC_VERSION=$(grep "^minecraft_version=" gradle.properties | cut -d'=' -f2)
+
+          echo "mod_id=$MOD_ID" >> $GITHUB_OUTPUT
+          echo "mod_version=$MOD_VERSION" >> $GITHUB_OUTPUT
+          echo "loader=$LOADER" >> $GITHUB_OUTPUT
+          echo "mc_version=$MC_VERSION" >> $GITHUB_OUTPUT
+
+      - name: Setup JDK 21
+        uses: actions/setup-java@v4
+        with:
+          java-version: '21'
+          distribution: 'temurin'
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Make Gradle wrapper executable
+        run: chmod +x ./gradlew
+
+      - name: Build with Gradle
+        run: ./gradlew build -Pmod_version="${{ steps.properties.outputs.mod_version }}-build.${{ github.run_number }}"
+
+      - name: Upload Build Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ steps.properties.outputs.mod_id }}-${{ steps.properties.outputs.loader }}-${{ steps.properties.outputs.mc_version }}-${{ steps.properties.outputs.mod_version }}-build.${{ github.run_number }}
+          path: build/libs/!(*-sources|*-dev).jar
+          retention-days: 14

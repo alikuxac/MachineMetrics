@@ -1,0 +1,19 @@
+{
+  "key.categories.machinemetrics": "机器遥测指标 (Machine Metrics)",
+  "key.machinemetrics.toggle_hud": "切换遥测 HUD 显示",
+  "machinemetrics.hud.enabled": "[Machinemetrics] HUD 已启用",
+  "machinemetrics.hud.disabled": "[Machinemetrics] HUD 已禁用",
+  "machinemetrics.hud.button": "Machinemetrics HUD 设置",
+  "machinemetrics.hud.reset_button": "重置为准星位置",
+  "machinemetrics.hud.editor_title": "Machinemetrics HUD 位置编辑器",
+  "machinemetrics.hud.drag_instruction": "点击并拖拽 HUD 框调整位置",
+  "machinemetrics.hud.save_instruction": "按 ESC 保存并关闭",
+  "machinemetrics.hud.drag_sample": "物品: 12.0 /s (拖拽我)",
+  "machinemetrics.state.optimal": "最佳 (OPTIMAL)",
+  "machinemetrics.state.starved": "缺料 (STARVED)",
+  "machinemetrics.state.clogged": "堵塞 (CLOGGED)",
+  "machinemetrics.state.unknown": "未知 (UNKNOWN)",
+  "machinemetrics.metrics.items": "物品: %s /s",
+  "machinemetrics.metrics.fluid": "流体: %s mB/s",
+  "machinemetrics.metrics.energy": "能量: %s FE/t"
+}

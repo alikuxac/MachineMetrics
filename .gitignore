@@ -1,0 +1,40 @@
+# Gradle build artifacts
+.gradle/
+build/
+**/build/
+!gradle/wrapper/gradle-wrapper.jar
+
+# IDE files
+.idea/
+*.iws
+*.iml
+*.ipr
+out/
+**/out/
+.run/
+.vscode/
+.architectury-transformer/
+todo/
+
+# Eclipse files
+.apt_generated
+.classpath
+.eclipse/
+.factorypath
+.project
+.settings
+.springBeans
+.sts4-cache
+bin/
+**/bin/
+
+# OS generated files
+.DS_Store
+Thumbs.db
+
+# Minecraft run directory & generated cache
+run/
+**/run/
+**/src/generated/**/.cache/
+repo/
+**/repo/

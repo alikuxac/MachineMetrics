@@ -1,0 +1,19 @@
+{
+  "key.categories.machinemetrics": "Machine Metrics Telemetry",
+  "key.machinemetrics.toggle_hud": "Toggle Telemetry HUD",
+  "machinemetrics.hud.enabled": "[Machinemetrics] HUD Enabled",
+  "machinemetrics.hud.disabled": "[Machinemetrics] HUD Disabled",
+  "machinemetrics.hud.button": "Machinemetrics HUD",
+  "machinemetrics.hud.reset_button": "Reset to Crosshair",
+  "machinemetrics.hud.editor_title": "Machinemetrics HUD Position Editor",
+  "machinemetrics.hud.drag_instruction": "Click and drag the HUD box to set position",
+  "machinemetrics.hud.save_instruction": "Press ESC to Save & Close",
+  "machinemetrics.hud.drag_sample": "Items: 12.0 /s (Drag Me)",
+  "machinemetrics.state.optimal": "OPTIMAL",
+  "machinemetrics.state.starved": "STARVED",
+  "machinemetrics.state.clogged": "CLOGGED",
+  "machinemetrics.state.unknown": "UNKNOWN",
+  "machinemetrics.metrics.items": "Items: %s /s",
+  "machinemetrics.metrics.fluid": "Fluid: %s mB/s",
+  "machinemetrics.metrics.energy": "Energy: %s FE/t"
+}

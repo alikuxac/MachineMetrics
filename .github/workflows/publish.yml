@@ -1,0 +1,71 @@
+name: Publish Mod
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Parse Tag & Detect Release Channel
+        id: parse_tag
+        run: |
+          # Example tag: v0.1.0-beta.1 or v0.1.0
+          TAG_NAME="${GITHUB_REF#refs/tags/}"
+          
+          # Remove leading 'v'
+          VERSION_RAW="${TAG_NAME#v}"
+          
+          # Detect release channel (beta vs release)
+          if [[ "$VERSION_RAW" =~ (beta|alpha|rc) ]]; then
+            RELEASE_TYPE="beta"
+          else
+            RELEASE_TYPE="release"
+          fi
+
+          echo "tag_name=$TAG_NAME" >> $GITHUB_OUTPUT
+          echo "mod_version=$VERSION_RAW" >> $GITHUB_OUTPUT
+          echo "release_type=$RELEASE_TYPE" >> $GITHUB_OUTPUT
+
+      - name: Setup JDK 21
+        uses: actions/setup-java@v4
+        with:
+          java-version: '21'
+          distribution: 'temurin'
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Build Mod Jar
+        run: |
+          chmod +x ./gradlew
+          ./gradlew build -Pmod_version="${{ steps.parse_tag.outputs.mod_version }}"
+
+      - name: Publish to CurseForge & Modrinth
+        uses: Kirstein/mc-publish@v3
+        with:
+          modrinth-token: ${{ secrets.MODRINTH_TOKEN }}
+          curseforge-token: ${{ secrets.CURSEFORGE_TOKEN }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+
+          # Modrinth configuration
+          modrinth-id: 'hRT19d7o'
+
+          # CurseForge configuration
+          curseforge-id: '1706910'
+
+          loader: neoforge
+          game-version: 1.21.1
+          java: 21
+          
+          files: |
+            build/libs/!(*-sources|*-dev).jar
+
+          type: ${{ steps.parse_tag.outputs.release_type }}
