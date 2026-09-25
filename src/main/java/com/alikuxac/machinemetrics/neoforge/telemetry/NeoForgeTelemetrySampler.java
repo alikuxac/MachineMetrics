@@ -216,7 +216,44 @@ public class NeoForgeTelemetrySampler {
         boolean hasFluids = maxFluid > 0;
         boolean hasEnergy = maxEnergy > 0;
 
-        TelemetryData.BottleneckState state = isActive ? TelemetryData.BottleneckState.OPTIMAL : TelemetryData.BottleneckState.IDLE;
+        TelemetryData.BottleneckState state;
+        if (isActive) {
+            state = TelemetryData.BottleneckState.OPTIMAL;
+        } else {
+            // Machine is not active (Throughput == 0)
+            boolean isOutputClogged = false;
+            boolean isInputStarved = false;
+
+            // Step 1: Check Power Starvation
+            if (hasEnergy && maxEnergy > 0 && currentEnergy == 0) {
+                state = TelemetryData.BottleneckState.STARVED;
+            } else {
+                // Check fill levels for output clogged and input starved
+                float itemFillRatio = maxItems > 0 ? (float) currentItems / maxItems : 0f;
+                float fluidFillRatio = maxFluid > 0 ? (float) currentFluid / maxFluid : 0f;
+
+                if (itemFillRatio > 0.95f || fluidFillRatio > 0.95f) {
+                    isOutputClogged = true;
+                }
+
+                if ((hasItems || hasFluids) && currentItems == 0 && currentFluid == 0) {
+                    isInputStarved = true;
+                }
+
+                // Step 2: Check Output Clogged (>95% full)
+                if (isOutputClogged) {
+                    state = TelemetryData.BottleneckState.CLOGGED;
+                }
+                // Step 3: Check Input Starved (Input slots/tanks empty)
+                else if (isInputStarved) {
+                    state = TelemetryData.BottleneckState.STARVED;
+                }
+                // Step 4: Default fallback -> IDLE
+                else {
+                    state = TelemetryData.BottleneckState.IDLE;
+                }
+            }
+        }
 
         if (addedNewSample && TelemetryConfig.DEBUG_LOGGING.get()) {
             LOGGER.info("[TelemetryDebug] Block: {} | Slots: {} | Tanks: {} | itemTp: {}/s | fluidTp: {} mB/s | energyDelta: {} FE/t | state: {}",

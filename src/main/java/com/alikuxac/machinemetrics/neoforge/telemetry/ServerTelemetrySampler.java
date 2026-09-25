@@ -182,7 +182,6 @@ public class ServerTelemetrySampler {
             }
         }
 
-        // Active Burst Detection & Hold Time Window (1.5 seconds)
         boolean hasImmediateActivity = itemThroughput > 0f || fluidThroughput > 0f || Math.abs(energyDelta) > 0.1f;
         if (hasImmediateActivity) {
             history.lastActiveTimeMs = now;
@@ -208,7 +207,40 @@ public class ServerTelemetrySampler {
         boolean hasFluids = maxFluid > 0;
         boolean hasEnergy = maxEnergy > 0;
 
-        TelemetryData.BottleneckState state = isActive ? TelemetryData.BottleneckState.OPTIMAL : TelemetryData.BottleneckState.IDLE;
+        TelemetryData.BottleneckState state;
+        if (isActive) {
+            state = TelemetryData.BottleneckState.OPTIMAL;
+        } else {
+            boolean isOutputClogged = false;
+            boolean isInputStarved = false;
+
+            if (hasEnergy && maxEnergy > 0 && currentEnergy == 0) {
+                state = TelemetryData.BottleneckState.STARVED;
+            } else {
+                float itemFillRatio = maxItems > 0 ? (float) currentItems / maxItems : 0f;
+                float fluidFillRatio = maxFluid > 0 ? (float) currentFluid / maxFluid : 0f;
+
+                if (itemFillRatio > 0.95f || fluidFillRatio > 0.95f) {
+                    isOutputClogged = true;
+                }
+
+                if ((hasItems || hasFluids) && currentItems == 0 && currentFluid == 0) {
+                    isInputStarved = true;
+                }
+
+                if (isOutputClogged) {
+                    state = TelemetryData.BottleneckState.CLOGGED;
+                }
+                
+                else if (isInputStarved) {
+                    state = TelemetryData.BottleneckState.STARVED;
+                }
+
+                else {
+                    state = TelemetryData.BottleneckState.IDLE;
+                }
+            }
+        }
 
         return new TelemetryData(itemThroughput, hasItems, fluidThroughput, hasFluids, energyDelta, hasEnergy, state);
     }
