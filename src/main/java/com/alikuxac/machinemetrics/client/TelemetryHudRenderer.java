@@ -7,6 +7,7 @@ import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.screens.Screen;
 
 import net.minecraft.core.BlockPos;
+import net.minecraft.core.Direction;
 import net.minecraft.network.chat.Component;
 import net.minecraft.world.phys.BlockHitResult;
 import net.minecraft.world.phys.HitResult;
@@ -133,17 +134,94 @@ public class TelemetryHudRenderer {
         List<MetricLine> lines = new ArrayList<>();
 
         if (data.bottleneckState() != TelemetryData.BottleneckState.IDLE) {
+
             if (data.hasItems() || data.itemThroughput() > 0f) {
-                lines.add(new MetricLine("Items", formatItemRate(data.itemThroughput()), 0xFFFFFF));
+                lines.add(new MetricLine("Items", formatItemRate(data.itemThroughput()), 0xFFD54F));
             }
+
             if (data.hasFluids() || data.fluidThroughput() > 0f) {
-                lines.add(new MetricLine("Fluids", formatFluidRate(data.fluidThroughput()), 0x55FFFF));
+                lines.add(new MetricLine("Fluids", formatFluidRate(data.fluidThroughput()), 0x4FC3F7));
             }
+
             if (data.hasEnergy() || data.energyDelta() != 0f) {
-                int energyColor = data.energyDelta() > 0 ? 0x55FF55 : (data.energyDelta() < 0 ? 0xFF5555 : 0xAAAAAA);
+                int energyColor = data.energyDelta() > 0 ? 0x69F0AE : (data.energyDelta() < 0 ? 0xFF5252 : 0xE040FB);
                 lines.add(new MetricLine("Energy", formatEnergyRate(data.energyDelta()), energyColor));
             }
         }
+
+        if (data.hasActiveSides()) {
+            Direction[] directions = Direction.values();
+            List<Direction> activeItemSides = new ArrayList<>();
+            List<Direction> activeFluidSides = new ArrayList<>();
+            Float firstItemRate = null;
+            Float firstFluidRate = null;
+            boolean allItemRatesEqual = true;
+            boolean allFluidRatesEqual = true;
+
+            for (Direction dir : directions) {
+                float itemVal = data.getItemSideRate(dir);
+                float fluidVal = data.getFluidSideRate(dir);
+
+                if (itemVal > 0.01f) {
+                    activeItemSides.add(dir);
+                    if (firstItemRate == null) {
+                        firstItemRate = itemVal;
+                    } else if (Math.abs(firstItemRate - itemVal) > 0.01f) {
+                        allItemRatesEqual = false;
+                    }
+                }
+
+                if (fluidVal > 0.01f) {
+                    activeFluidSides.add(dir);
+                    if (firstFluidRate == null) {
+                        firstFluidRate = fluidVal;
+                    } else if (Math.abs(firstFluidRate - fluidVal) > 0.01f) {
+                        allFluidRatesEqual = false;
+                    }
+                }
+            }
+
+            boolean canGroupAll = (activeItemSides.isEmpty() || (activeItemSides.size() > 1 && allItemRatesEqual)) &&
+                                  (activeFluidSides.isEmpty() || (activeFluidSides.size() > 1 && allFluidRatesEqual)) &&
+                                  (!activeItemSides.isEmpty() || !activeFluidSides.isEmpty());
+
+            // Group 4: Directions / Sides (Xanh Ngọc Emerald - 0x69F0AE)
+            int sideColor = 0x69F0AE;
+
+            if (canGroupAll) {
+                StringBuilder summaryText = new StringBuilder("  └ [ALL SIDES] ");
+                if (firstItemRate != null) {
+                    summaryText.append(String.format("📦 %s ", formatItemRate(firstItemRate)));
+                }
+                if (firstFluidRate != null) {
+                    summaryText.append(String.format("💧 %s", formatFluidRate(firstFluidRate)));
+                }
+                lines.add(new MetricLine(summaryText.toString().trim(), "", sideColor));
+            } else {
+                for (Direction dir : directions) {
+                    float itemVal = data.getItemSideRate(dir);
+                    float fluidVal = data.getFluidSideRate(dir);
+
+                    if (itemVal > 0.01f || fluidVal > 0.01f) {
+                        StringBuilder sideText = new StringBuilder();
+                        sideText.append("  └ [").append(dir.getName().toUpperCase()).append("] ");
+                        
+                        if (itemVal > 0.01f) {
+                            sideText.append(String.format("📦 %s ", formatItemRate(itemVal)));
+                        }
+                        if (fluidVal > 0.01f) {
+                            sideText.append(String.format("💧 %s", formatFluidRate(fluidVal)));
+                        }
+
+                        lines.add(new MetricLine(sideText.toString().trim(), "", sideColor));
+                    }
+                }
+            }
+        }
+
+
+
+
 
         String stateText = data.bottleneckState().name();
         int headerLineWidth = mc.font.width("Telemetry HUD") + mc.font.width(stateText) + 20;
@@ -197,7 +275,7 @@ public class TelemetryHudRenderer {
     }
 
     private static String formatItemRate(float rate) {
-        if (rate <= 0f) return "0.0 /s";
+        if (rate <= 0.001f) return "None";
         if (rate < 1.0f) {
             return String.format("%.2f /s", rate);
         } else {
@@ -207,12 +285,13 @@ public class TelemetryHudRenderer {
 
     private static String formatEnergyRate(float rate) {
         float abs = Math.abs(rate);
+        if (abs <= 0.001f) return "None";
         String prefix = rate > 0 ? "+" : (rate < 0 ? "-" : "");
         if (abs >= 1_000_000f) {
             return String.format("%s%.2f MFE/t", prefix, abs / 1_000_000f);
         } else if (abs >= 1_000f) {
             return String.format("%s%.1f kFE/t", prefix, abs / 1_000f);
-        } else if (abs < 1.0f && abs > 0f) {
+        } else if (abs < 1.0f) {
             return String.format("%s%.2f FE/t", prefix, abs);
         } else {
             return String.format("%s%.0f FE/t", prefix, abs);
@@ -220,14 +299,16 @@ public class TelemetryHudRenderer {
     }
 
     private static String formatFluidRate(float rate) {
+        if (rate <= 0.001f) return "None";
         if (rate >= 1_000f) {
             return String.format("%.2f B/s", rate / 1_000f);
-        } else if (rate < 1.0f && rate > 0f) {
+        } else if (rate < 1.0f) {
             return String.format("%.2f mB/s", rate);
         } else {
             return String.format("%.1f mB/s", rate);
         }
     }
+
 
     private record MetricLine(String label, String value, int color) {}
 }

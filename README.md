@@ -9,6 +9,7 @@
 ### ✨ Key Features
 
 * **⚡ Real-Time Machine Telemetry:** Instantly inspect dynamic throughput (**Items/s**, **Fluids/s**) and net energy delta (**FE/t**).
+* **🎯 Side-Specific Directional Tracking:** Analyzes capability changes per block face (`UP`, `DOWN`, `NORTH`, `SOUTH`, `WEST`, `EAST`) to pinpoint exact item & fluid throughput on each individual side.
 * **🔍 Bottleneck State Diagnostics:** Automatically categorizes machine status:
   * 🟢 **OPTIMAL:** Operating with active throughput.
   * 🟡 **STARVED:** Lacking required inputs or energy.
@@ -35,11 +36,31 @@ Designed for heavy technical modpacks (ATM, All The Mods, SkyFactory, etc.):
 
 ---
 
+### 🌐 Client / Server Setup Breakdown
+
+This mod is designed with a **flexible hybrid architecture**. You can install it on the client, server, or both depending on your environment:
+
+| Installation Setup | Behavior & Functionality |
+| :--- | :--- |
+| **Both Client & Server (Recommended)** | 🌟 **Full Capability.** The client sends network telemetry requests (`RequestTelemetryPayload`) to the server. The server computes precise server-side block capabilities, throughput rates, and side-specific metrics, sending back `SyncTelemetryPayload` for maximum accuracy. |
+| **Client Only (Vanilla / Dedicated Server without Mod)** | ⚡ **Client-Side Standalone Mode.** The HUD remains functional! Telemetry capabilities are sampled locally via client-side block entities and capabilities. Perfect for playing on public servers or vanilla servers. |
+| **Server Only (No Client Installed)** | 😴 **Inactive / No Effect.** The server registers payload channels and capability listeners, but since no client sends telemetry requests, no HUD is rendered and zero network overhead is generated. |
+
+---
+
 ### 🛠️ Configuration & Controls
 
 * **Toggle HUD:** Press keybind in `Options -> Controls -> Key Binds` (Default: `H`).
 * **Detailed View:** Hold `Shift` while targeting a machine.
 * **Config File:** `config/machinemetrics-common.toml` (supports `hudScale` & `enableDebugLogging`).
+
+---
+
+### 📌 Project Status & Maintenance Note
+
+* **Personal Project:** This mod is maintained as a personal side-project. Updates and feature additions will be released as time permits.
+* **No Backports:** There are **no plans to backport** this mod to older Minecraft versions or legacy loader versions.
+* **Mod Loaders & Support:** Currently focused on **NeoForge**. Support for other mod loaders (e.g. Fabric, Forge) or newer MC versions will only be considered if there is sufficient community demand.
 
 ---
 

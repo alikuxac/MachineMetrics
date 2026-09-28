@@ -1,15 +1,14 @@
 name: Publish Mod
 
 on:
-  push:
-    tags:
-      - 'v*'
+  release:
+    types: [published]
 
 jobs:
   publish:
     runs-on: ubuntu-latest
     permissions:
-      contents: write
+      contents: read
 
     steps:
       - name: Checkout Repository
@@ -17,13 +16,13 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Parse Tag & Detect Release Channel
-        id: parse_tag
+      - name: Parse Tag & Extract Release Info
+        id: parse_release
         run: |
-          # Tag Formats:
+          # Release Tag Formats:
           # Release: v0.0.1+1.21.1-neoforge           --> mod_version: 0.0.1, mc_version: 1.21.1, loader: neoforge
           # Beta:    v0.0.1-beta.1+1.21.1-neoforge    --> mod_version: 0.0.1-beta.1, mc_version: 1.21.1, loader: neoforge
-          TAG_NAME="${GITHUB_REF#refs/tags/}"
+          TAG_NAME="${{ github.event.release.tag_name }}"
           VERSION_RAW="${TAG_NAME#v}"
           
           # Extract mod version before '+'
@@ -34,7 +33,7 @@ jobs:
           MC_VERSION="${META%-*}"
           LOADER="${META##*-}"
 
-          if [[ "$TAG_NAME" =~ (beta|alpha|rc) ]]; then
+          if [[ "${{ github.event.release.prerelease }}" == "true" ]] || [[ "$TAG_NAME" =~ (beta|alpha|rc) ]]; then
             RELEASE_TYPE="beta"
           else
             RELEASE_TYPE="release"
@@ -58,7 +57,7 @@ jobs:
       - name: Build Mod Jar
         run: |
           chmod +x ./gradlew
-          ./gradlew build -Pmod_version="${{ steps.parse_tag.outputs.mod_version }}"
+          ./gradlew build -Pmod_version="${{ steps.parse_release.outputs.mod_version }}"
 
       - name: Publish Mod
         uses: Kir-Antipov/mc-publish@v3.3.1
@@ -70,13 +69,13 @@ jobs:
           modrinth-id: 'hRT19d7o'
           curseforge-id: '1706910'
 
-          name: '[${{ steps.parse_tag.outputs.mc_version }}-${{ steps.parse_tag.outputs.loader }}] Machinemetrics v${{ steps.parse_tag.outputs.mod_version }}'
-          version: '${{ steps.parse_tag.outputs.tag_name }}'
-          version-type: '${{ steps.parse_tag.outputs.release_type }}'
-          changelog: 'See release changes on GitHub: https://github.com/${{ github.repository }}/releases/tag/${{ steps.parse_tag.outputs.tag_name }}'
+          name: 'machinemetrics-${{ steps.parse_release.outputs.mod_version }}+mc${{ steps.parse_release.outputs.mc_version }}-${{ steps.parse_release.outputs.loader }}.jar'
+          version: '${{ steps.parse_release.outputs.tag_name }}'
+          version-type: '${{ steps.parse_release.outputs.release_type }}'
+          changelog: 'See release changes on GitHub: https://github.com/${{ github.repository }}/releases/tag/${{ steps.parse_release.outputs.tag_name }}'
 
-          loader: '${{ steps.parse_tag.outputs.loader }}'
-          game-versions: '${{ steps.parse_tag.outputs.mc_version }}'
+          loader: '${{ steps.parse_release.outputs.loader }}'
+          game-versions: '${{ steps.parse_release.outputs.mc_version }}'
           java: 21
 
           files: |
