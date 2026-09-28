@@ -8,7 +8,7 @@ jobs:
   publish:
     runs-on: ubuntu-latest
     permissions:
-      contents: read
+      contents: write
 
     steps:
       - name: Checkout Repository
@@ -59,10 +59,17 @@ jobs:
           chmod +x ./gradlew
           ./gradlew build -Pmod_version="${{ steps.parse_release.outputs.mod_version }}"
 
+      - name: Upload Release Asset to GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: build/libs/!(*-sources|*-dev).jar
+          tag_name: ${{ steps.parse_release.outputs.tag_name }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
       - name: Publish Mod
         uses: Kir-Antipov/mc-publish@v3.3.1
         with:
-          github-token: ${{ secrets.GITHUB_TOKEN }}
           modrinth-token: ${{ secrets.MODRINTH_TOKEN }}
           curseforge-token: ${{ secrets.CURSEFORGE_TOKEN }}
 
@@ -80,3 +87,4 @@ jobs:
 
           files: |
             build/libs/!(*-sources|*-dev).jar
+
