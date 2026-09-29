@@ -1,0 +1,26 @@
+modLoader="javafml"
+loaderVersion="[51,)"
+issueTrackerURL="https://github.com/alikuxac/MachineMetrics/issues"
+
+[[mods]]
+modId="machinemetrics"
+version="${version}"
+displayName="Machine Metrics"
+authors="Alikuxac"
+description='''
+A high-tech standalone client-side HUD mod displaying real-time machine telemetry metrics (Items/s, FE/t) and dynamic bottleneck states (Optimal, Starved, Clogged).
+'''
+
+[[dependencies.machinemetrics]]
+    modId="forge"
+    mandatory=true
+    versionRange="[${forge_version},)"
+    ordering="NONE"
+    side="BOTH"
+
+[[dependencies.machinemetrics]]
+    modId="minecraft"
+    mandatory=true
+    versionRange="${minecraft_version_range}"
+    ordering="NONE"
+    side="BOTH"

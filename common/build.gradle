@@ -1,0 +1,27 @@
+plugins {
+    id 'java-library'
+    id 'net.neoforged.moddev' version '1.0.21'
+}
+
+group = rootProject.mod_group_id
+version = rootProject.mod_version
+
+java {
+    toolchain {
+        languageVersion = JavaLanguageVersion.of(rootProject.java_version)
+    }
+    withSourcesJar()
+}
+
+neoForge {
+    version = rootProject.neo_version
+
+    parchment {
+        minecraftVersion = rootProject.parchment_minecraft_version
+        mappingsVersion = rootProject.parchment_mappings_version
+    }
+}
+
+tasks.withType(JavaCompile).configureEach {
+    options.encoding = 'UTF-8'
+}

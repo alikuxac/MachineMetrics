@@ -20,18 +20,16 @@ jobs:
         id: parse_release
         run: |
           # Release Tag Formats:
-          # Release: v0.0.1+1.21.1-neoforge           --> mod_version: 0.0.1, mc_version: 1.21.1, loader: neoforge
-          # Beta:    v0.0.1-beta.1+1.21.1-neoforge    --> mod_version: 0.0.1-beta.1, mc_version: 1.21.1, loader: neoforge
+          # Release: v0.0.1+1.21.1            --> mod_version: 0.0.1, mc_version: 1.21.1
+          # Beta:    v0.0.1-beta.1+1.21.1     --> mod_version: 0.0.1-beta.1, mc_version: 1.21.1
           TAG_NAME="${{ github.event.release.tag_name }}"
           VERSION_RAW="${TAG_NAME#v}"
           
           # Extract mod version before '+'
           MOD_VERSION="${VERSION_RAW%%+*}"
 
-          # Extract metadata after '+' (e.g., 1.21.1-neoforge)
-          META="${VERSION_RAW#*+}"
-          MC_VERSION="${META%-*}"
-          LOADER="${META##*-}"
+          # Extract mc_version after '+'
+          MC_VERSION="${VERSION_RAW#*+}"
 
           if [[ "${{ github.event.release.prerelease }}" == "true" ]] || [[ "$TAG_NAME" =~ (beta|alpha|rc) ]]; then
             RELEASE_TYPE="beta"
@@ -42,7 +40,6 @@ jobs:
           echo "tag_name=$TAG_NAME" >> $GITHUB_OUTPUT
           echo "mod_version=$MOD_VERSION" >> $GITHUB_OUTPUT
           echo "mc_version=$MC_VERSION" >> $GITHUB_OUTPUT
-          echo "loader=$LOADER" >> $GITHUB_OUTPUT
           echo "release_type=$RELEASE_TYPE" >> $GITHUB_OUTPUT
 
       - name: Setup JDK 21
@@ -54,20 +51,22 @@ jobs:
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v4
 
-      - name: Build Mod Jar
+      - name: Build Mod Jars (NeoForge & Forge)
         run: |
           chmod +x ./gradlew
           ./gradlew build -Pmod_version="${{ steps.parse_release.outputs.mod_version }}"
 
-      - name: Upload Release Asset to GitHub Release
+      - name: Upload Release Assets to GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          files: build/libs/!(*-sources|*-dev).jar
+          files: |
+            neoforge/build/libs/machinemetrics-*.jar
+            forge/build/libs/machinemetrics-*.jar
           tag_name: ${{ steps.parse_release.outputs.tag_name }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Publish Mod
+      - name: Publish NeoForge Mod
         uses: Kir-Antipov/mc-publish@v3.3.1
         with:
           modrinth-token: ${{ secrets.MODRINTH_TOKEN }}
@@ -76,15 +75,35 @@ jobs:
           modrinth-id: 'hRT19d7o'
           curseforge-id: '1706910'
 
-          name: 'machinemetrics-${{ steps.parse_release.outputs.mod_version }}+mc${{ steps.parse_release.outputs.mc_version }}-${{ steps.parse_release.outputs.loader }}.jar'
-          version: '${{ steps.parse_release.outputs.tag_name }}'
+          name: 'MachineMetrics ${{ steps.parse_release.outputs.mod_version }} (NeoForge)'
+          version: '${{ steps.parse_release.outputs.tag_name }}-neoforge'
           version-type: '${{ steps.parse_release.outputs.release_type }}'
           changelog: 'See release changes on GitHub: https://github.com/${{ github.repository }}/releases/tag/${{ steps.parse_release.outputs.tag_name }}'
 
-          loader: '${{ steps.parse_release.outputs.loader }}'
+          loader: 'neoforge'
           game-versions: '${{ steps.parse_release.outputs.mc_version }}'
           java: 21
 
           files: |
-            build/libs/!(*-sources|*-dev).jar
+            neoforge/build/libs/machinemetrics-*.jar
 
+      - name: Publish Forge Mod
+        uses: Kir-Antipov/mc-publish@v3.3.1
+        with:
+          modrinth-token: ${{ secrets.MODRINTH_TOKEN }}
+          curseforge-token: ${{ secrets.CURSEFORGE_TOKEN }}
+
+          modrinth-id: 'hRT19d7o'
+          curseforge-id: '1706910'
+
+          name: 'MachineMetrics ${{ steps.parse_release.outputs.mod_version }} (Forge)'
+          version: '${{ steps.parse_release.outputs.tag_name }}-forge'
+          version-type: '${{ steps.parse_release.outputs.release_type }}'
+          changelog: 'See release changes on GitHub: https://github.com/${{ github.repository }}/releases/tag/${{ steps.parse_release.outputs.tag_name }}'
+
+          loader: 'forge'
+          game-versions: '${{ steps.parse_release.outputs.mc_version }}'
+          java: 21
+
+          files: |
+            forge/build/libs/machinemetrics-*.jar

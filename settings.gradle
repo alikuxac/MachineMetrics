@@ -1,0 +1,5 @@
+rootProject.name = 'machinemetrics'
+
+include 'common'
+include 'neoforge'
+include 'forge'
