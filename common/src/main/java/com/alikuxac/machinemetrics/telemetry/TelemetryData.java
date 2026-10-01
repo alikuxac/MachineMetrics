@@ -10,6 +10,11 @@ public record TelemetryData(
         boolean hasFluids,
         float energyDelta,
         boolean hasEnergy,
+        float chemicalThroughput,
+        boolean hasChemicals,
+        String chemicalName,
+        long chemicalAmount,
+        long chemicalCapacity,
         BottleneckState bottleneckState,
         IntArrayList allSlotCounts,
         IntArrayList allTankAmounts,
@@ -26,9 +31,10 @@ public record TelemetryData(
             0.0f, false,
             0.0f, false,
             0.0f, false,
+            0.0f, false, "", 0L, 0L,
             BottleneckState.IDLE,
             new IntArrayList(), new IntArrayList(),
-            new float[12]
+            new float[18]
     );
 
     public static TelemetryData empty() {
@@ -36,7 +42,7 @@ public record TelemetryData(
     }
 
     public boolean isEmpty() {
-        return !hasItems && !hasFluids && !hasEnergy;
+        return !hasItems && !hasFluids && !hasEnergy && !hasChemicals;
     }
 
     public float getItemSideRate(Direction dir) {
@@ -49,6 +55,11 @@ public record TelemetryData(
         return sideMetrics[6 + dir.ordinal()];
     }
 
+    public float getChemicalSideRate(Direction dir) {
+        if (sideMetrics == null || dir == null || sideMetrics.length < 18) return 0.0f;
+        return sideMetrics[12 + dir.ordinal()];
+    }
+
     public boolean hasActiveSides() {
         if (sideMetrics == null) return false;
         for (float val : sideMetrics) {
@@ -56,5 +67,7 @@ public record TelemetryData(
         }
         return false;
     }
+
 }
+
 

@@ -19,7 +19,9 @@
   "machinemetrics.state.unknown": "UNKNOWN",
   "machinemetrics.metrics.items": "Items",
   "machinemetrics.metrics.fluids": "Fluids",
+  "machinemetrics.metrics.chemicals": "Chemicals",
   "machinemetrics.metrics.energy": "Energy",
   "machinemetrics.metrics.all_sides": "ALL SIDES",
   "machinemetrics.metrics.none": "None"
 }
+

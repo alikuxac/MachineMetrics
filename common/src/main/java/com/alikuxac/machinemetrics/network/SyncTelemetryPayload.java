@@ -16,6 +16,11 @@ public record SyncTelemetryPayload(
         boolean hasFluids,
         float energyDelta,
         boolean hasEnergy,
+        float chemicalThroughput,
+        boolean hasChemicals,
+        String chemicalName,
+        long chemicalAmount,
+        long chemicalCapacity,
         byte machineState,
         float[] sideMetrics,
         IntArrayList allSlotCounts,
@@ -35,6 +40,11 @@ public record SyncTelemetryPayload(
                 data.hasFluids(),
                 data.energyDelta(),
                 data.hasEnergy(),
+                data.chemicalThroughput(),
+                data.hasChemicals(),
+                data.chemicalName() != null ? data.chemicalName() : "",
+                data.chemicalAmount(),
+                data.chemicalCapacity(),
                 (byte) data.bottleneckState().ordinal(),
                 data.sideMetrics(),
                 data.allSlotCounts(),
@@ -52,10 +62,15 @@ public record SyncTelemetryPayload(
                 hasFluids,
                 energyDelta,
                 hasEnergy,
+                chemicalThroughput,
+                hasChemicals,
+                chemicalName,
+                chemicalAmount,
+                chemicalCapacity,
                 state,
                 allSlotCounts != null ? allSlotCounts : new IntArrayList(),
                 allTankAmounts != null ? allTankAmounts : new IntArrayList(),
-                sideMetrics != null ? sideMetrics : new float[12]
+                sideMetrics != null ? sideMetrics : new float[18]
         );
     }
 
@@ -67,6 +82,11 @@ public record SyncTelemetryPayload(
         buf.writeBoolean(payload.hasFluids);
         buf.writeFloat(payload.energyDelta);
         buf.writeBoolean(payload.hasEnergy);
+        buf.writeFloat(payload.chemicalThroughput);
+        buf.writeBoolean(payload.hasChemicals);
+        buf.writeUtf(payload.chemicalName != null ? payload.chemicalName : "");
+        buf.writeVarLong(payload.chemicalAmount);
+        buf.writeVarLong(payload.chemicalCapacity);
         buf.writeByte(payload.machineState);
 
         IntArrayList slots = payload.allSlotCounts;
@@ -84,7 +104,7 @@ public record SyncTelemetryPayload(
         }
 
         float[] sideMetrics = payload.sideMetrics;
-        for (int i = 0; i < 12; i++) {
+        for (int i = 0; i < 18; i++) {
             buf.writeFloat(sideMetrics != null && i < sideMetrics.length ? sideMetrics[i] : 0.0f);
         }
     }
@@ -97,6 +117,11 @@ public record SyncTelemetryPayload(
         boolean hasFluids = buf.readBoolean();
         float energyDelta = buf.readFloat();
         boolean hasEnergy = buf.readBoolean();
+        float chemicalThroughput = buf.readFloat();
+        boolean hasChemicals = buf.readBoolean();
+        String chemicalName = buf.readUtf();
+        long chemicalAmount = buf.readVarLong();
+        long chemicalCapacity = buf.readVarLong();
         byte machineState = buf.readByte();
 
         int slotCount = buf.readVarInt();
@@ -111,10 +136,11 @@ public record SyncTelemetryPayload(
             allTankAmounts.add(buf.readVarInt());
         }
 
-        float[] sideMetrics = new float[12];
-        for (int i = 0; i < 12; i++) {
+        float[] sideMetrics = new float[18];
+        for (int i = 0; i < 18; i++) {
             sideMetrics[i] = buf.readFloat();
         }
+
 
         return new SyncTelemetryPayload(
                 targetPos,
@@ -124,12 +150,18 @@ public record SyncTelemetryPayload(
                 hasFluids,
                 energyDelta,
                 hasEnergy,
+                chemicalThroughput,
+                hasChemicals,
+                chemicalName,
+                chemicalAmount,
+                chemicalCapacity,
                 machineState,
                 sideMetrics,
                 allSlotCounts,
                 allTankAmounts
         );
     }
+
 
     @Override
     public Type<? extends CustomPacketPayload> type() {

@@ -12,7 +12,9 @@ public class TelemetryConfig {
     public static final ModConfigSpec.ConfigValue<String> COLOR_HEADER;
     public static final ModConfigSpec.ConfigValue<String> COLOR_ITEMS;
     public static final ModConfigSpec.ConfigValue<String> COLOR_FLUIDS;
+    public static final ModConfigSpec.ConfigValue<String> COLOR_CHEMICALS;
     public static final ModConfigSpec.ConfigValue<String> COLOR_ENERGY_POSITIVE;
+
     public static final ModConfigSpec.ConfigValue<String> COLOR_ENERGY_NEGATIVE;
     public static final ModConfigSpec.ConfigValue<String> COLOR_ENERGY_NEUTRAL;
     public static final ModConfigSpec.ConfigValue<String> COLOR_SIDES;
@@ -55,7 +57,12 @@ public class TelemetryConfig {
                 .comment("Fluids metric color")
                 .define("fluidsColor", "#4FC3F7");
 
+        COLOR_CHEMICALS = builder
+                .comment("Chemicals metric color")
+                .define("chemicalsColor", "#AEEA00");
+
         COLOR_ENERGY_POSITIVE = builder
+
                 .comment("Positive energy rate color (+FE/t)")
                 .define("energyPositiveColor", "#69F0AE");
 

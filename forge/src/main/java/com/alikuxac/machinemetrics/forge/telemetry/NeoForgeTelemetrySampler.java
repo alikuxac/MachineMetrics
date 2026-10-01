@@ -103,7 +103,7 @@ public class NeoForgeTelemetrySampler {
 
             hasAnyCapability = true;
 
-            // 1. TÍNH METRIC RIÊNG CHO MẶT HIỆN TẠI (0..5: Item)
+            // 1. Calculate side-specific metrics (0..5: Item)
             if (side != null) {
                 float sideItemCount = 0.0f;
                 for (int i = 0; i < itemHandler.getSlots(); i++) {
@@ -112,11 +112,11 @@ public class NeoForgeTelemetrySampler {
                         sideItemCount += stack.getCount();
                     }
                 }
-                // Gán vào đúng slot của mặt: DOWN=0, UP=1, NORTH=2, SOUTH=3, WEST=4, EAST=5
+                // Assign to side slot: DOWN=0, UP=1, NORTH=2, SOUTH=3, WEST=4, EAST=5
                 sideMetrics[side.ordinal()] = sideItemCount;
             }
 
-            // 2. TÍNH DUNG TÍCH TỔNG (GLOBAL) - KHỬ TRÙNG LẶP HANDLER
+            // 2. Calculate global capacity - deduplicate handlers
             if (processedItemHandlers.add(itemHandler)) {
                 for (int i = 0; i < itemHandler.getSlots(); i++) {
                     var stack = itemHandler.getStackInSlot(i);
@@ -149,7 +149,7 @@ public class NeoForgeTelemetrySampler {
                 for (int i = 0; i < fluidHandler.getTanks(); i++) {
                     sideAmount += fluidHandler.getFluidInTank(i).getAmount();
                 }
-                // Gán vào slot Fluid tương ứng trong mảng 12 phần tử (offset + 6)
+                // Assign to side fluid slot in 12-element array (offset + 6)
                 sideMetrics[6 + side.ordinal()] = sideAmount;
             }
 
@@ -292,18 +292,13 @@ public class NeoForgeTelemetrySampler {
         } else {
             if (hasEnergy && maxEnergy > 0 && currentEnergy == 0) {
                 state = TelemetryData.BottleneckState.STARVED;
-            } else if (!hasItems && !hasFluids && hasEnergy) {
-                state = TelemetryData.BottleneckState.IDLE;
             } else {
                 float itemFillRatio = maxItems > 0 ? (float) currentItems / maxItems : 0.0f;
                 float fluidFillRatio = maxFluid > 0 ? (float) currentFluid / maxFluid : 0.0f;
 
                 boolean isOutputClogged = (hasItems || hasFluids) && (itemFillRatio > 0.90f || fluidFillRatio > 0.90f);
-                boolean isInputStarved = (hasItems || hasFluids) && currentItems == 0 && currentFluid == 0;
 
-                if (isInputStarved) {
-                    state = TelemetryData.BottleneckState.STARVED;
-                } else if (isOutputClogged) {
+                if (isOutputClogged) {
                     state = TelemetryData.BottleneckState.CLOGGED;
                 } else {
                     state = TelemetryData.BottleneckState.IDLE;
@@ -319,8 +314,15 @@ public class NeoForgeTelemetrySampler {
                     be.getClass().getSimpleName(), itemSlots.length, Arrays.toString(fluidTanks), itemThroughput, fluidThroughput, energyDelta, state);
         }
 
-        return new TelemetryData(itemThroughput, hasItems, fluidThroughput, hasFluids, energyDelta, hasEnergy, state, allSlotCounts, allTankAmounts, sideRates);
+        return new TelemetryData(
+                itemThroughput, hasItems,
+                fluidThroughput, hasFluids,
+                energyDelta, hasEnergy,
+                0f, false, "", 0L, 0L,
+                state, allSlotCounts, allTankAmounts, sideRates
+        );
     }
+
 
 
     private static void cleanupStaleEntries(long now) {

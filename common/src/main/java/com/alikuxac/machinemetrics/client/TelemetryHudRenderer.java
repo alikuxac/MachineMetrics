@@ -97,6 +97,9 @@ public class TelemetryHudRenderer {
 
     private static void renderCompactHud(GuiGraphics graphics, Minecraft mc, TelemetryData data, int x, int y) {
         String mainMetric;
+        int itemsColor = TelemetryConfig.parseHexColor(TelemetryConfig.COLOR_ITEMS, 0xFFD54F);
+        int fluidsColor = TelemetryConfig.parseHexColor(TelemetryConfig.COLOR_FLUIDS, 0x4FC3F7);
+        int chemicalsColor = TelemetryConfig.parseHexColor(TelemetryConfig.COLOR_CHEMICALS, 0xAEEA00);
         int positiveEnergyColor = TelemetryConfig.parseHexColor(TelemetryConfig.COLOR_ENERGY_POSITIVE, 0x55FF55);
         int negativeEnergyColor = TelemetryConfig.parseHexColor(TelemetryConfig.COLOR_ENERGY_NEGATIVE, 0xFF5252);
         int neutralEnergyColor = TelemetryConfig.parseHexColor(TelemetryConfig.COLOR_ENERGY_NEUTRAL, 0xE040FB);
@@ -104,10 +107,15 @@ public class TelemetryHudRenderer {
 
         int metricColor = 0xFFFFFF;
 
-        if (data.itemThroughput() > 0f || (data.hasItems() && !data.hasFluids() && !data.hasEnergy())) {
+        if (data.itemThroughput() > 0f || (data.hasItems() && !data.hasFluids() && !data.hasChemicals() && !data.hasEnergy())) {
             mainMetric = formatItemRate(data.itemThroughput());
-        } else if (data.fluidThroughput() > 0f || (data.hasFluids() && !data.hasEnergy())) {
+            metricColor = itemsColor;
+        } else if (data.fluidThroughput() > 0f || (data.hasFluids() && !data.hasChemicals() && !data.hasEnergy())) {
             mainMetric = formatFluidRate(data.fluidThroughput());
+            metricColor = fluidsColor;
+        } else if (data.chemicalThroughput() > 0f || (data.hasChemicals() && !data.hasEnergy())) {
+            mainMetric = formatChemicalRate(data.chemicalThroughput());
+            metricColor = chemicalsColor;
         } else if (data.hasEnergy() || data.energyDelta() != 0f) {
             mainMetric = formatEnergyRate(data.energyDelta());
             metricColor = data.energyDelta() > 0 ? positiveEnergyColor : (data.energyDelta() < 0 ? negativeEnergyColor : neutralEnergyColor);
@@ -115,6 +123,8 @@ public class TelemetryHudRenderer {
             mainMetric = Component.translatable("machinemetrics.state.idle").getString();
             metricColor = idleColor;
         }
+
+
 
         Component titleComp = Component.translatable("machinemetrics.hud.title");
         int titleWidth = mc.font.width(titleComp);
@@ -140,6 +150,7 @@ public class TelemetryHudRenderer {
 
         int itemsColor = TelemetryConfig.parseHexColor(TelemetryConfig.COLOR_ITEMS, 0xFFD54F);
         int fluidsColor = TelemetryConfig.parseHexColor(TelemetryConfig.COLOR_FLUIDS, 0x4FC3F7);
+        int chemicalsColor = TelemetryConfig.parseHexColor(TelemetryConfig.COLOR_CHEMICALS, 0xAEEA00);
         int positiveEnergyColor = TelemetryConfig.parseHexColor(TelemetryConfig.COLOR_ENERGY_POSITIVE, 0x69F0AE);
         int negativeEnergyColor = TelemetryConfig.parseHexColor(TelemetryConfig.COLOR_ENERGY_NEGATIVE, 0xFF5252);
         int neutralEnergyColor = TelemetryConfig.parseHexColor(TelemetryConfig.COLOR_ENERGY_NEUTRAL, 0xE040FB);
@@ -156,7 +167,13 @@ public class TelemetryHudRenderer {
                 lines.add(new MetricLine(Component.translatable("machinemetrics.metrics.fluids").getString(), formatFluidRate(data.fluidThroughput()), fluidsColor));
             }
 
+            if (data.hasChemicals() || data.chemicalThroughput() > 0f) {
+                lines.add(new MetricLine(Component.translatable("machinemetrics.metrics.chemicals").getString(), formatChemicalRate(data.chemicalThroughput()), chemicalsColor));
+            }
+
             if (data.hasEnergy() || data.energyDelta() != 0f) {
+
+
                 int energyColor = data.energyDelta() > 0 ? positiveEnergyColor : (data.energyDelta() < 0 ? negativeEnergyColor : neutralEnergyColor);
                 lines.add(new MetricLine(Component.translatable("machinemetrics.metrics.energy").getString(), formatEnergyRate(data.energyDelta()), energyColor));
             }
@@ -166,14 +183,18 @@ public class TelemetryHudRenderer {
             Direction[] directions = Direction.values();
             List<Direction> activeItemSides = new ArrayList<>();
             List<Direction> activeFluidSides = new ArrayList<>();
+            List<Direction> activeChemicalSides = new ArrayList<>();
             Float firstItemRate = null;
             Float firstFluidRate = null;
+            Float firstChemicalRate = null;
             boolean allItemRatesEqual = true;
             boolean allFluidRatesEqual = true;
+            boolean allChemicalRatesEqual = true;
 
             for (Direction dir : directions) {
                 float itemVal = data.getItemSideRate(dir);
                 float fluidVal = data.getFluidSideRate(dir);
+                float chemVal = data.getChemicalSideRate(dir);
 
                 if (itemVal > 0.01f) {
                     activeItemSides.add(dir);
@@ -192,11 +213,21 @@ public class TelemetryHudRenderer {
                         allFluidRatesEqual = false;
                     }
                 }
+
+                if (chemVal > 0.01f) {
+                    activeChemicalSides.add(dir);
+                    if (firstChemicalRate == null) {
+                        firstChemicalRate = chemVal;
+                    } else if (Math.abs(firstChemicalRate - chemVal) > 0.01f) {
+                        allChemicalRatesEqual = false;
+                    }
+                }
             }
 
             boolean canGroupAll = (activeItemSides.isEmpty() || (activeItemSides.size() > 1 && allItemRatesEqual)) &&
-                                  (activeFluidSides.isEmpty() || (activeFluidSides.size() > 1 && allFluidRatesEqual)) &&
-                                  (!activeItemSides.isEmpty() || !activeFluidSides.isEmpty());
+                                   (activeFluidSides.isEmpty() || (activeFluidSides.size() > 1 && allFluidRatesEqual)) &&
+                                   (activeChemicalSides.isEmpty() || (activeChemicalSides.size() > 1 && allChemicalRatesEqual)) &&
+                                   (!activeItemSides.isEmpty() || !activeFluidSides.isEmpty() || !activeChemicalSides.isEmpty());
 
             if (canGroupAll) {
                 String allSidesLabel = Component.translatable("machinemetrics.metrics.all_sides").getString();
@@ -205,15 +236,19 @@ public class TelemetryHudRenderer {
                     summaryText.append(String.format("📦 %s ", formatItemRate(firstItemRate)));
                 }
                 if (firstFluidRate != null) {
-                    summaryText.append(String.format("💧 %s", formatFluidRate(firstFluidRate)));
+                    summaryText.append(String.format("💧 %s ", formatFluidRate(firstFluidRate)));
+                }
+                if (firstChemicalRate != null) {
+                    summaryText.append(String.format("🧪 %s", formatChemicalRate(firstChemicalRate)));
                 }
                 lines.add(new MetricLine(summaryText.toString().trim(), "", sideColor));
             } else {
                 for (Direction dir : directions) {
                     float itemVal = data.getItemSideRate(dir);
                     float fluidVal = data.getFluidSideRate(dir);
+                    float chemVal = data.getChemicalSideRate(dir);
 
-                    if (itemVal > 0.01f || fluidVal > 0.01f) {
+                    if (itemVal > 0.01f || fluidVal > 0.01f || chemVal > 0.01f) {
                         StringBuilder sideText = new StringBuilder();
                         sideText.append("  └ [").append(dir.getName().toUpperCase()).append("] ");
                         
@@ -221,7 +256,10 @@ public class TelemetryHudRenderer {
                             sideText.append(String.format("📦 %s ", formatItemRate(itemVal)));
                         }
                         if (fluidVal > 0.01f) {
-                            sideText.append(String.format("💧 %s", formatFluidRate(fluidVal)));
+                            sideText.append(String.format("💧 %s ", formatFluidRate(fluidVal)));
+                        }
+                        if (chemVal > 0.01f) {
+                            sideText.append(String.format("🧪 %s", formatChemicalRate(chemVal)));
                         }
 
                         lines.add(new MetricLine(sideText.toString().trim(), "", sideColor));
@@ -231,6 +269,7 @@ public class TelemetryHudRenderer {
         }
 
         Component titleComp = Component.translatable("machinemetrics.hud.detailed_title");
+
         Component stateComp = getStateComponent(data.bottleneckState());
 
         int headerLineWidth = mc.font.width(titleComp) + mc.font.width(stateComp) + 20;
@@ -325,5 +364,17 @@ public class TelemetryHudRenderer {
         }
     }
 
+    private static String formatChemicalRate(float rate) {
+        if (rate <= 0.001f) return Component.translatable("machinemetrics.metrics.none").getString();
+        if (rate >= 1_000f) {
+            return String.format("%.2f B/s", rate / 1_000f);
+        } else if (rate < 1.0f) {
+            return String.format("%.2f mB/s", rate);
+        } else {
+            return String.format("%.1f mB/s", rate);
+        }
+    }
+
     private record MetricLine(String label, String value, int color) {}
 }
+

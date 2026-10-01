@@ -1,6 +1,8 @@
 package com.alikuxac.machinemetrics.forge.telemetry;
 
+import com.alikuxac.machinemetrics.compat.mekanism.MekanismChemicalInspector;
 import com.alikuxac.machinemetrics.telemetry.TelemetryData;
+
 import it.unimi.dsi.fastutil.ints.IntArrayList;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
@@ -36,7 +38,7 @@ public class ServerTelemetrySampler {
         private float lastItemTp;
         private float lastFluidTp;
         private float lastEnergyDelta;
-        private float[] lastSideRates = new float[12];
+        private float[] lastSideRates = new float[18];
 
         public SampleHistory(Sample initialSample) {
             this.lastSample = initialSample;
@@ -50,6 +52,7 @@ public class ServerTelemetrySampler {
             this.lastAccessMs = System.currentTimeMillis();
         }
     }
+
 
     public static TelemetryData sampleTargetBlock(ServerLevel level, BlockPos pos) {
         if (level == null || pos == null || !level.isLoaded(pos)) {
@@ -83,7 +86,7 @@ public class ServerTelemetrySampler {
         boolean hasAnyCapability = false;
 
         Direction[] sidesToQuery = new Direction[] { null, Direction.UP, Direction.DOWN, Direction.NORTH, Direction.SOUTH, Direction.WEST, Direction.EAST };
-        float[] sideMetrics = new float[12];
+        float[] sideMetrics = new float[18];
 
         IntArrayList allSlotCounts = new IntArrayList();
         Set<IItemHandler> processedItemHandlers = Collections.newSetFromMap(new IdentityHashMap<>());
@@ -163,6 +166,19 @@ public class ServerTelemetrySampler {
         }
         int[] fluidTanks = allTankAmounts.toIntArray();
 
+        for (Direction side : sidesToQuery) {
+            try {
+                if (side != null) {
+                    var chemOpt = MekanismChemicalInspector.inspectChemicals(level, pos, side);
+                    if (chemOpt.isPresent()) {
+                        sideMetrics[12 + side.ordinal()] = (float) chemOpt.get().amount();
+                    }
+                }
+            } catch (Throwable ignored) {
+            }
+        }
+
+
         Set<IEnergyStorage> processedEnergyStorages = Collections.newSetFromMap(new IdentityHashMap<>());
 
         for (Direction side : sidesToQuery) {
@@ -177,7 +193,7 @@ public class ServerTelemetrySampler {
                     }
                 }
             } catch (Throwable ignored) {
-                // Nuốt lỗi crash do bug cast class từ mod Oritech
+                // Ignore capability query exception
             }
         }
 
@@ -196,7 +212,7 @@ public class ServerTelemetrySampler {
         float itemThroughput = 0f;
         float fluidThroughput = 0f;
         float energyDelta = 0f;
-        float[] sideRates = new float[12];
+        float[] sideRates = new float[18];
 
         if (history.previousSample != null) {
             float timeDiffSec = (history.lastSample.timestampMs() - history.previousSample.timestampMs()) / 1000f;
@@ -229,7 +245,7 @@ public class ServerTelemetrySampler {
                 float[] prevSideMetrics = history.previousSample.sideMetrics();
                 float[] currSideMetrics = history.lastSample.sideMetrics();
                 if (prevSideMetrics != null && currSideMetrics != null) {
-                    for (int i = 0; i < 12; i++) {
+                    for (int i = 0; i < 18; i++) {
                         float p = i < prevSideMetrics.length ? prevSideMetrics[i] : 0.0f;
                         float c = i < currSideMetrics.length ? currSideMetrics[i] : 0.0f;
                         sideRates[i] = Math.abs(c - p) / timeDiffSec;
@@ -246,7 +262,7 @@ public class ServerTelemetrySampler {
             if (Math.abs(energyDelta) > 0.1f) {
                 history.lastEnergyDelta = energyDelta;
             }
-            for (int i = 0; i < 12; i++) {
+            for (int i = 0; i < 18; i++) {
                 if (sideRates[i] > 0.001f) {
                     history.lastSideRates[i] = Math.max(history.lastSideRates[i], sideRates[i]);
                 }
@@ -258,7 +274,7 @@ public class ServerTelemetrySampler {
             if (itemThroughput == 0f) itemThroughput = history.lastItemTp;
             if (fluidThroughput == 0f) fluidThroughput = history.lastFluidTp;
             if (energyDelta == 0f) energyDelta = history.lastEnergyDelta;
-            for (int i = 0; i < 12; i++) {
+            for (int i = 0; i < 18; i++) {
                 if (sideRates[i] == 0f && history.lastSideRates[i] > 0f) {
                     sideRates[i] = history.lastSideRates[i];
                 }
@@ -271,6 +287,29 @@ public class ServerTelemetrySampler {
             Arrays.fill(sideRates, 0f);
         }
 
+        float chemicalThroughput = 0f;
+        for (int i = 12; i < 18; i++) {
+            chemicalThroughput += sideRates[i];
+        }
+
+        boolean hasChemicals = false;
+        String chemicalName = "";
+        long chemicalAmount = 0L;
+        long chemicalCapacity = 0L;
+
+        try {
+            var chemOpt = MekanismChemicalInspector.inspectChemicals(level, pos, null);
+            if (chemOpt.isPresent()) {
+
+                var chemData = chemOpt.get();
+                hasChemicals = true;
+                chemicalName = chemData.chemicalName();
+                chemicalAmount = chemData.amount();
+                chemicalCapacity = chemData.capacity();
+                hasAnyCapability = true;
+            }
+        } catch (Throwable ignored) {
+        }
 
         boolean hasItems = maxItems > 0;
         boolean hasFluids = maxFluid > 0;
@@ -278,26 +317,17 @@ public class ServerTelemetrySampler {
 
         TelemetryData.BottleneckState state;
         if (isActive) {
-            // Máy đang hoạt động (có năng lượng tăng/giảm hoặc lưu lượng I/O) -> OPTIMAL
             state = TelemetryData.BottleneckState.OPTIMAL;
         } else {
-            // Máy không hoạt động / đứng yên (Throughput == 0 & energyDelta == 0)
             if (hasEnergy && maxEnergy > 0 && currentEnergy == 0) {
-                // Thiếu điện (currentEnergy == 0) -> STARVED
                 state = TelemetryData.BottleneckState.STARVED;
-            } else if (!hasItems && !hasFluids && hasEnergy) {
-                // Khối/Multiblock chỉ dùng điện (Energy-Only): Không thay đổi điện -> IDLE
-                state = TelemetryData.BottleneckState.IDLE;
             } else {
                 float itemFillRatio = maxItems > 0 ? (float) currentItems / maxItems : 0.0f;
                 float fluidFillRatio = maxFluid > 0 ? (float) currentFluid / maxFluid : 0.0f;
 
                 boolean isOutputClogged = (hasItems || hasFluids) && (itemFillRatio > 0.90f || fluidFillRatio > 0.90f);
-                boolean isInputStarved = (hasItems || hasFluids) && currentItems == 0 && currentFluid == 0;
 
-                if (isInputStarved) {
-                    state = TelemetryData.BottleneckState.STARVED;
-                } else if (isOutputClogged) {
+                if (isOutputClogged) {
                     state = TelemetryData.BottleneckState.CLOGGED;
                 } else {
                     state = TelemetryData.BottleneckState.IDLE;
@@ -305,11 +335,16 @@ public class ServerTelemetrySampler {
             }
         }
 
-
-
-
-        return new TelemetryData(itemThroughput, hasItems, fluidThroughput, hasFluids, energyDelta, hasEnergy, state, allSlotCounts, allTankAmounts, sideRates);
+        return new TelemetryData(
+                itemThroughput, hasItems,
+                fluidThroughput, hasFluids,
+                energyDelta, hasEnergy,
+                chemicalThroughput, hasChemicals, chemicalName, chemicalAmount, chemicalCapacity,
+                state, allSlotCounts, allTankAmounts, sideRates
+        );
     }
+
+
 
 
     private static void cleanupStaleEntries(long now) {
