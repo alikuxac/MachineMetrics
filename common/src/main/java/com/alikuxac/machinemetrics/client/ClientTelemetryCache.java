@@ -1,6 +1,6 @@
 package com.alikuxac.machinemetrics.client;
 
-import com.alikuxac.machinemetrics.config.TelemetryConfig;
+import com.alikuxac.machinemetrics.config.ClientConfig;
 import com.alikuxac.machinemetrics.telemetry.TelemetryData;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.Font;
@@ -89,16 +89,16 @@ public class ClientTelemetryCache {
         Font font = mc.font;
 
         // Colors
-        int itemsColor = TelemetryConfig.parseHexColor(TelemetryConfig.COLOR_ITEMS, 0xFFD54F);
-        int fluidsColor = TelemetryConfig.parseHexColor(TelemetryConfig.COLOR_FLUIDS, 0x4FC3F7);
-        int chemicalsColor = TelemetryConfig.parseHexColor(TelemetryConfig.COLOR_CHEMICALS, 0xAEEA00);
-        int positiveEnergyColor = TelemetryConfig.parseHexColor(TelemetryConfig.COLOR_ENERGY_POSITIVE, 0x55FF55);
-        int negativeEnergyColor = TelemetryConfig.parseHexColor(TelemetryConfig.COLOR_ENERGY_NEGATIVE, 0xFF5252);
-        int neutralEnergyColor = TelemetryConfig.parseHexColor(TelemetryConfig.COLOR_ENERGY_NEUTRAL, 0xE040FB);
-        int detailedPositiveEnergyColor = TelemetryConfig.parseHexColor(TelemetryConfig.COLOR_ENERGY_POSITIVE, 0x69F0AE);
-        int sideColor = TelemetryConfig.parseHexColor(TelemetryConfig.COLOR_SIDES, 0x69F0AE);
-        int idleColor = TelemetryConfig.parseHexColor(TelemetryConfig.COLOR_STATE_IDLE, 0xAAAAAA);
-        int headerColor = TelemetryConfig.parseHexColor(TelemetryConfig.COLOR_HEADER, 0x00FFCC);
+        int itemsColor = ClientConfig.parseHexColor(ClientConfig.COLOR_ITEMS, 0xFFD54F);
+        int fluidsColor = ClientConfig.parseHexColor(ClientConfig.COLOR_FLUIDS, 0x4FC3F7);
+        int chemicalsColor = ClientConfig.parseHexColor(ClientConfig.COLOR_CHEMICALS, 0xAEEA00);
+        int positiveEnergyColor = ClientConfig.parseHexColor(ClientConfig.COLOR_ENERGY_POSITIVE, 0x55FF55);
+        int negativeEnergyColor = ClientConfig.parseHexColor(ClientConfig.COLOR_ENERGY_NEGATIVE, 0xFF5252);
+        int neutralEnergyColor = ClientConfig.parseHexColor(ClientConfig.COLOR_ENERGY_NEUTRAL, 0xE040FB);
+        int detailedPositiveEnergyColor = ClientConfig.parseHexColor(ClientConfig.COLOR_ENERGY_POSITIVE, 0x69F0AE);
+        int sideColor = ClientConfig.parseHexColor(ClientConfig.COLOR_SIDES, 0x69F0AE);
+        int idleColor = ClientConfig.parseHexColor(ClientConfig.COLOR_STATE_IDLE, 0xAAAAAA);
+        int headerColor = ClientConfig.parseHexColor(ClientConfig.COLOR_HEADER, 0x00FFCC);
 
         // --- Compact HUD Calculations ---
         String compactMetricStr;
@@ -328,10 +328,10 @@ public class ClientTelemetryCache {
 
     private static int getStatusColor(TelemetryData.BottleneckState state) {
         return switch (state) {
-            case OPTIMAL -> TelemetryConfig.parseHexColor(TelemetryConfig.COLOR_STATE_OPTIMAL, 0x55FF55);
-            case STARVED -> TelemetryConfig.parseHexColor(TelemetryConfig.COLOR_STATE_STARVED, 0xFFFF55);
-            case CLOGGED -> TelemetryConfig.parseHexColor(TelemetryConfig.COLOR_STATE_CLOGGED, 0xFF5555);
-            case IDLE -> TelemetryConfig.parseHexColor(TelemetryConfig.COLOR_STATE_IDLE, 0xAAAAAA);
+            case OPTIMAL -> ClientConfig.parseHexColor(ClientConfig.COLOR_STATE_OPTIMAL, 0x55FF55);
+            case STARVED -> ClientConfig.parseHexColor(ClientConfig.COLOR_STATE_STARVED, 0xFFFF55);
+            case CLOGGED -> ClientConfig.parseHexColor(ClientConfig.COLOR_STATE_CLOGGED, 0xFF5555);
+            case IDLE -> ClientConfig.parseHexColor(ClientConfig.COLOR_STATE_IDLE, 0xAAAAAA);
         };
     }
 

@@ -1,7 +1,7 @@
 package com.alikuxac.machinemetrics.neoforge.telemetry;
 
 import com.alikuxac.machinemetrics.telemetry.TelemetryData;
-import com.alikuxac.machinemetrics.config.TelemetryConfig;
+import com.alikuxac.machinemetrics.config.ServerConfig;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.multiplayer.ClientLevel;
 import net.minecraft.core.BlockPos;
@@ -56,7 +56,6 @@ public class NeoForgeTelemetrySampler {
         }
     }
 
-
     public static TelemetryData sampleTargetBlock(BlockPos pos) {
         Minecraft mc = Minecraft.getInstance();
         ClientLevel level = mc.level;
@@ -79,7 +78,6 @@ public class NeoForgeTelemetrySampler {
                 || beClassName.contains("bin") || beClassName.contains("crate")) {
             return TelemetryData.empty();
         }
-
 
         int currentItems = 0;
         int maxItems = 0;
@@ -280,8 +278,6 @@ public class NeoForgeTelemetrySampler {
             Arrays.fill(sideRates, 0f);
         }
 
-
-
         boolean hasItems = maxItems > 0;
         boolean hasFluids = maxFluid > 0;
         boolean hasEnergy = maxEnergy > 0;
@@ -306,10 +302,7 @@ public class NeoForgeTelemetrySampler {
             }
         }
 
-
-
-
-        if (addedNewSample && TelemetryConfig.DEBUG_LOGGING.get()) {
+        if (addedNewSample && ServerConfig.DEBUG_LOGGING.get()) {
             LOGGER.info("[TelemetryDebug] Block: {} | Slots: {} | Tanks: {} | itemTp: {}/s | fluidTp: {} mB/s | energyDelta: {} FE/t | state: {}",
                     be.getClass().getSimpleName(), itemSlots.length, Arrays.toString(fluidTanks), itemThroughput, fluidThroughput, energyDelta, state);
         }
@@ -322,8 +315,6 @@ public class NeoForgeTelemetrySampler {
                 state, allSlotCounts, allTankAmounts, sideRates
         );
     }
-
-
 
     private static void cleanupStaleEntries(long now) {
         CACHE.entrySet().removeIf(entry -> now - entry.getValue().lastAccessMs > CLEANUP_EXPIRE_MS);

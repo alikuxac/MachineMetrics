@@ -1,6 +1,6 @@
 package com.alikuxac.machinemetrics.client;
 
-import com.alikuxac.machinemetrics.config.TelemetryConfig;
+import com.alikuxac.machinemetrics.config.ClientConfig;
 import com.alikuxac.machinemetrics.network.RequestTelemetryPayload;
 import com.alikuxac.machinemetrics.telemetry.TelemetryData;
 import net.minecraft.client.Minecraft;
@@ -78,7 +78,7 @@ public class TelemetryHudRenderer {
 
         boolean isCompact = !Screen.hasShiftDown();
 
-        float scale = TelemetryConfig.HUD_SCALE != null ? TelemetryConfig.HUD_SCALE.get().floatValue() : 1.0f;
+        float scale = ClientConfig.HUD_SCALE != null ? ClientConfig.HUD_SCALE.get().floatValue() : 1.0f;
         int rawX = HudPositionScreen.posX;
         int rawY = HudPositionScreen.posY;
 

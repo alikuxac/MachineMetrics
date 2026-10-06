@@ -1,7 +1,8 @@
 package com.alikuxac.machinemetrics.forge;
 
 import com.alikuxac.machinemetrics.client.KeyBindings;
-import com.alikuxac.machinemetrics.config.TelemetryConfig;
+import com.alikuxac.machinemetrics.config.ClientConfig;
+import com.alikuxac.machinemetrics.config.ServerConfig;
 import com.mojang.logging.LogUtils;
 import net.neoforged.api.distmarker.Dist;
 import net.neoforged.bus.api.IEventBus;
@@ -19,10 +20,11 @@ public class MachinemetricsForge {
 
     public MachinemetricsForge(IEventBus modEventBus, ModContainer modContainer) {
         com.alikuxac.machinemetrics.platform.Services.SERVER_SAMPLER = com.alikuxac.machinemetrics.forge.telemetry.ServerTelemetrySampler::sampleTargetBlock;
-        modContainer.registerConfig(net.neoforged.fml.config.ModConfig.Type.COMMON, TelemetryConfig.SPEC);
+        modContainer.registerConfig(net.neoforged.fml.config.ModConfig.Type.SERVER, ServerConfig.SPEC);
         modEventBus.addListener(com.alikuxac.machinemetrics.network.NetworkHandler::register);
 
         if (FMLEnvironment.dist == Dist.CLIENT) {
+            modContainer.registerConfig(net.neoforged.fml.config.ModConfig.Type.CLIENT, ClientConfig.SPEC);
             modEventBus.addListener(this::registerKeyMappings);
         }
 

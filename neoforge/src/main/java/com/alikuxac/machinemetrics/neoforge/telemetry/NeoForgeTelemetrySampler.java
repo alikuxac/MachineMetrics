@@ -1,7 +1,7 @@
 package com.alikuxac.machinemetrics.neoforge.telemetry;
 
 import com.alikuxac.machinemetrics.telemetry.TelemetryData;
-import com.alikuxac.machinemetrics.config.TelemetryConfig;
+import com.alikuxac.machinemetrics.config.ServerConfig;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.multiplayer.ClientLevel;
 import net.minecraft.core.BlockPos;
@@ -309,7 +309,7 @@ public class NeoForgeTelemetrySampler {
 
 
 
-        if (addedNewSample && TelemetryConfig.DEBUG_LOGGING.get()) {
+        if (addedNewSample && ServerConfig.DEBUG_LOGGING.get()) {
             LOGGER.info("[TelemetryDebug] Block: {} | Slots: {} | Tanks: {} | itemTp: {}/s | fluidTp: {} mB/s | energyDelta: {} FE/t | state: {}",
                     be.getClass().getSimpleName(), itemSlots.length, Arrays.toString(fluidTanks), itemThroughput, fluidThroughput, energyDelta, state);
         }

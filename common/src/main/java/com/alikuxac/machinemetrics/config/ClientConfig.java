@@ -2,10 +2,9 @@ package com.alikuxac.machinemetrics.config;
 
 import net.neoforged.neoforge.common.ModConfigSpec;
 
-public class TelemetryConfig {
+public class ClientConfig {
 
     public static final ModConfigSpec SPEC;
-    public static final ModConfigSpec.BooleanValue DEBUG_LOGGING;
     public static final ModConfigSpec.DoubleValue HUD_SCALE;
 
     // Configurable Colors (HEX string format, e.g. "0x00FFCC" or "#00FFCC")
@@ -14,7 +13,6 @@ public class TelemetryConfig {
     public static final ModConfigSpec.ConfigValue<String> COLOR_FLUIDS;
     public static final ModConfigSpec.ConfigValue<String> COLOR_CHEMICALS;
     public static final ModConfigSpec.ConfigValue<String> COLOR_ENERGY_POSITIVE;
-
     public static final ModConfigSpec.ConfigValue<String> COLOR_ENERGY_NEGATIVE;
     public static final ModConfigSpec.ConfigValue<String> COLOR_ENERGY_NEUTRAL;
     public static final ModConfigSpec.ConfigValue<String> COLOR_SIDES;
@@ -26,14 +24,6 @@ public class TelemetryConfig {
 
     static {
         ModConfigSpec.Builder builder = new ModConfigSpec.Builder();
-
-        builder.comment("Telemetry Debug Configuration").push("debug");
-
-        DEBUG_LOGGING = builder
-                .comment("Enable detailed telemetry debug logging in game console")
-                .define("enableDebugLogging", false);
-
-        builder.pop();
 
         builder.comment("Telemetry HUD Visual Configuration").push("hud");
 
@@ -62,7 +52,6 @@ public class TelemetryConfig {
                 .define("chemicalsColor", "#AEEA00");
 
         COLOR_ENERGY_POSITIVE = builder
-
                 .comment("Positive energy rate color (+FE/t)")
                 .define("energyPositiveColor", "#69F0AE");
 

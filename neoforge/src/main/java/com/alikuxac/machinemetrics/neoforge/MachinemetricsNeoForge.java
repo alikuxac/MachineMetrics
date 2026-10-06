@@ -20,10 +20,11 @@ public class MachinemetricsNeoForge {
 
     public MachinemetricsNeoForge(IEventBus modEventBus, ModContainer modContainer) {
         com.alikuxac.machinemetrics.platform.Services.SERVER_SAMPLER = com.alikuxac.machinemetrics.neoforge.telemetry.ServerTelemetrySampler::sampleTargetBlock;
-        modContainer.registerConfig(net.neoforged.fml.config.ModConfig.Type.COMMON, com.alikuxac.machinemetrics.config.TelemetryConfig.SPEC);
+        modContainer.registerConfig(net.neoforged.fml.config.ModConfig.Type.SERVER, com.alikuxac.machinemetrics.config.ServerConfig.SPEC);
         modEventBus.addListener(com.alikuxac.machinemetrics.network.NetworkHandler::register);
 
         if (FMLEnvironment.dist == Dist.CLIENT) {
+            modContainer.registerConfig(net.neoforged.fml.config.ModConfig.Type.CLIENT, com.alikuxac.machinemetrics.config.ClientConfig.SPEC);
             modEventBus.addListener(this::registerKeyMappings);
             NeoForge.EVENT_BUS.register(NeoForgeClientEventHandler.class);
             NeoForge.EVENT_BUS.register(NeoForgeHudRenderer.class);
