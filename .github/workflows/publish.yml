@@ -75,7 +75,7 @@ jobs:
           modrinth-id: 'hRT19d7o'
           curseforge-id: '1706910'
 
-          name: 'MachineMetrics ${{ steps.parse_release.outputs.mod_version }} (NeoForge)'
+          name: 'machinemetrics-${{ steps.parse_release.outputs.mod_version }}+mc${{ steps.parse_release.outputs.mc_version }}-neoforge.jar'
           version: '${{ steps.parse_release.outputs.tag_name }}-neoforge'
           version-type: '${{ steps.parse_release.outputs.release_type }}'
           changelog: 'See release changes on GitHub: https://github.com/${{ github.repository }}/releases/tag/${{ steps.parse_release.outputs.tag_name }}'
@@ -96,7 +96,7 @@ jobs:
           modrinth-id: 'hRT19d7o'
           curseforge-id: '1706910'
 
-          name: 'MachineMetrics ${{ steps.parse_release.outputs.mod_version }} (Forge)'
+          name: 'machinemetrics-${{ steps.parse_release.outputs.mod_version }}+mc${{ steps.parse_release.outputs.mc_version }}-forge.jar'
           version: '${{ steps.parse_release.outputs.tag_name }}-forge'
           version-type: '${{ steps.parse_release.outputs.release_type }}'
           changelog: 'See release changes on GitHub: https://github.com/${{ github.repository }}/releases/tag/${{ steps.parse_release.outputs.tag_name }}'
