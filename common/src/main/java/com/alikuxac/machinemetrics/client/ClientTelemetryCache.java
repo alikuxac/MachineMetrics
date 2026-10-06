@@ -74,6 +74,12 @@ public class ClientTelemetryCache {
         return entry;
     }
 
+    public static void remove(BlockPos pos) {
+        if (pos != null) {
+            CACHE.remove(pos);
+        }
+    }
+
     public static void clear() {
         CACHE.clear();
     }

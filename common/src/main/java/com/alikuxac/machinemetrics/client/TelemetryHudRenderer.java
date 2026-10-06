@@ -33,7 +33,10 @@ public class TelemetryHudRenderer {
 
         HitResult hitResult = mc.hitResult;
         if (hitResult == null || hitResult.getType() != HitResult.Type.BLOCK) {
-            currentHoverPos = null;
+            if (currentHoverPos != null) {
+                ClientTelemetryCache.remove(currentHoverPos);
+                currentHoverPos = null;
+            }
             return;
         }
 
@@ -43,6 +46,9 @@ public class TelemetryHudRenderer {
         long now = System.currentTimeMillis();
 
         if (!targetPos.equals(currentHoverPos)) {
+            if (currentHoverPos != null) {
+                ClientTelemetryCache.remove(currentHoverPos);
+            }
             currentHoverPos = targetPos;
             hoverStartTimeMs = now;
         }
