@@ -8,7 +8,14 @@ import net.minecraft.server.level.ServerPlayer;
 import net.neoforged.neoforge.network.event.RegisterPayloadHandlersEvent;
 import net.neoforged.neoforge.network.handling.IPayloadContext;
 
+import net.minecraft.core.BlockPos;
+
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
+
 public class NetworkHandler {
+
+    private static final Map<BlockPos, TelemetryData> LAST_SENT_TO_CLIENT = new ConcurrentHashMap<>();
 
     public static void register(RegisterPayloadHandlersEvent event) {
         var registrar = event.registrar("1.0.0").optional();
@@ -30,9 +37,15 @@ public class NetworkHandler {
         context.enqueueWork(() -> {
             if (context.player() instanceof ServerPlayer serverPlayer) {
                 ServerLevel serverLevel = serverPlayer.serverLevel();
-                TelemetryData data = Services.SERVER_SAMPLER.apply(serverLevel, payload.targetPos());
-                SyncTelemetryPayload response = SyncTelemetryPayload.from(payload.targetPos(), data);
-                context.reply(response);
+                BlockPos targetPos = payload.targetPos();
+                TelemetryData data = Services.SERVER_SAMPLER.apply(serverLevel, targetPos);
+                
+                TelemetryData lastSent = LAST_SENT_TO_CLIENT.get(targetPos);
+                if (lastSent == null || data.hasSignificantDelta(lastSent)) {
+                    LAST_SENT_TO_CLIENT.put(targetPos, data);
+                    SyncTelemetryPayload response = SyncTelemetryPayload.from(targetPos, data);
+                    context.reply(response);
+                }
             }
         });
     }

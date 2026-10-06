@@ -68,6 +68,26 @@ public record TelemetryData(
         return false;
     }
 
+    public boolean hasSignificantDelta(TelemetryData other) {
+        if (other == null) return true;
+        if (this.bottleneckState != other.bottleneckState) return true;
+        if (this.hasItems != other.hasItems || this.hasFluids != other.hasFluids || this.hasEnergy != other.hasEnergy || this.hasChemicals != other.hasChemicals) return true;
+        if (Math.abs(this.itemThroughput - other.itemThroughput) > 0.1f) return true;
+        if (Math.abs(this.fluidThroughput - other.fluidThroughput) > 1.0f) return true;
+        if (Math.abs(this.chemicalThroughput - other.chemicalThroughput) > 1.0f) return true;
+        if (Math.abs(this.energyDelta - other.energyDelta) > 1.0f) return true;
+        if (this.chemicalAmount != other.chemicalAmount) return true;
+
+        if (this.sideMetrics != null && other.sideMetrics != null) {
+            int len = Math.min(this.sideMetrics.length, other.sideMetrics.length);
+            for (int i = 0; i < len; i++) {
+                if (Math.abs(this.sideMetrics[i] - other.sideMetrics[i]) > 0.5f) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
 }
 
 
