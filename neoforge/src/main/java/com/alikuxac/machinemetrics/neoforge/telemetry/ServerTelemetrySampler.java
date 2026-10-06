@@ -26,7 +26,11 @@ public class ServerTelemetrySampler {
 
     private static final Logger LOGGER = LoggerFactory.getLogger(ServerTelemetrySampler.class);
     private static final Map<BlockPos, SampleHistory> CACHE = new ConcurrentHashMap<>();
+    private static final Map<BlockPos, Long> INERT_BLOCK_CACHE = new ConcurrentHashMap<>();
     private static final long CLEANUP_EXPIRE_MS = 10000L;
+    private static final long INERT_EXPIRE_MS = 5000L;
+
+    private static final Direction[] SIDES_TO_QUERY = new Direction[] { null, Direction.UP, Direction.DOWN, Direction.NORTH, Direction.SOUTH, Direction.WEST, Direction.EAST };
 
     private record Sample(long timestampMs, int[] itemSlots, int[] fluidTanks, int energyAmount, int totalItems, int totalFluid, float[] sideMetrics) {}
 
@@ -62,8 +66,18 @@ public class ServerTelemetrySampler {
         long now = System.currentTimeMillis();
         cleanupStaleEntries(now);
 
+        Long inertTimestamp = INERT_BLOCK_CACHE.get(pos);
+        if (inertTimestamp != null) {
+            if (now - inertTimestamp < INERT_EXPIRE_MS) {
+                return TelemetryData.empty();
+            } else {
+                INERT_BLOCK_CACHE.remove(pos);
+            }
+        }
+
         BlockEntity be = level.getBlockEntity(pos);
         if (be == null) {
+            INERT_BLOCK_CACHE.put(pos, now);
             return TelemetryData.empty();
         }
 
@@ -72,6 +86,7 @@ public class ServerTelemetrySampler {
                 || beClassName.contains("waystone") || beClassName.contains("drawer") || beClassName.contains("chest") || beClassName.contains("barrel")
                 || beClassName.contains("storage") || beClassName.contains("shulker") || beClassName.contains("vault")
                 || beClassName.contains("bin") || beClassName.contains("crate")) {
+            INERT_BLOCK_CACHE.put(pos, now);
             return TelemetryData.empty();
         }
 
@@ -85,7 +100,7 @@ public class ServerTelemetrySampler {
 
         boolean hasAnyCapability = false;
 
-        Direction[] sidesToQuery = new Direction[] { null, Direction.UP, Direction.DOWN, Direction.NORTH, Direction.SOUTH, Direction.WEST, Direction.EAST };
+        Direction[] sidesToQuery = SIDES_TO_QUERY;
         float[] sideMetrics = new float[18];
 
         IntArrayList allSlotCounts = new IntArrayList();
@@ -199,8 +214,11 @@ public class ServerTelemetrySampler {
 
 
         if (!hasAnyCapability || (maxItems == 0 && maxFluid == 0 && maxEnergy == 0)) {
+            INERT_BLOCK_CACHE.put(pos, now);
             return TelemetryData.empty();
         }
+
+        INERT_BLOCK_CACHE.remove(pos);
 
         Sample currentSample = new Sample(now, itemSlots, fluidTanks, currentEnergy, currentItems, currentFluid, sideMetrics);
         SampleHistory history = CACHE.computeIfAbsent(pos, p -> new SampleHistory(currentSample));
