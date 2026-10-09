@@ -41,7 +41,7 @@ public class NeoForgeTelemetrySampler {
         private float lastItemTp;
         private float lastFluidTp;
         private float lastEnergyDelta;
-        private float[] lastSideRates = new float[12];
+        private float[] lastSideRates = new float[18];
 
         public SampleHistory(Sample initialSample) {
             this.lastSample = initialSample;
@@ -93,7 +93,7 @@ public class NeoForgeTelemetrySampler {
         boolean hasAnyCapability = false;
 
         Direction[] sidesToQuery = new Direction[] { null, Direction.UP, Direction.DOWN, Direction.NORTH, Direction.SOUTH, Direction.WEST, Direction.EAST };
-        float[] sideMetrics = new float[12];
+        float[] sideMetrics = new float[18];
         IntArrayList allSlotCounts = new IntArrayList();
         Set<IItemHandler> processedItemHandlers = Collections.newSetFromMap(new IdentityHashMap<>());
 
@@ -205,7 +205,7 @@ public class NeoForgeTelemetrySampler {
         float itemThroughput = 0f;
         float fluidThroughput = 0f;
         float energyDelta = 0f;
-        float[] sideRates = new float[12];
+        float[] sideRates = new float[18];
 
         if (history.previousSample != null) {
             float timeDiffSec = (history.lastSample.timestampMs() - history.previousSample.timestampMs()) / 1000f;
@@ -239,7 +239,7 @@ public class NeoForgeTelemetrySampler {
                 float[] prevSideMetrics = history.previousSample.sideMetrics();
                 float[] currSideMetrics = history.lastSample.sideMetrics();
                 if (prevSideMetrics != null && currSideMetrics != null) {
-                    for (int i = 0; i < 12; i++) {
+                    for (int i = 0; i < 18; i++) {
                         float p = i < prevSideMetrics.length ? prevSideMetrics[i] : 0.0f;
                         float c = i < currSideMetrics.length ? currSideMetrics[i] : 0.0f;
                         sideRates[i] = Math.abs(c - p) / timeDiffSec;
@@ -257,7 +257,7 @@ public class NeoForgeTelemetrySampler {
             if (Math.abs(energyDelta) > 0.1f) {
                 history.lastEnergyDelta = energyDelta;
             }
-            for (int i = 0; i < 12; i++) {
+            for (int i = 0; i < 18; i++) {
                 if (sideRates[i] > 0.001f) {
                     history.lastSideRates[i] = Math.max(history.lastSideRates[i], sideRates[i]);
                 }
@@ -269,7 +269,7 @@ public class NeoForgeTelemetrySampler {
             if (itemThroughput == 0f) itemThroughput = history.lastItemTp;
             if (fluidThroughput == 0f) fluidThroughput = history.lastFluidTp;
             if (energyDelta == 0f) energyDelta = history.lastEnergyDelta;
-            for (int i = 0; i < 12; i++) {
+            for (int i = 0; i < 18; i++) {
                 if (sideRates[i] == 0f && history.lastSideRates[i] > 0f) {
                     sideRates[i] = history.lastSideRates[i];
                 }
