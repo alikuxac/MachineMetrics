@@ -2,6 +2,7 @@ package com.alikuxac.machinemetrics.neoforge.telemetry;
 
 import com.alikuxac.machinemetrics.telemetry.TelemetryData;
 import com.alikuxac.machinemetrics.config.ServerConfig;
+import com.alikuxac.machinemetrics.compat.create.CreateKineticInspector;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.multiplayer.ClientLevel;
 import net.minecraft.core.BlockPos;
@@ -58,6 +59,10 @@ public class NeoForgeTelemetrySampler {
 
 
     public static TelemetryData sampleTargetBlock(BlockPos pos) {
+        return sampleTargetBlock(pos, null);
+    }
+
+    public static TelemetryData sampleTargetBlock(BlockPos pos, Direction hitFace) {
         Minecraft mc = Minecraft.getInstance();
         ClientLevel level = mc.level;
         if (level == null || pos == null) {
@@ -187,7 +192,31 @@ public class NeoForgeTelemetrySampler {
         }
 
 
-        if (!hasAnyCapability || (maxItems == 0 && maxFluid == 0 && maxEnergy == 0)) {
+        float kineticSpeed = 0f;
+        float kineticStress = 0f;
+        float kineticCapacity = 0f;
+        float kineticBlockStress = 0f;
+        boolean isOverstressed = false;
+        boolean hasKinetic = false;
+        CreateKineticInspector.RotationDirection kineticDirection = CreateKineticInspector.RotationDirection.STATIONARY;
+
+        try {
+            var kineticOpt = CreateKineticInspector.inspectKinetic(level, pos, hitFace);
+            if (kineticOpt.isPresent()) {
+                var kData = kineticOpt.get();
+                hasKinetic = true;
+                kineticSpeed = kData.speed();
+                kineticStress = kData.stress();
+                kineticCapacity = kData.capacity();
+                kineticBlockStress = kData.blockStress();
+                isOverstressed = kData.isOverstressed();
+                kineticDirection = kData.direction();
+                hasAnyCapability = true;
+            }
+        } catch (Throwable ignored) {
+        }
+
+        if (!hasAnyCapability || (maxItems == 0 && maxFluid == 0 && maxEnergy == 0 && !hasKinetic)) {
             return TelemetryData.empty();
         }
 
@@ -287,7 +316,13 @@ public class NeoForgeTelemetrySampler {
         boolean hasEnergy = maxEnergy > 0;
 
         TelemetryData.BottleneckState state;
-        if (isActive) {
+        if (isOverstressed) {
+            state = TelemetryData.BottleneckState.OVERLOADED;
+        } else if (hasKinetic && Math.abs(kineticSpeed) > 0.001f) {
+            state = TelemetryData.BottleneckState.OPTIMAL;
+        } else if (hasKinetic && Math.abs(kineticSpeed) <= 0.001f) {
+            state = TelemetryData.BottleneckState.STARVED;
+        } else if (isActive) {
             state = TelemetryData.BottleneckState.OPTIMAL;
         } else {
             if (hasEnergy && maxEnergy > 0 && currentEnergy == 0) {
@@ -306,9 +341,6 @@ public class NeoForgeTelemetrySampler {
             }
         }
 
-
-
-
         if (addedNewSample && ServerConfig.DEBUG_LOGGING.get()) {
             LOGGER.info("[TelemetryDebug] Block: {} | Slots: {} | Tanks: {} | itemTp: {}/s | fluidTp: {} mB/s | energyDelta: {} FE/t | state: {}",
                     be.getClass().getSimpleName(), itemSlots.length, Arrays.toString(fluidTanks), itemThroughput, fluidThroughput, energyDelta, state);
@@ -319,6 +351,7 @@ public class NeoForgeTelemetrySampler {
                 fluidThroughput, hasFluids,
                 energyDelta, hasEnergy,
                 0f, false, "", 0L, 0L,
+                kineticSpeed, kineticStress, kineticCapacity, kineticBlockStress, hasKinetic, kineticDirection,
                 state, allSlotCounts, allTankAmounts, sideRates
         );
     }

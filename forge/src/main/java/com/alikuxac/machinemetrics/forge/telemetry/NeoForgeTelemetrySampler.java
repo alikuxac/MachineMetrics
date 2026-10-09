@@ -1,4 +1,4 @@
-package com.alikuxac.machinemetrics.neoforge.telemetry;
+package com.alikuxac.machinemetrics.forge.telemetry;
 
 import com.alikuxac.machinemetrics.telemetry.TelemetryData;
 import com.alikuxac.machinemetrics.config.ServerConfig;
@@ -57,6 +57,10 @@ public class NeoForgeTelemetrySampler {
     }
 
     public static TelemetryData sampleTargetBlock(BlockPos pos) {
+        return sampleTargetBlock(pos, null);
+    }
+
+    public static TelemetryData sampleTargetBlock(BlockPos pos, Direction hitFace) {
         Minecraft mc = Minecraft.getInstance();
         ClientLevel level = mc.level;
         if (level == null || pos == null) {
@@ -312,6 +316,7 @@ public class NeoForgeTelemetrySampler {
                 fluidThroughput, hasFluids,
                 energyDelta, hasEnergy,
                 0f, false, "", 0L, 0L,
+                0f, 0f, 0f, 0f, false, null,
                 state, allSlotCounts, allTankAmounts, sideRates
         );
     }

@@ -1,5 +1,6 @@
 package com.alikuxac.machinemetrics.telemetry;
 
+import com.alikuxac.machinemetrics.compat.create.CreateKineticInspector.RotationDirection;
 import net.minecraft.core.Direction;
 import it.unimi.dsi.fastutil.ints.IntArrayList;
 
@@ -15,6 +16,12 @@ public record TelemetryData(
         String chemicalName,
         long chemicalAmount,
         long chemicalCapacity,
+        float kineticSpeed,
+        float kineticStress,
+        float kineticCapacity,
+        float kineticBlockStress,
+        boolean hasKinetic,
+        RotationDirection kineticDirection,
         BottleneckState bottleneckState,
         IntArrayList allSlotCounts,
         IntArrayList allTankAmounts,
@@ -24,6 +31,7 @@ public record TelemetryData(
         OPTIMAL,
         STARVED,
         CLOGGED,
+        OVERLOADED,
         IDLE
     }
 
@@ -32,6 +40,8 @@ public record TelemetryData(
             0.0f, false,
             0.0f, false,
             0.0f, false, "", 0L, 0L,
+            0.0f, 0.0f, 0.0f, 0.0f, false,
+            RotationDirection.STATIONARY,
             BottleneckState.IDLE,
             new IntArrayList(), new IntArrayList(),
             new float[18]
@@ -42,7 +52,7 @@ public record TelemetryData(
     }
 
     public boolean isEmpty() {
-        return !hasItems && !hasFluids && !hasEnergy && !hasChemicals;
+        return !hasItems && !hasFluids && !hasEnergy && !hasChemicals && !hasKinetic;
     }
 
     public float getItemSideRate(Direction dir) {
@@ -71,11 +81,16 @@ public record TelemetryData(
     public boolean hasSignificantDelta(TelemetryData other) {
         if (other == null) return true;
         if (this.bottleneckState != other.bottleneckState) return true;
-        if (this.hasItems != other.hasItems || this.hasFluids != other.hasFluids || this.hasEnergy != other.hasEnergy || this.hasChemicals != other.hasChemicals) return true;
+        if (this.kineticDirection != other.kineticDirection) return true;
+        if (this.hasItems != other.hasItems || this.hasFluids != other.hasFluids || this.hasEnergy != other.hasEnergy || this.hasChemicals != other.hasChemicals || this.hasKinetic != other.hasKinetic) return true;
         if (Math.abs(this.itemThroughput - other.itemThroughput) > 0.1f) return true;
         if (Math.abs(this.fluidThroughput - other.fluidThroughput) > 1.0f) return true;
         if (Math.abs(this.chemicalThroughput - other.chemicalThroughput) > 1.0f) return true;
         if (Math.abs(this.energyDelta - other.energyDelta) > 1.0f) return true;
+        if (Math.abs(this.kineticSpeed - other.kineticSpeed) > 0.1f) return true;
+        if (Math.abs(this.kineticStress - other.kineticStress) > 0.5f) return true;
+        if (Math.abs(this.kineticCapacity - other.kineticCapacity) > 0.5f) return true;
+        if (Math.abs(this.kineticBlockStress - other.kineticBlockStress) > 0.5f) return true;
         if (this.chemicalAmount != other.chemicalAmount) return true;
 
         if (this.sideMetrics != null && other.sideMetrics != null) {

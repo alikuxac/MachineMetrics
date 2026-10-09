@@ -1,6 +1,5 @@
 package com.alikuxac.machinemetrics.forge.telemetry;
 
-import com.alikuxac.machinemetrics.compat.mekanism.MekanismChemicalInspector;
 import com.alikuxac.machinemetrics.telemetry.TelemetryData;
 
 import it.unimi.dsi.fastutil.ints.IntArrayList;
@@ -59,6 +58,10 @@ public class ServerTelemetrySampler {
 
 
     public static TelemetryData sampleTargetBlock(ServerLevel level, BlockPos pos) {
+        return sampleTargetBlock(level, pos, null);
+    }
+
+    public static TelemetryData sampleTargetBlock(ServerLevel level, BlockPos pos, Direction hitFace) {
         if (level == null || pos == null || !level.isLoaded(pos)) {
             return TelemetryData.empty();
         }
@@ -181,19 +184,6 @@ public class ServerTelemetrySampler {
         }
         int[] fluidTanks = allTankAmounts.toIntArray();
 
-        for (Direction side : sidesToQuery) {
-            try {
-                if (side != null) {
-                    var chemOpt = MekanismChemicalInspector.inspectChemicals(level, pos, side);
-                    if (chemOpt.isPresent()) {
-                        sideMetrics[12 + side.ordinal()] = (float) chemOpt.get().amount();
-                    }
-                }
-            } catch (Throwable ignored) {
-            }
-        }
-
-
         Set<IEnergyStorage> processedEnergyStorages = Collections.newSetFromMap(new IdentityHashMap<>());
 
         for (Direction side : sidesToQuery) {
@@ -211,7 +201,6 @@ public class ServerTelemetrySampler {
                 // Ignore capability query exception
             }
         }
-
 
         if (!hasAnyCapability || (maxItems == 0 && maxFluid == 0 && maxEnergy == 0)) {
             INERT_BLOCK_CACHE.put(pos, now);
@@ -305,30 +294,6 @@ public class ServerTelemetrySampler {
             Arrays.fill(sideRates, 0f);
         }
 
-        float chemicalThroughput = 0f;
-        for (int i = 12; i < 18; i++) {
-            chemicalThroughput += sideRates[i];
-        }
-
-        boolean hasChemicals = false;
-        String chemicalName = "";
-        long chemicalAmount = 0L;
-        long chemicalCapacity = 0L;
-
-        try {
-            var chemOpt = MekanismChemicalInspector.inspectChemicals(level, pos, null);
-            if (chemOpt.isPresent()) {
-
-                var chemData = chemOpt.get();
-                hasChemicals = true;
-                chemicalName = chemData.chemicalName();
-                chemicalAmount = chemData.amount();
-                chemicalCapacity = chemData.capacity();
-                hasAnyCapability = true;
-            }
-        } catch (Throwable ignored) {
-        }
-
         boolean hasItems = maxItems > 0;
         boolean hasFluids = maxFluid > 0;
         boolean hasEnergy = maxEnergy > 0;
@@ -357,7 +322,8 @@ public class ServerTelemetrySampler {
                 itemThroughput, hasItems,
                 fluidThroughput, hasFluids,
                 energyDelta, hasEnergy,
-                chemicalThroughput, hasChemicals, chemicalName, chemicalAmount, chemicalCapacity,
+                0f, false, "", 0L, 0L,
+                0f, 0f, 0f, 0f, false, null,
                 state, allSlotCounts, allTankAmounts, sideRates
         );
     }

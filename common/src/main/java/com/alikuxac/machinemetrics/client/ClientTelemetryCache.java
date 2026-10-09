@@ -2,6 +2,7 @@ package com.alikuxac.machinemetrics.client;
 
 import com.alikuxac.machinemetrics.config.ClientConfig;
 import com.alikuxac.machinemetrics.telemetry.TelemetryData;
+import com.alikuxac.machinemetrics.compat.create.CreateKineticInspector;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.Font;
 import net.minecraft.core.BlockPos;
@@ -39,8 +40,20 @@ public class ClientTelemetryCache {
     private static final Map<BlockPos, Entry> CACHE = new ConcurrentHashMap<>();
     private static final long EXPIRE_MS = 2000L;
 
+    public static void putSynced(BlockPos pos, TelemetryData data) {
+        if (pos != null && data != null) {
+            CachedHudRenderData renderData = buildRenderData(data);
+            CACHE.put(pos, new Entry(data, renderData, System.currentTimeMillis()));
+        }
+    }
+
     public static void put(BlockPos pos, TelemetryData data) {
         if (pos != null && data != null) {
+            Entry existing = CACHE.get(pos);
+            // If we already have fresh server-synced data, do not let local client sampler overwrite it
+            if (existing != null && (System.currentTimeMillis() - existing.receivedTimeMs < EXPIRE_MS)) {
+                return;
+            }
             CachedHudRenderData renderData = buildRenderData(data);
             CACHE.put(pos, new Entry(data, renderData, System.currentTimeMillis()));
         }
@@ -92,6 +105,7 @@ public class ClientTelemetryCache {
         int itemsColor = ClientConfig.parseHexColor(ClientConfig.COLOR_ITEMS, 0xFFD54F);
         int fluidsColor = ClientConfig.parseHexColor(ClientConfig.COLOR_FLUIDS, 0x4FC3F7);
         int chemicalsColor = ClientConfig.parseHexColor(ClientConfig.COLOR_CHEMICALS, 0xAEEA00);
+        int kineticColor = ClientConfig.parseHexColor(ClientConfig.COLOR_KINETIC, 0xFF9E59);
         int positiveEnergyColor = ClientConfig.parseHexColor(ClientConfig.COLOR_ENERGY_POSITIVE, 0x55FF55);
         int negativeEnergyColor = ClientConfig.parseHexColor(ClientConfig.COLOR_ENERGY_NEGATIVE, 0xFF5252);
         int neutralEnergyColor = ClientConfig.parseHexColor(ClientConfig.COLOR_ENERGY_NEUTRAL, 0xE040FB);
@@ -104,7 +118,13 @@ public class ClientTelemetryCache {
         String compactMetricStr;
         int compactMetricColor = 0xFFFFFF;
 
-        if (data.itemThroughput() > 0f || (data.hasItems() && !data.hasFluids() && !data.hasChemicals() && !data.hasEnergy())) {
+        if (data.hasKinetic() || Math.abs(data.kineticSpeed()) > 0f) {
+            String dirSuffix = (data.kineticDirection() != null && data.kineticDirection() != CreateKineticInspector.RotationDirection.STATIONARY)
+                    ? " " + data.kineticDirection().getLabel()
+                    : "";
+            compactMetricStr = String.format("%.0f RPM%s", Math.abs(data.kineticSpeed()), dirSuffix);
+            compactMetricColor = kineticColor;
+        } else if (data.itemThroughput() > 0f || (data.hasItems() && !data.hasFluids() && !data.hasChemicals() && !data.hasEnergy())) {
             compactMetricStr = formatItemRate(data.itemThroughput());
             compactMetricColor = itemsColor;
         } else if (data.fluidThroughput() > 0f || (data.hasFluids() && !data.hasChemicals() && !data.hasEnergy())) {
@@ -136,6 +156,54 @@ public class ClientTelemetryCache {
         int detailedStateColor = getStatusColor(data.bottleneckState());
 
         List<RenderRow> detailedRows = new ArrayList<>();
+
+        // Kinetic rows always render (they're constant values, not throughput deltas)
+        if (data.hasKinetic() || Math.abs(data.kineticSpeed()) > 0f || data.kineticCapacity() > 0f) {
+            String dirSuffix = (data.kineticDirection() != null && data.kineticDirection() != CreateKineticInspector.RotationDirection.STATIONARY)
+                    ? " " + data.kineticDirection().getLabel()
+                    : "";
+            String speedLabel = Component.translatable("machinemetrics.metrics.speed").getString() + ":";
+            String speedVal = String.format("%.0f RPM%s", Math.abs(data.kineticSpeed()), dirSuffix);
+            detailedRows.add(new RenderRow(
+                    Component.literal(speedLabel),
+                    Component.literal(speedVal),
+                    kineticColor,
+                    font != null ? font.width(speedVal) : 0
+            ));
+
+            float actualCapacity = data.kineticCapacity();
+            float actualStress = data.kineticStress();
+
+            String stressLabel = Component.translatable("machinemetrics.metrics.stress").getString() + ":";
+            String stressVal;
+            if (actualCapacity > 0f) {
+                float stressPct = (actualStress / actualCapacity) * 100f;
+                stressVal = String.format("%.0f / %.0f SU (%.0f%%)", actualStress, actualCapacity, stressPct);
+            } else if (actualStress > 0f) {
+                stressVal = String.format("%.0f SU", actualStress);
+            } else {
+                stressVal = "0 SU";
+            }
+            int stressColor = data.bottleneckState() == TelemetryData.BottleneckState.OVERLOADED ?
+                    ClientConfig.parseHexColor(ClientConfig.COLOR_STATE_OVERLOADED, 0xFF3333) : kineticColor;
+            detailedRows.add(new RenderRow(
+                    Component.literal(stressLabel),
+                    Component.literal(stressVal),
+                    stressColor,
+                    font != null ? font.width(stressVal) : 0
+            ));
+
+            if (data.kineticBlockStress() > 0.001f) {
+                String impactLabel = Component.translatable("machinemetrics.metrics.stress_impact").getString() + ":";
+                String impactVal = String.format("%.0f SU", data.kineticBlockStress());
+                detailedRows.add(new RenderRow(
+                        Component.literal(impactLabel),
+                        Component.literal(impactVal),
+                        kineticColor,
+                        font != null ? font.width(impactVal) : 0
+                ));
+            }
+        }
 
         if (data.bottleneckState() != TelemetryData.BottleneckState.IDLE) {
             if (data.hasItems() || data.itemThroughput() > 0f) {
@@ -322,6 +390,7 @@ public class ClientTelemetryCache {
             case OPTIMAL -> Component.translatable("machinemetrics.state.optimal");
             case STARVED -> Component.translatable("machinemetrics.state.starved");
             case CLOGGED -> Component.translatable("machinemetrics.state.clogged");
+            case OVERLOADED -> Component.translatable("machinemetrics.state.overloaded");
             case IDLE -> Component.translatable("machinemetrics.state.idle");
         };
     }
@@ -331,6 +400,7 @@ public class ClientTelemetryCache {
             case OPTIMAL -> ClientConfig.parseHexColor(ClientConfig.COLOR_STATE_OPTIMAL, 0x55FF55);
             case STARVED -> ClientConfig.parseHexColor(ClientConfig.COLOR_STATE_STARVED, 0xFFFF55);
             case CLOGGED -> ClientConfig.parseHexColor(ClientConfig.COLOR_STATE_CLOGGED, 0xFF5555);
+            case OVERLOADED -> ClientConfig.parseHexColor(ClientConfig.COLOR_STATE_OVERLOADED, 0xFF3333);
             case IDLE -> ClientConfig.parseHexColor(ClientConfig.COLOR_STATE_IDLE, 0xAAAAAA);
         };
     }

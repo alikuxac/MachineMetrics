@@ -1,5 +1,6 @@
 package com.alikuxac.machinemetrics.neoforge.telemetry;
 
+import com.alikuxac.machinemetrics.compat.create.CreateKineticInspector;
 import com.alikuxac.machinemetrics.compat.mekanism.MekanismChemicalInspector;
 import com.alikuxac.machinemetrics.telemetry.TelemetryData;
 
@@ -59,6 +60,10 @@ public class ServerTelemetrySampler {
 
 
     public static TelemetryData sampleTargetBlock(ServerLevel level, BlockPos pos) {
+        return sampleTargetBlock(level, pos, null);
+    }
+
+    public static TelemetryData sampleTargetBlock(ServerLevel level, BlockPos pos, Direction hitFace) {
         if (level == null || pos == null || !level.isLoaded(pos)) {
             return TelemetryData.empty();
         }
@@ -212,8 +217,31 @@ public class ServerTelemetrySampler {
             }
         }
 
+        float kineticSpeed = 0f;
+        float kineticStress = 0f;
+        float kineticCapacity = 0f;
+        float kineticBlockStress = 0f;
+        boolean isOverstressed = false;
+        boolean hasKinetic = false;
+        CreateKineticInspector.RotationDirection kineticDirection = CreateKineticInspector.RotationDirection.STATIONARY;
 
-        if (!hasAnyCapability || (maxItems == 0 && maxFluid == 0 && maxEnergy == 0)) {
+        try {
+            var kineticOpt = CreateKineticInspector.inspectKinetic(level, pos, hitFace);
+            if (kineticOpt.isPresent()) {
+                var kData = kineticOpt.get();
+                hasKinetic = true;
+                kineticSpeed = kData.speed();
+                kineticStress = kData.stress();
+                kineticCapacity = kData.capacity();
+                kineticBlockStress = kData.blockStress();
+                isOverstressed = kData.isOverstressed();
+                kineticDirection = kData.direction();
+                hasAnyCapability = true;
+            }
+        } catch (Throwable ignored) {
+        }
+
+        if (!hasAnyCapability || (maxItems == 0 && maxFluid == 0 && maxEnergy == 0 && !hasKinetic)) {
             INERT_BLOCK_CACHE.put(pos, now);
             return TelemetryData.empty();
         }
@@ -272,7 +300,7 @@ public class ServerTelemetrySampler {
             }
         }
 
-        boolean hasImmediateActivity = itemThroughput > 0.001f || fluidThroughput > 0.001f || Math.abs(energyDelta) > 0.1f;
+        boolean hasImmediateActivity = itemThroughput > 0.001f || fluidThroughput > 0.001f || Math.abs(energyDelta) > 0.1f || Math.abs(kineticSpeed) > 0.001f;
         if (hasImmediateActivity) {
             history.lastActiveTimeMs = now;
             history.lastItemTp = Math.max(history.lastItemTp, itemThroughput);
@@ -305,8 +333,6 @@ public class ServerTelemetrySampler {
             Arrays.fill(sideRates, 0f);
         }
 
-
-
         float chemicalThroughput = 0f;
         for (int i = 12; i < 18; i++) {
             chemicalThroughput += sideRates[i];
@@ -336,7 +362,15 @@ public class ServerTelemetrySampler {
         boolean hasEnergy = maxEnergy > 0;
 
         TelemetryData.BottleneckState state;
-        if (isActive) {
+        if (isOverstressed) {
+            state = TelemetryData.BottleneckState.OVERLOADED;
+        } else if (hasKinetic && Math.abs(kineticSpeed) > 0.001f) {
+            // Kinetic blocks with speed are always OPTIMAL
+            state = TelemetryData.BottleneckState.OPTIMAL;
+        } else if (hasKinetic && Math.abs(kineticSpeed) <= 0.001f) {
+            // Kinetic block with no speed = STARVED (no power source)
+            state = TelemetryData.BottleneckState.STARVED;
+        } else if (isActive) {
             state = TelemetryData.BottleneckState.OPTIMAL;
         } else {
             if (hasEnergy && maxEnergy > 0 && currentEnergy == 0) {
@@ -360,6 +394,7 @@ public class ServerTelemetrySampler {
                 fluidThroughput, hasFluids,
                 energyDelta, hasEnergy,
                 chemicalThroughput, hasChemicals, chemicalName, chemicalAmount, chemicalCapacity,
+                kineticSpeed, kineticStress, kineticCapacity, kineticBlockStress, hasKinetic, kineticDirection,
                 state, allSlotCounts, allTankAmounts, sideRates
         );
     }

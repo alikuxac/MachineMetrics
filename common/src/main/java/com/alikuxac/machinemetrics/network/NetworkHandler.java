@@ -3,6 +3,7 @@ package com.alikuxac.machinemetrics.network;
 import com.alikuxac.machinemetrics.client.ClientTelemetryCache;
 import com.alikuxac.machinemetrics.platform.Services;
 import com.alikuxac.machinemetrics.telemetry.TelemetryData;
+import net.minecraft.core.Direction;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.neoforged.neoforge.network.event.RegisterPayloadHandlersEvent;
@@ -38,21 +39,19 @@ public class NetworkHandler {
             if (context.player() instanceof ServerPlayer serverPlayer) {
                 ServerLevel serverLevel = serverPlayer.serverLevel();
                 BlockPos targetPos = payload.targetPos();
-                TelemetryData data = Services.SERVER_SAMPLER.apply(serverLevel, targetPos);
+                Direction hitFace = payload.hitFace();
+                TelemetryData data = Services.SERVER_SAMPLER.sample(serverLevel, targetPos, hitFace);
                 
-                TelemetryData lastSent = LAST_SENT_TO_CLIENT.get(targetPos);
-                if (lastSent == null || data.hasSignificantDelta(lastSent)) {
-                    LAST_SENT_TO_CLIENT.put(targetPos, data);
-                    SyncTelemetryPayload response = SyncTelemetryPayload.from(targetPos, data);
-                    context.reply(response);
-                }
+                LAST_SENT_TO_CLIENT.put(targetPos, data);
+                SyncTelemetryPayload response = SyncTelemetryPayload.from(targetPos, data);
+                context.reply(response);
             }
         });
     }
 
     private static void handleSyncPayload(SyncTelemetryPayload payload, IPayloadContext context) {
         context.enqueueWork(() -> {
-            ClientTelemetryCache.put(payload.targetPos(), payload.toTelemetryData());
+            ClientTelemetryCache.putSynced(payload.targetPos(), payload.toTelemetryData());
         });
     }
 }

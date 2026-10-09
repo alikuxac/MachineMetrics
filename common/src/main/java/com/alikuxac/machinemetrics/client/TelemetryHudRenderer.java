@@ -2,11 +2,13 @@ package com.alikuxac.machinemetrics.client;
 
 import com.alikuxac.machinemetrics.config.ClientConfig;
 import com.alikuxac.machinemetrics.network.RequestTelemetryPayload;
+import com.alikuxac.machinemetrics.platform.Services.ClientSampler;
 import com.alikuxac.machinemetrics.telemetry.TelemetryData;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.core.BlockPos;
+import net.minecraft.core.Direction;
 import net.minecraft.world.phys.BlockHitResult;
 import net.minecraft.world.phys.HitResult;
 import net.neoforged.neoforge.network.PacketDistributor;
@@ -17,11 +19,13 @@ import java.util.function.Function;
 public class TelemetryHudRenderer {
 
     private static BlockPos currentHoverPos = null;
+    private static Direction currentHoverFace = null;
     private static long hoverStartTimeMs = 0L;
     private static BlockPos lastSentPos = null;
+    private static Direction lastSentFace = null;
     private static long lastRequestTimeMs = 0L;
 
-    public static void renderHud(GuiGraphics graphics, Function<BlockPos, TelemetryData> sampler) {
+    public static void renderHud(GuiGraphics graphics, ClientSampler sampler) {
         if (!KeyBindings.hudEnabled) {
             return;
         }
@@ -36,31 +40,35 @@ public class TelemetryHudRenderer {
             if (currentHoverPos != null) {
                 ClientTelemetryCache.remove(currentHoverPos);
                 currentHoverPos = null;
+                currentHoverFace = null;
             }
             return;
         }
 
         BlockHitResult blockHitResult = (BlockHitResult) hitResult;
         BlockPos targetPos = blockHitResult.getBlockPos();
+        Direction hitFace = blockHitResult.getDirection();
 
         long now = System.currentTimeMillis();
 
-        if (!targetPos.equals(currentHoverPos)) {
+        if (!targetPos.equals(currentHoverPos) || hitFace != currentHoverFace) {
             if (currentHoverPos != null) {
                 ClientTelemetryCache.remove(currentHoverPos);
             }
             currentHoverPos = targetPos;
+            currentHoverFace = hitFace;
             hoverStartTimeMs = now;
         }
 
         // Raycast Debounce (~2-3 ticks / 120ms hover before sending network packet)
         if (now - hoverStartTimeMs >= 120L) {
-            if (now - lastRequestTimeMs >= 200L || !targetPos.equals(lastSentPos)) {
+            if (now - lastRequestTimeMs >= 200L || !targetPos.equals(lastSentPos) || hitFace != lastSentFace) {
                 lastRequestTimeMs = now;
                 lastSentPos = targetPos;
+                lastSentFace = hitFace;
                 try {
                     if (mc.getConnection() != null) {
-                        PacketDistributor.sendToServer(new RequestTelemetryPayload(targetPos));
+                        PacketDistributor.sendToServer(new RequestTelemetryPayload(targetPos, hitFace));
                     }
                 } catch (Exception ignored) {
                 }
@@ -69,7 +77,7 @@ public class TelemetryHudRenderer {
 
         TelemetryData data = ClientTelemetryCache.get(targetPos);
         if (data.isEmpty()) {
-            data = sampler.apply(targetPos);
+            data = sampler.sample(targetPos, hitFace);
         }
 
         if (data == null || data.isEmpty()) {

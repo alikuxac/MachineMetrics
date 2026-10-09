@@ -1,5 +1,6 @@
 package com.alikuxac.machinemetrics.network;
 
+import com.alikuxac.machinemetrics.compat.create.CreateKineticInspector;
 import com.alikuxac.machinemetrics.telemetry.TelemetryData;
 import it.unimi.dsi.fastutil.ints.IntArrayList;
 import net.minecraft.core.BlockPos;
@@ -21,6 +22,12 @@ public record SyncTelemetryPayload(
         String chemicalName,
         long chemicalAmount,
         long chemicalCapacity,
+        float kineticSpeed,
+        float kineticStress,
+        float kineticCapacity,
+        float kineticBlockStress,
+        boolean hasKinetic,
+        byte kineticDirection,
         byte machineState,
         float[] sideMetrics,
         IntArrayList allSlotCounts,
@@ -32,6 +39,7 @@ public record SyncTelemetryPayload(
             StreamCodec.of(SyncTelemetryPayload::encode, SyncTelemetryPayload::decode);
 
     public static SyncTelemetryPayload from(BlockPos pos, TelemetryData data) {
+        byte dirByte = data.kineticDirection() != null ? (byte) data.kineticDirection().ordinal() : (byte) 2;
         return new SyncTelemetryPayload(
                 pos,
                 data.itemThroughput(),
@@ -45,6 +53,12 @@ public record SyncTelemetryPayload(
                 data.chemicalName() != null ? data.chemicalName() : "",
                 data.chemicalAmount(),
                 data.chemicalCapacity(),
+                data.kineticSpeed(),
+                data.kineticStress(),
+                data.kineticCapacity(),
+                data.kineticBlockStress(),
+                data.hasKinetic(),
+                dirByte,
                 (byte) data.bottleneckState().ordinal(),
                 data.sideMetrics(),
                 data.allSlotCounts(),
@@ -55,6 +69,8 @@ public record SyncTelemetryPayload(
     public TelemetryData toTelemetryData() {
         TelemetryData.BottleneckState[] states = TelemetryData.BottleneckState.values();
         TelemetryData.BottleneckState state = (machineState >= 0 && machineState < states.length) ? states[machineState] : TelemetryData.BottleneckState.IDLE;
+        var dirs = CreateKineticInspector.RotationDirection.values();
+        var dir = (kineticDirection >= 0 && kineticDirection < dirs.length) ? dirs[kineticDirection] : CreateKineticInspector.RotationDirection.STATIONARY;
         return new TelemetryData(
                 itemThroughput,
                 hasItems,
@@ -67,6 +83,12 @@ public record SyncTelemetryPayload(
                 chemicalName,
                 chemicalAmount,
                 chemicalCapacity,
+                kineticSpeed,
+                kineticStress,
+                kineticCapacity,
+                kineticBlockStress,
+                hasKinetic,
+                dir,
                 state,
                 allSlotCounts != null ? allSlotCounts : new IntArrayList(),
                 allTankAmounts != null ? allTankAmounts : new IntArrayList(),
@@ -87,6 +109,12 @@ public record SyncTelemetryPayload(
         buf.writeUtf(payload.chemicalName != null ? payload.chemicalName : "");
         buf.writeVarLong(payload.chemicalAmount);
         buf.writeVarLong(payload.chemicalCapacity);
+        buf.writeFloat(payload.kineticSpeed);
+        buf.writeFloat(payload.kineticStress);
+        buf.writeFloat(payload.kineticCapacity);
+        buf.writeFloat(payload.kineticBlockStress);
+        buf.writeBoolean(payload.hasKinetic);
+        buf.writeByte(payload.kineticDirection);
         buf.writeByte(payload.machineState);
 
         IntArrayList slots = payload.allSlotCounts;
@@ -122,6 +150,12 @@ public record SyncTelemetryPayload(
         String chemicalName = buf.readUtf();
         long chemicalAmount = buf.readVarLong();
         long chemicalCapacity = buf.readVarLong();
+        float kineticSpeed = buf.readFloat();
+        float kineticStress = buf.readFloat();
+        float kineticCapacity = buf.readFloat();
+        float kineticBlockStress = buf.readFloat();
+        boolean hasKinetic = buf.readBoolean();
+        byte kineticDirection = buf.readByte();
         byte machineState = buf.readByte();
 
         int slotCount = buf.readVarInt();
@@ -141,7 +175,6 @@ public record SyncTelemetryPayload(
             sideMetrics[i] = buf.readFloat();
         }
 
-
         return new SyncTelemetryPayload(
                 targetPos,
                 itemThroughput,
@@ -155,6 +188,12 @@ public record SyncTelemetryPayload(
                 chemicalName,
                 chemicalAmount,
                 chemicalCapacity,
+                kineticSpeed,
+                kineticStress,
+                kineticCapacity,
+                kineticBlockStress,
+                hasKinetic,
+                kineticDirection,
                 machineState,
                 sideMetrics,
                 allSlotCounts,

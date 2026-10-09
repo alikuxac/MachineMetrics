@@ -12,6 +12,7 @@ public class ClientConfig {
     public static final ModConfigSpec.ConfigValue<String> COLOR_ITEMS;
     public static final ModConfigSpec.ConfigValue<String> COLOR_FLUIDS;
     public static final ModConfigSpec.ConfigValue<String> COLOR_CHEMICALS;
+    public static final ModConfigSpec.ConfigValue<String> COLOR_KINETIC;
     public static final ModConfigSpec.ConfigValue<String> COLOR_ENERGY_POSITIVE;
     public static final ModConfigSpec.ConfigValue<String> COLOR_ENERGY_NEGATIVE;
     public static final ModConfigSpec.ConfigValue<String> COLOR_ENERGY_NEUTRAL;
@@ -20,6 +21,7 @@ public class ClientConfig {
     public static final ModConfigSpec.ConfigValue<String> COLOR_STATE_OPTIMAL;
     public static final ModConfigSpec.ConfigValue<String> COLOR_STATE_STARVED;
     public static final ModConfigSpec.ConfigValue<String> COLOR_STATE_CLOGGED;
+    public static final ModConfigSpec.ConfigValue<String> COLOR_STATE_OVERLOADED;
     public static final ModConfigSpec.ConfigValue<String> COLOR_STATE_IDLE;
 
     static {
@@ -51,6 +53,10 @@ public class ClientConfig {
                 .comment("Chemicals metric color")
                 .define("chemicalsColor", "#AEEA00");
 
+        COLOR_KINETIC = builder
+                .comment("Kinetic metric color (RPM/Stress)")
+                .define("kineticColor", "#FF9E59");
+
         COLOR_ENERGY_POSITIVE = builder
                 .comment("Positive energy rate color (+FE/t)")
                 .define("energyPositiveColor", "#69F0AE");
@@ -78,6 +84,10 @@ public class ClientConfig {
         COLOR_STATE_CLOGGED = builder
                 .comment("CLOGGED status state color")
                 .define("stateCloggedColor", "#FF5555");
+
+        COLOR_STATE_OVERLOADED = builder
+                .comment("OVERLOADED status state color")
+                .define("stateOverloadedColor", "#FF3333");
 
         COLOR_STATE_IDLE = builder
                 .comment("IDLE status state color")

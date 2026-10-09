@@ -2,18 +2,28 @@ package com.alikuxac.machinemetrics.platform;
 
 import com.alikuxac.machinemetrics.telemetry.TelemetryData;
 import net.minecraft.core.BlockPos;
+import net.minecraft.core.Direction;
 import net.minecraft.server.level.ServerLevel;
 
 import java.util.function.BiFunction;
-import java.util.function.Function;
 
 public class Services {
-    public static Function<BlockPos, TelemetryData> CLIENT_SAMPLER = pos -> TelemetryData.EMPTY;
-    public static BiFunction<ServerLevel, BlockPos, TelemetryData> SERVER_SAMPLER = (level, pos) -> TelemetryData.EMPTY;
-    public static NetworkSender NETWORK_SENDER = (pos) -> {};
+    @FunctionalInterface
+    public interface ClientSampler {
+        TelemetryData sample(BlockPos pos, Direction hitFace);
+    }
+
+    @FunctionalInterface
+    public interface ServerSampler {
+        TelemetryData sample(ServerLevel level, BlockPos pos, Direction hitFace);
+    }
+
+    public static ClientSampler CLIENT_SAMPLER = (pos, face) -> TelemetryData.EMPTY;
+    public static ServerSampler SERVER_SAMPLER = (level, pos, face) -> TelemetryData.EMPTY;
+    public static NetworkSender NETWORK_SENDER = (pos, face) -> {};
 
     @FunctionalInterface
     public interface NetworkSender {
-        void sendRequest(BlockPos pos);
+        void sendRequest(BlockPos pos, Direction face);
     }
 }

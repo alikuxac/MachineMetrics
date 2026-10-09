@@ -1,4 +1,4 @@
-package com.alikuxac.machinemetrics.neoforge.client;
+package com.alikuxac.machinemetrics.forge.client;
 
 import com.alikuxac.machinemetrics.client.HudPositionScreen;
 import com.alikuxac.machinemetrics.client.KeyBindings;

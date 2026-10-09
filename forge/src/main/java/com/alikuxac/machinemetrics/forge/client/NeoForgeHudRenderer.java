@@ -1,7 +1,7 @@
-package com.alikuxac.machinemetrics.neoforge.client;
+package com.alikuxac.machinemetrics.forge.client;
 
 import com.alikuxac.machinemetrics.client.TelemetryHudRenderer;
-import com.alikuxac.machinemetrics.neoforge.telemetry.NeoForgeTelemetrySampler;
+import com.alikuxac.machinemetrics.forge.telemetry.NeoForgeTelemetrySampler;
 import net.neoforged.api.distmarker.Dist;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.common.EventBusSubscriber;
