@@ -5,10 +5,49 @@ import net.neoforged.neoforge.common.ModConfigSpec;
 public class ServerConfig {
 
     public static final ModConfigSpec SPEC;
+
+    // Feature Toggles (default: true)
+    public static final ModConfigSpec.BooleanValue ALLOW_ITEMS;
+    public static final ModConfigSpec.BooleanValue ALLOW_FLUIDS;
+    public static final ModConfigSpec.BooleanValue ALLOW_ENERGY;
+    public static final ModConfigSpec.BooleanValue ALLOW_KINETIC;
+    public static final ModConfigSpec.BooleanValue ALLOW_CHEMICALS;
+    public static final ModConfigSpec.BooleanValue ALLOW_SIDE_METRICS;
+
+    // Debug
     public static final ModConfigSpec.BooleanValue DEBUG_LOGGING;
 
     static {
         ModConfigSpec.Builder builder = new ModConfigSpec.Builder();
+
+        builder.comment("Server Telemetry Metric Permissions (What data the server samples and sends to clients)")
+                .push("features");
+
+        ALLOW_ITEMS = builder
+                .comment("Allow sending item transfer throughput metrics to clients")
+                .define("allow_items_telemetry", true);
+
+        ALLOW_FLUIDS = builder
+                .comment("Allow sending fluid transfer throughput metrics to clients")
+                .define("allow_fluids_telemetry", true);
+
+        ALLOW_ENERGY = builder
+                .comment("Allow sending Forge Energy (FE/t) rate metrics to clients")
+                .define("allow_energy_telemetry", true);
+
+        ALLOW_KINETIC = builder
+                .comment("Allow sending Create kinetic rotational metrics (Speed, Stress, Capacity) to clients")
+                .define("allow_kinetic_telemetry", true);
+
+        ALLOW_CHEMICALS = builder
+                .comment("Allow sending Mekanism chemical metrics (Gases, Infuse Types, Pigments, Slurries) to clients")
+                .define("allow_chemicals_telemetry", true);
+
+        ALLOW_SIDE_METRICS = builder
+                .comment("Allow sending per-side / per-face throughput metrics to clients")
+                .define("allow_side_metrics_telemetry", true);
+
+        builder.pop();
 
         builder.comment("Telemetry Server & Logic Configuration").push("debug");
 

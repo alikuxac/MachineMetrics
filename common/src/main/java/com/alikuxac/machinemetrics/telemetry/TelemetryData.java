@@ -25,7 +25,8 @@ public record TelemetryData(
         BottleneckState bottleneckState,
         IntArrayList allSlotCounts,
         IntArrayList allTankAmounts,
-        float[] sideMetrics
+        float[] sideMetrics,
+        short serverDisabledMask
 ) {
     public enum BottleneckState {
         OPTIMAL,
@@ -33,6 +34,48 @@ public record TelemetryData(
         CLOGGED,
         OVERLOADED,
         IDLE
+    }
+
+    public static final short MASK_ITEMS = 1 << 0;
+    public static final short MASK_FLUIDS = 1 << 1;
+    public static final short MASK_ENERGY = 1 << 2;
+    public static final short MASK_KINETIC = 1 << 3;
+    public static final short MASK_CHEMICALS = 1 << 4;
+    public static final short MASK_SIDES = 1 << 5;
+
+    public TelemetryData(
+            float itemThroughput,
+            boolean hasItems,
+            float fluidThroughput,
+            boolean hasFluids,
+            float energyDelta,
+            boolean hasEnergy,
+            float chemicalThroughput,
+            boolean hasChemicals,
+            String chemicalName,
+            long chemicalAmount,
+            long chemicalCapacity,
+            float kineticSpeed,
+            float kineticStress,
+            float kineticCapacity,
+            float kineticBlockStress,
+            boolean hasKinetic,
+            RotationDirection kineticDirection,
+            BottleneckState bottleneckState,
+            IntArrayList allSlotCounts,
+            IntArrayList allTankAmounts,
+            float[] sideMetrics
+    ) {
+        this(
+                itemThroughput, hasItems,
+                fluidThroughput, hasFluids,
+                energyDelta, hasEnergy,
+                chemicalThroughput, hasChemicals, chemicalName, chemicalAmount, chemicalCapacity,
+                kineticSpeed, kineticStress, kineticCapacity, kineticBlockStress, hasKinetic,
+                kineticDirection, bottleneckState,
+                allSlotCounts, allTankAmounts, sideMetrics,
+                (short) 0
+        );
     }
 
     public static final TelemetryData EMPTY = new TelemetryData(
@@ -44,7 +87,8 @@ public record TelemetryData(
             RotationDirection.STATIONARY,
             BottleneckState.IDLE,
             new IntArrayList(), new IntArrayList(),
-            new float[18]
+            new float[18],
+            (short) 0
     );
 
     public static TelemetryData empty() {
@@ -52,7 +96,31 @@ public record TelemetryData(
     }
 
     public boolean isEmpty() {
-        return !hasItems && !hasFluids && !hasEnergy && !hasChemicals && !hasKinetic;
+        return !hasItems && !hasFluids && !hasEnergy && !hasChemicals && !hasKinetic && serverDisabledMask == 0;
+    }
+
+    public boolean isItemsDisabledByServer() {
+        return (serverDisabledMask & MASK_ITEMS) != 0;
+    }
+
+    public boolean isFluidsDisabledByServer() {
+        return (serverDisabledMask & MASK_FLUIDS) != 0;
+    }
+
+    public boolean isEnergyDisabledByServer() {
+        return (serverDisabledMask & MASK_ENERGY) != 0;
+    }
+
+    public boolean isKineticDisabledByServer() {
+        return (serverDisabledMask & MASK_KINETIC) != 0;
+    }
+
+    public boolean isChemicalsDisabledByServer() {
+        return (serverDisabledMask & MASK_CHEMICALS) != 0;
+    }
+
+    public boolean isSidesDisabledByServer() {
+        return (serverDisabledMask & MASK_SIDES) != 0;
     }
 
     public float getItemSideRate(Direction dir) {
@@ -80,6 +148,7 @@ public record TelemetryData(
 
     public boolean hasSignificantDelta(TelemetryData other) {
         if (other == null) return true;
+        if (this.serverDisabledMask != other.serverDisabledMask) return true;
         if (this.bottleneckState != other.bottleneckState) return true;
         if (this.kineticDirection != other.kineticDirection) return true;
         if (this.hasItems != other.hasItems || this.hasFluids != other.hasFluids || this.hasEnergy != other.hasEnergy || this.hasChemicals != other.hasChemicals || this.hasKinetic != other.hasKinetic) return true;
@@ -104,5 +173,3 @@ public record TelemetryData(
         return false;
     }
 }
-
-

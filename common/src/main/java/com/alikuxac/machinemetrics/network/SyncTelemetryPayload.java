@@ -31,7 +31,8 @@ public record SyncTelemetryPayload(
         byte machineState,
         float[] sideMetrics,
         IntArrayList allSlotCounts,
-        IntArrayList allTankAmounts
+        IntArrayList allTankAmounts,
+        short serverDisabledMask
 ) implements CustomPacketPayload {
     public static final Type<SyncTelemetryPayload> TYPE = new Type<>(ResourceLocation.fromNamespaceAndPath("machinemetrics", "sync_telemetry"));
 
@@ -39,6 +40,10 @@ public record SyncTelemetryPayload(
             StreamCodec.of(SyncTelemetryPayload::encode, SyncTelemetryPayload::decode);
 
     public static SyncTelemetryPayload from(BlockPos pos, TelemetryData data) {
+        return from(pos, data, data.serverDisabledMask());
+    }
+
+    public static SyncTelemetryPayload from(BlockPos pos, TelemetryData data, short serverDisabledMask) {
         byte dirByte = data.kineticDirection() != null ? (byte) data.kineticDirection().ordinal() : (byte) 2;
         return new SyncTelemetryPayload(
                 pos,
@@ -62,7 +67,8 @@ public record SyncTelemetryPayload(
                 (byte) data.bottleneckState().ordinal(),
                 data.sideMetrics(),
                 data.allSlotCounts(),
-                data.allTankAmounts()
+                data.allTankAmounts(),
+                serverDisabledMask
         );
     }
 
@@ -92,7 +98,8 @@ public record SyncTelemetryPayload(
                 state,
                 allSlotCounts != null ? allSlotCounts : new IntArrayList(),
                 allTankAmounts != null ? allTankAmounts : new IntArrayList(),
-                sideMetrics != null ? sideMetrics : new float[18]
+                sideMetrics != null ? sideMetrics : new float[18],
+                serverDisabledMask
         );
     }
 
@@ -135,6 +142,8 @@ public record SyncTelemetryPayload(
         for (int i = 0; i < 18; i++) {
             buf.writeFloat(sideMetrics != null && i < sideMetrics.length ? sideMetrics[i] : 0.0f);
         }
+
+        buf.writeShort(payload.serverDisabledMask);
     }
 
     private static SyncTelemetryPayload decode(FriendlyByteBuf buf) {
@@ -175,6 +184,8 @@ public record SyncTelemetryPayload(
             sideMetrics[i] = buf.readFloat();
         }
 
+        short serverDisabledMask = buf.readShort();
+
         return new SyncTelemetryPayload(
                 targetPos,
                 itemThroughput,
@@ -197,14 +208,13 @@ public record SyncTelemetryPayload(
                 machineState,
                 sideMetrics,
                 allSlotCounts,
-                allTankAmounts
+                allTankAmounts,
+                serverDisabledMask
         );
     }
-
 
     @Override
     public Type<? extends CustomPacketPayload> type() {
         return TYPE;
     }
 }
-

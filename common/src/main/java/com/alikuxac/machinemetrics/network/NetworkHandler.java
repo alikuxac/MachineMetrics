@@ -42,8 +42,28 @@ public class NetworkHandler {
                 Direction hitFace = payload.hitFace();
                 TelemetryData data = Services.SERVER_SAMPLER.sample(serverLevel, targetPos, hitFace);
                 
+                short disabledMask = 0;
+                if (com.alikuxac.machinemetrics.config.ServerConfig.ALLOW_ITEMS != null && !com.alikuxac.machinemetrics.config.ServerConfig.ALLOW_ITEMS.get()) {
+                    disabledMask |= TelemetryData.MASK_ITEMS;
+                }
+                if (com.alikuxac.machinemetrics.config.ServerConfig.ALLOW_FLUIDS != null && !com.alikuxac.machinemetrics.config.ServerConfig.ALLOW_FLUIDS.get()) {
+                    disabledMask |= TelemetryData.MASK_FLUIDS;
+                }
+                if (com.alikuxac.machinemetrics.config.ServerConfig.ALLOW_ENERGY != null && !com.alikuxac.machinemetrics.config.ServerConfig.ALLOW_ENERGY.get()) {
+                    disabledMask |= TelemetryData.MASK_ENERGY;
+                }
+                if (com.alikuxac.machinemetrics.config.ServerConfig.ALLOW_KINETIC != null && !com.alikuxac.machinemetrics.config.ServerConfig.ALLOW_KINETIC.get()) {
+                    disabledMask |= TelemetryData.MASK_KINETIC;
+                }
+                if (com.alikuxac.machinemetrics.config.ServerConfig.ALLOW_CHEMICALS != null && !com.alikuxac.machinemetrics.config.ServerConfig.ALLOW_CHEMICALS.get()) {
+                    disabledMask |= TelemetryData.MASK_CHEMICALS;
+                }
+                if (com.alikuxac.machinemetrics.config.ServerConfig.ALLOW_SIDE_METRICS != null && !com.alikuxac.machinemetrics.config.ServerConfig.ALLOW_SIDE_METRICS.get()) {
+                    disabledMask |= TelemetryData.MASK_SIDES;
+                }
+
                 LAST_SENT_TO_CLIENT.put(targetPos, data);
-                SyncTelemetryPayload response = SyncTelemetryPayload.from(targetPos, data);
+                SyncTelemetryPayload response = SyncTelemetryPayload.from(targetPos, data, disabledMask);
                 context.reply(response);
             }
         });

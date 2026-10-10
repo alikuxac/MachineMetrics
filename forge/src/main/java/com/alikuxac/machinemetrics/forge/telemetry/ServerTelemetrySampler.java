@@ -1,5 +1,6 @@
 package com.alikuxac.machinemetrics.forge.telemetry;
 
+import com.alikuxac.machinemetrics.config.ServerConfig;
 import com.alikuxac.machinemetrics.telemetry.TelemetryData;
 
 import it.unimi.dsi.fastutil.ints.IntArrayList;
@@ -94,6 +95,11 @@ public class ServerTelemetrySampler {
         }
 
 
+        boolean allowItems = ServerConfig.ALLOW_ITEMS == null || ServerConfig.ALLOW_ITEMS.get();
+        boolean allowFluids = ServerConfig.ALLOW_FLUIDS == null || ServerConfig.ALLOW_FLUIDS.get();
+        boolean allowEnergy = ServerConfig.ALLOW_ENERGY == null || ServerConfig.ALLOW_ENERGY.get();
+        boolean allowSides = ServerConfig.ALLOW_SIDE_METRICS == null || ServerConfig.ALLOW_SIDE_METRICS.get();
+
         int currentItems = 0;
         int maxItems = 0;
         int currentFluid = 0;
@@ -109,35 +115,37 @@ public class ServerTelemetrySampler {
         IntArrayList allSlotCounts = new IntArrayList();
         Set<IItemHandler> processedItemHandlers = Collections.newSetFromMap(new IdentityHashMap<>());
 
-        for (Direction side : sidesToQuery) {
-            IItemHandler itemHandler = level.getCapability(Capabilities.ItemHandler.BLOCK, pos, side);
-            if (itemHandler == null || itemHandler.getSlots() <= 0) {
-                continue;
-            }
-
-            hasAnyCapability = true;
-
-            if (side != null) {
-                int sideCount = 0;
-                for (int i = 0; i < itemHandler.getSlots(); i++) {
-                    var stack = itemHandler.getStackInSlot(i);
-                    if (!stack.isEmpty()) {
-                        sideCount += stack.getCount();
-                    }
+        if (allowItems) {
+            for (Direction side : sidesToQuery) {
+                IItemHandler itemHandler = level.getCapability(Capabilities.ItemHandler.BLOCK, pos, side);
+                if (itemHandler == null || itemHandler.getSlots() <= 0) {
+                    continue;
                 }
-                sideMetrics[side.ordinal()] = (float) sideCount;
-            }
-            
-            if (processedItemHandlers.add(itemHandler)) {
-                for (int i = 0; i < itemHandler.getSlots(); i++) {
-                    var stack = itemHandler.getStackInSlot(i);
-                    if (!stack.isEmpty()) {
-                        currentItems += stack.getCount();
-                        maxItems += stack.getMaxStackSize();
-                        allSlotCounts.add(stack.getCount());
-                    } else {
-                        maxItems += 64;
-                        allSlotCounts.add(0);
+
+                hasAnyCapability = true;
+
+                if (side != null && allowSides) {
+                    int sideCount = 0;
+                    for (int i = 0; i < itemHandler.getSlots(); i++) {
+                        var stack = itemHandler.getStackInSlot(i);
+                        if (!stack.isEmpty()) {
+                            sideCount += stack.getCount();
+                        }
+                    }
+                    sideMetrics[side.ordinal()] = (float) sideCount;
+                }
+                
+                if (processedItemHandlers.add(itemHandler)) {
+                    for (int i = 0; i < itemHandler.getSlots(); i++) {
+                        var stack = itemHandler.getStackInSlot(i);
+                        if (!stack.isEmpty()) {
+                            currentItems += stack.getCount();
+                            maxItems += stack.getMaxStackSize();
+                            allSlotCounts.add(stack.getCount());
+                        } else {
+                            maxItems += 64;
+                            allSlotCounts.add(0);
+                        }
                     }
                 }
             }
@@ -148,37 +156,39 @@ public class ServerTelemetrySampler {
         IntArrayList allTankAmounts = new IntArrayList();
         Set<IFluidHandler> processedFluidHandlers = Collections.newSetFromMap(new IdentityHashMap<>());
 
-        for (Direction side : sidesToQuery) {
-            IFluidHandler fluidHandler = level.getCapability(Capabilities.FluidHandler.BLOCK, pos, side);
-            if (fluidHandler == null || fluidHandler.getTanks() <= 0) {
-                continue;
-            }
-
-            hasAnyCapability = true;
-
-            if (side != null) {
-                int sideFluidAmount = 0;
-                for (int i = 0; i < fluidHandler.getTanks(); i++) {
-                    var stack = fluidHandler.getFluidInTank(i);
-                    if (!stack.isEmpty()) {
-                        sideFluidAmount += stack.getAmount();
-                    }
+        if (allowFluids) {
+            for (Direction side : sidesToQuery) {
+                IFluidHandler fluidHandler = level.getCapability(Capabilities.FluidHandler.BLOCK, pos, side);
+                if (fluidHandler == null || fluidHandler.getTanks() <= 0) {
+                    continue;
                 }
 
-                sideMetrics[6 + side.ordinal()] = (float) sideFluidAmount;
-            }
+                hasAnyCapability = true;
 
-            if (processedFluidHandlers.add(fluidHandler)) {
-                for (int i = 0; i < fluidHandler.getTanks(); i++) {
-                    var fluidStack = fluidHandler.getFluidInTank(i);
-                    int tankCap = fluidHandler.getTankCapacity(i);
-                    if (!fluidStack.isEmpty()) {
-                        currentFluid += fluidStack.getAmount();
-                        allTankAmounts.add(fluidStack.getAmount());
-                    } else {
-                        allTankAmounts.add(0);
+                if (side != null && allowSides) {
+                    int sideFluidAmount = 0;
+                    for (int i = 0; i < fluidHandler.getTanks(); i++) {
+                        var stack = fluidHandler.getFluidInTank(i);
+                        if (!stack.isEmpty()) {
+                            sideFluidAmount += stack.getAmount();
+                        }
                     }
-                    maxFluid += tankCap;
+
+                    sideMetrics[6 + side.ordinal()] = (float) sideFluidAmount;
+                }
+
+                if (processedFluidHandlers.add(fluidHandler)) {
+                    for (int i = 0; i < fluidHandler.getTanks(); i++) {
+                        var fluidStack = fluidHandler.getFluidInTank(i);
+                        int tankCap = fluidHandler.getTankCapacity(i);
+                        if (!fluidStack.isEmpty()) {
+                            currentFluid += fluidStack.getAmount();
+                            allTankAmounts.add(fluidStack.getAmount());
+                        } else {
+                            allTankAmounts.add(0);
+                        }
+                        maxFluid += tankCap;
+                    }
                 }
             }
         }
@@ -186,19 +196,21 @@ public class ServerTelemetrySampler {
 
         Set<IEnergyStorage> processedEnergyStorages = Collections.newSetFromMap(new IdentityHashMap<>());
 
-        for (Direction side : sidesToQuery) {
-            try {
-                IEnergyStorage energyStorage = level.getCapability(Capabilities.EnergyStorage.BLOCK, pos, side);
-                if (energyStorage != null && processedEnergyStorages.add(energyStorage)) {
-                    int maxCap = energyStorage.getMaxEnergyStored();
-                    if (maxCap > 0) {
-                        hasAnyCapability = true;
-                        currentEnergy += energyStorage.getEnergyStored();
-                        maxEnergy += maxCap;
+        if (allowEnergy) {
+            for (Direction side : sidesToQuery) {
+                try {
+                    IEnergyStorage energyStorage = level.getCapability(Capabilities.EnergyStorage.BLOCK, pos, side);
+                    if (energyStorage != null && processedEnergyStorages.add(energyStorage)) {
+                        int maxCap = energyStorage.getMaxEnergyStored();
+                        if (maxCap > 0) {
+                            hasAnyCapability = true;
+                            currentEnergy += energyStorage.getEnergyStored();
+                            maxEnergy += maxCap;
+                        }
                     }
+                } catch (Throwable ignored) {
+                    // Ignore capability query exception
                 }
-            } catch (Throwable ignored) {
-                // Ignore capability query exception
             }
         }
 

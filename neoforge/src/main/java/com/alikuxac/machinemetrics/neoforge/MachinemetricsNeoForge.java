@@ -1,5 +1,6 @@
 package com.alikuxac.machinemetrics.neoforge;
 
+import com.alikuxac.machinemetrics.client.HudPositionScreen;
 import com.alikuxac.machinemetrics.client.KeyBindings;
 import com.alikuxac.machinemetrics.config.ClientConfig;
 import com.alikuxac.machinemetrics.config.ServerConfig;
@@ -15,6 +16,7 @@ import net.neoforged.bus.api.IEventBus;
 import net.neoforged.fml.ModContainer;
 import net.neoforged.fml.common.Mod;
 import net.neoforged.fml.loading.FMLEnvironment;
+import net.neoforged.neoforge.client.gui.IConfigScreenFactory;
 import net.neoforged.neoforge.client.event.RegisterKeyMappingsEvent;
 import net.neoforged.neoforge.common.NeoForge;
 import org.slf4j.Logger;
@@ -31,6 +33,10 @@ public class MachinemetricsNeoForge {
 
         if (FMLEnvironment.dist == Dist.CLIENT) {
             modContainer.registerConfig(ModConfig.Type.CLIENT, ClientConfig.SPEC);
+            modContainer.registerExtensionPoint(
+                    IConfigScreenFactory.class,
+                    (container, screen) -> new HudPositionScreen(screen)
+            );
             modEventBus.addListener(this::registerKeyMappings);
             NeoForge.EVENT_BUS.register(NeoForgeClientEventHandler.class);
             NeoForge.EVENT_BUS.register(NeoForgeHudRenderer.class);

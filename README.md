@@ -1,69 +1,71 @@
-# ⚡ Machine Metrics
+# Machine Metrics
 
-**Machine Metrics** is a lightweight, pure **client-side & server-sync capable** telemetry and diagnostics HUD for Minecraft. It provides real-time insights into industrial machines, automation lines, and energy networks without relying on external tooltip frameworks.
+Machine Metrics is a client-side and server-synced telemetry HUD for Minecraft. It shows real-time throughput, energy rates, and machine states without needing an external tooltip mod like Jade or WTHIT.
 
-> ⚠️ **CAUTION:** This mod is currently in **BETA** state. Features and network protocols are subject to active refinement. **Please remember to backup your worlds and saves before installing or updating!**
-
----
-
-### ✨ Key Features
-
-* **⚡ Real-Time Machine Telemetry:** Instantly inspect dynamic throughput (**Items/s**, **Fluids/s**) and net energy delta (**FE/t**).
-* **🎯 Side-Specific Directional Tracking:** Analyzes capability changes per block face (`UP`, `DOWN`, `NORTH`, `SOUTH`, `WEST`, `EAST`) to pinpoint exact item & fluid throughput on each individual side.
-* **🔍 Bottleneck State Diagnostics:** Automatically categorizes machine status:
-  * 🟢 **OPTIMAL:** Operating with active throughput.
-  * 🟡 **STARVED:** Lacking required inputs or energy.
-  * 🔴 **CLOGGED:** Output buffers or conduits congested.
-  * ⚪ **IDLE:** Standby mode (automatically hides rate metrics when inactive).
-* **🖥️ Dynamic & Responsive HUD:**
-  * **Auto-Adaptive Sizing:** HUD dimensions dynamically auto-fit based on content and line count.
-  * **GUI Scale Sync:** Native compatibility with Minecraft's GUI Scale (including `Auto`) and custom scale multiplier (`hudScale`).
-  * **Dual-State View:** Compact overview by default, expands detailed metrics when holding `Shift`.
-  * **Smart Filtering:** Automatically ignores static storage containers (Chests, Drawers, Vaults) and AE2 cables.
-* **🌐 Hybrid Network Architecture:**
-  * **Client-Side Standalone:** Fully functional on Vanilla/No-Mod servers via local capability sampling.
-  * **Server Synchronization:** Uses custom payload packets (`RequestTelemetryPayload` / `SyncTelemetryPayload`) when installed on NeoForge servers.
-  * **Raycast Debouncing:** Built-in 2-3 tick hover delay to prevent network packet spam.
-* **🔧 Configurable Debugging:** Configurable `enableDebugLogging` option to keep game console logs clean.
+> **Note:** This mod is currently in beta. Features and network protocols may change between updates. Back up your worlds before updating.
 
 ---
 
-### 🎮 Compatibility
+### Features
 
-Designed for heavy technical modpacks (ATM, All The Mods, SkyFactory, etc.):
-* NeoForge & Forge Block Capabilities (`EnergyStorage`, `ItemHandler`, `FluidHandler`).
-* Works with **Mekanism**, **Applied Energistics 2**, **Industrial Foregoing**, **Ender IO**, and more.
+- **Real-Time Throughput:** Measures transfer rates for items (Items/s), fluids (mB/s, B/s), and energy (FE/t).
+- **Per-Side Tracking:** Checks individual block faces to show throughput per side.
+- **Machine State Badges:**
+  - `OPTIMAL`: Machine is processing or moving materials.
+  - `STARVED`: Lacking input materials or power.
+  - `CLOGGED`: Output buffer or connected pipe is full.
+  - `IDLE`: Machine is inactive (throughput numbers hide automatically).
+- **HUD Layout:**
+  - Auto-resizing box based on active lines.
+  - Drag-and-drop position editor in the pause menu.
+  - Switches between anchors (`TOP_LEFT`, `TOP_RIGHT`, `BOTTOM_LEFT`, `BOTTOM_RIGHT`, `CROSSHAIR`).
+  - Ignores static storage containers like chests, barrels, drawers, and AE2 cables.
+- **Client & Server Sync:**
+  - Works on vanilla or unmodded servers using client-side capability reads.
+  - Syncs server-side measurements when installed on dedicated servers for higher precision.
 
 ---
 
-### 🌐 Client / Server Setup Breakdown
+### Compatibility
 
-This mod is designed with a **flexible hybrid architecture**. You can install it on the client, server, or both depending on your environment:
+- **Standard Capabilities:** Works with any block using standard NeoForge or Forge capabilities (Item Handler, Fluid Handler, Energy Storage).
+- **Create:** Kinetic speed (RPM), rotation direction, network stress, capacity (SU), overstress warning, and headroom.
+- **Mekanism:** Chemical throughput and tank capacities (Gases, Infuse Types, Pigments, Slurries).
+- **Tooltip Mods:** Automatically hides the block title line when Jade, Waila, WTHIT, or The One Probe is installed.
 
-| Installation Setup | Behavior & Functionality |
+---
+
+### Client & Server Setup
+
+| Setup | Behavior |
 | :--- | :--- |
-| **Both Client & Server (Recommended)** | 🌟 **Full Capability.** The client sends network telemetry requests (`RequestTelemetryPayload`) to the server. The server computes precise server-side block capabilities, throughput rates, and side-specific metrics, sending back `SyncTelemetryPayload` for maximum accuracy. |
-| **Client Only (Vanilla / Dedicated Server without Mod)** | ⚡ **Client-Side Standalone Mode.** The HUD remains functional! Telemetry capabilities are sampled locally via client-side block entities and capabilities. Perfect for playing on public servers or vanilla servers. |
-| **Server Only (No Client Installed)** | 😴 **Inactive / No Effect.** The server registers payload channels and capability listeners, but since no client sends telemetry requests, no HUD is rendered and zero network overhead is generated. |
+| **Client and Server** | Full accuracy. The client requests metrics from the server, and the server samples block throughput and face rates directly. |
+| **Client Only** | Works on vanilla and third-party servers without the mod. Samples block entities locally on the client. |
+| **Server Only** | Idle. The server only samples blocks when clients send requests. Generates zero overhead without modded clients. |
 
 ---
 
-### 🛠️ Configuration & Controls
+### Controls & Configuration
 
-* **Toggle HUD:** Press keybind in `Options -> Controls -> Key Binds` (Default: `H`).
-* **Detailed View:** Hold `Shift` while targeting a machine.
-* **Config File:** `config/machinemetrics-common.toml` (supports `hudScale` & `enableDebugLogging`).
-
----
-
-### 📌 Project Status & Maintenance Note
-
-* **Personal Project:** This mod is maintained as a personal side-project. Updates and feature additions will be released as time permits.
-* **No Backports:** There are **no plans to backport** this mod to older Minecraft versions or legacy loader versions.
-* **Mod Loaders & Support:** Currently focused on **NeoForge**. Support for other mod loaders (e.g. Fabric, Forge) or newer MC versions will only be considered if there is sufficient community demand.
+- **Toggle HUD:** `H` (changeable in `Options -> Controls -> Key Binds`).
+- **Open HUD Editor:**
+  - In Main Menu: Go to `Mods` -> select `Machine Metrics` -> click **Config**.
+  - In-Game: Press `ESC` and click **Machinemetrics HUD** in the top right.
+- **Settings:**
+  - Client visual settings, offsets, presets, and colors: `config/machinemetrics-client.toml` or via the in-game editor.
+  - Server metrics permissions and toggles: `config/machinemetrics-server.toml`.
+  - See the [Configuration Guide](docs/configuration.md) for keys and compact template placeholders.
 
 ---
 
-### 📄 License
+### Notes
 
-Open-source and available under the terms of the [MIT License](LICENSE).
+- This is a personal side project. Updates come as time allows.
+- No backports to older Minecraft versions or loaders are planned.
+- Built for NeoForge and Forge on 1.21.1.
+
+---
+
+### License
+
+Available under the [MIT License](LICENSE).

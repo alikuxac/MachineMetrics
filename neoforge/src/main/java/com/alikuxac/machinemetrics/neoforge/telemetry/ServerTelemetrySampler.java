@@ -2,6 +2,7 @@ package com.alikuxac.machinemetrics.neoforge.telemetry;
 
 import com.alikuxac.machinemetrics.compat.create.CreateKineticInspector;
 import com.alikuxac.machinemetrics.compat.mekanism.MekanismChemicalInspector;
+import com.alikuxac.machinemetrics.config.ServerConfig;
 import com.alikuxac.machinemetrics.telemetry.TelemetryData;
 
 import it.unimi.dsi.fastutil.ints.IntArrayList;
@@ -96,6 +97,13 @@ public class ServerTelemetrySampler {
         }
 
 
+        boolean allowItems = ServerConfig.ALLOW_ITEMS == null || ServerConfig.ALLOW_ITEMS.get();
+        boolean allowFluids = ServerConfig.ALLOW_FLUIDS == null || ServerConfig.ALLOW_FLUIDS.get();
+        boolean allowEnergy = ServerConfig.ALLOW_ENERGY == null || ServerConfig.ALLOW_ENERGY.get();
+        boolean allowKinetic = ServerConfig.ALLOW_KINETIC == null || ServerConfig.ALLOW_KINETIC.get();
+        boolean allowChemicals = ServerConfig.ALLOW_CHEMICALS == null || ServerConfig.ALLOW_CHEMICALS.get();
+        boolean allowSides = ServerConfig.ALLOW_SIDE_METRICS == null || ServerConfig.ALLOW_SIDE_METRICS.get();
+
         int currentItems = 0;
         int maxItems = 0;
         int currentFluid = 0;
@@ -111,35 +119,37 @@ public class ServerTelemetrySampler {
         IntArrayList allSlotCounts = new IntArrayList();
         Set<IItemHandler> processedItemHandlers = Collections.newSetFromMap(new IdentityHashMap<>());
 
-        for (Direction side : sidesToQuery) {
-            IItemHandler itemHandler = level.getCapability(Capabilities.ItemHandler.BLOCK, pos, side);
-            if (itemHandler == null || itemHandler.getSlots() <= 0) {
-                continue;
-            }
-
-            hasAnyCapability = true;
-
-            if (side != null) {
-                int sideCount = 0;
-                for (int i = 0; i < itemHandler.getSlots(); i++) {
-                    var stack = itemHandler.getStackInSlot(i);
-                    if (!stack.isEmpty()) {
-                        sideCount += stack.getCount();
-                    }
+        if (allowItems) {
+            for (Direction side : sidesToQuery) {
+                IItemHandler itemHandler = level.getCapability(Capabilities.ItemHandler.BLOCK, pos, side);
+                if (itemHandler == null || itemHandler.getSlots() <= 0) {
+                    continue;
                 }
-                sideMetrics[side.ordinal()] = (float) sideCount;
-            }
-            
-            if (processedItemHandlers.add(itemHandler)) {
-                for (int i = 0; i < itemHandler.getSlots(); i++) {
-                    var stack = itemHandler.getStackInSlot(i);
-                    if (!stack.isEmpty()) {
-                        currentItems += stack.getCount();
-                        maxItems += stack.getMaxStackSize();
-                        allSlotCounts.add(stack.getCount());
-                    } else {
-                        maxItems += 64;
-                        allSlotCounts.add(0);
+
+                hasAnyCapability = true;
+
+                if (side != null && allowSides) {
+                    int sideCount = 0;
+                    for (int i = 0; i < itemHandler.getSlots(); i++) {
+                        var stack = itemHandler.getStackInSlot(i);
+                        if (!stack.isEmpty()) {
+                            sideCount += stack.getCount();
+                        }
+                    }
+                    sideMetrics[side.ordinal()] = (float) sideCount;
+                }
+                
+                if (processedItemHandlers.add(itemHandler)) {
+                    for (int i = 0; i < itemHandler.getSlots(); i++) {
+                        var stack = itemHandler.getStackInSlot(i);
+                        if (!stack.isEmpty()) {
+                            currentItems += stack.getCount();
+                            maxItems += stack.getMaxStackSize();
+                            allSlotCounts.add(stack.getCount());
+                        } else {
+                            maxItems += 64;
+                            allSlotCounts.add(0);
+                        }
                     }
                 }
             }
@@ -150,70 +160,75 @@ public class ServerTelemetrySampler {
         IntArrayList allTankAmounts = new IntArrayList();
         Set<IFluidHandler> processedFluidHandlers = Collections.newSetFromMap(new IdentityHashMap<>());
 
-        for (Direction side : sidesToQuery) {
-            IFluidHandler fluidHandler = level.getCapability(Capabilities.FluidHandler.BLOCK, pos, side);
-            if (fluidHandler == null || fluidHandler.getTanks() <= 0) {
-                continue;
-            }
-
-            hasAnyCapability = true;
-
-            if (side != null) {
-                int sideFluidAmount = 0;
-                for (int i = 0; i < fluidHandler.getTanks(); i++) {
-                    var stack = fluidHandler.getFluidInTank(i);
-                    if (!stack.isEmpty()) {
-                        sideFluidAmount += stack.getAmount();
-                    }
+        if (allowFluids) {
+            for (Direction side : sidesToQuery) {
+                IFluidHandler fluidHandler = level.getCapability(Capabilities.FluidHandler.BLOCK, pos, side);
+                if (fluidHandler == null || fluidHandler.getTanks() <= 0) {
+                    continue;
                 }
 
-                sideMetrics[6 + side.ordinal()] = (float) sideFluidAmount;
-            }
+                hasAnyCapability = true;
 
-            if (processedFluidHandlers.add(fluidHandler)) {
-                for (int i = 0; i < fluidHandler.getTanks(); i++) {
-                    var fluidStack = fluidHandler.getFluidInTank(i);
-                    int tankCap = fluidHandler.getTankCapacity(i);
-                    if (!fluidStack.isEmpty()) {
-                        currentFluid += fluidStack.getAmount();
-                        allTankAmounts.add(fluidStack.getAmount());
-                    } else {
-                        allTankAmounts.add(0);
+                if (side != null && allowSides) {
+                    int sideFluidAmount = 0;
+                    for (int i = 0; i < fluidHandler.getTanks(); i++) {
+                        var stack = fluidHandler.getFluidInTank(i);
+                        if (!stack.isEmpty()) {
+                            sideFluidAmount += stack.getAmount();
+                        }
                     }
-                    maxFluid += tankCap;
+
+                    sideMetrics[6 + side.ordinal()] = (float) sideFluidAmount;
+                }
+
+                if (processedFluidHandlers.add(fluidHandler)) {
+                    for (int i = 0; i < fluidHandler.getTanks(); i++) {
+                        var fluidStack = fluidHandler.getFluidInTank(i);
+                        int tankCap = fluidHandler.getTankCapacity(i);
+                        if (!fluidStack.isEmpty()) {
+                            currentFluid += fluidStack.getAmount();
+                            allTankAmounts.add(fluidStack.getAmount());
+                        } else {
+                            allTankAmounts.add(0);
+                        }
+                        maxFluid += tankCap;
+                    }
                 }
             }
         }
         int[] fluidTanks = allTankAmounts.toIntArray();
 
-        for (Direction side : sidesToQuery) {
-            try {
-                if (side != null) {
-                    var chemOpt = MekanismChemicalInspector.inspectChemicals(level, pos, side);
-                    if (chemOpt.isPresent()) {
-                        sideMetrics[12 + side.ordinal()] = (float) chemOpt.get().amount();
+        if (allowChemicals && allowSides) {
+            for (Direction side : sidesToQuery) {
+                try {
+                    if (side != null) {
+                        var chemOpt = MekanismChemicalInspector.inspectChemicals(level, pos, side);
+                        if (chemOpt.isPresent()) {
+                            sideMetrics[12 + side.ordinal()] = (float) chemOpt.get().amount();
+                        }
                     }
+                } catch (Throwable ignored) {
                 }
-            } catch (Throwable ignored) {
             }
         }
 
-
         Set<IEnergyStorage> processedEnergyStorages = Collections.newSetFromMap(new IdentityHashMap<>());
 
-        for (Direction side : sidesToQuery) {
-            try {
-                IEnergyStorage energyStorage = level.getCapability(Capabilities.EnergyStorage.BLOCK, pos, side);
-                if (energyStorage != null && processedEnergyStorages.add(energyStorage)) {
-                    int maxCap = energyStorage.getMaxEnergyStored();
-                    if (maxCap > 0) {
-                        hasAnyCapability = true;
-                        currentEnergy += energyStorage.getEnergyStored();
-                        maxEnergy += maxCap;
+        if (allowEnergy) {
+            for (Direction side : sidesToQuery) {
+                try {
+                    IEnergyStorage energyStorage = level.getCapability(Capabilities.EnergyStorage.BLOCK, pos, side);
+                    if (energyStorage != null && processedEnergyStorages.add(energyStorage)) {
+                        int maxCap = energyStorage.getMaxEnergyStored();
+                        if (maxCap > 0) {
+                            hasAnyCapability = true;
+                            currentEnergy += energyStorage.getEnergyStored();
+                            maxEnergy += maxCap;
+                        }
                     }
+                } catch (Throwable ignored) {
+                    // Ignore capability query exception
                 }
-            } catch (Throwable ignored) {
-                // Ignore capability query exception
             }
         }
 
@@ -225,20 +240,22 @@ public class ServerTelemetrySampler {
         boolean hasKinetic = false;
         CreateKineticInspector.RotationDirection kineticDirection = CreateKineticInspector.RotationDirection.STATIONARY;
 
-        try {
-            var kineticOpt = CreateKineticInspector.inspectKinetic(level, pos, hitFace);
-            if (kineticOpt.isPresent()) {
-                var kData = kineticOpt.get();
-                hasKinetic = true;
-                kineticSpeed = kData.speed();
-                kineticStress = kData.stress();
-                kineticCapacity = kData.capacity();
-                kineticBlockStress = kData.blockStress();
-                isOverstressed = kData.isOverstressed();
-                kineticDirection = kData.direction();
-                hasAnyCapability = true;
+        if (allowKinetic) {
+            try {
+                var kineticOpt = CreateKineticInspector.inspectKinetic(level, pos, hitFace);
+                if (kineticOpt.isPresent()) {
+                    var kData = kineticOpt.get();
+                    hasKinetic = true;
+                    kineticSpeed = kData.speed();
+                    kineticStress = kData.stress();
+                    kineticCapacity = kData.capacity();
+                    kineticBlockStress = kData.blockStress();
+                    isOverstressed = kData.isOverstressed();
+                    kineticDirection = kData.direction();
+                    hasAnyCapability = true;
+                }
+            } catch (Throwable ignored) {
             }
-        } catch (Throwable ignored) {
         }
 
         if (!hasAnyCapability || (maxItems == 0 && maxFluid == 0 && maxEnergy == 0 && !hasKinetic)) {
@@ -343,17 +360,19 @@ public class ServerTelemetrySampler {
         long chemicalAmount = 0L;
         long chemicalCapacity = 0L;
 
-        try {
-            var chemOpt = MekanismChemicalInspector.inspectChemicals(level, pos, null);
-            if (chemOpt.isPresent()) {
-                var chemData = chemOpt.get();
-                hasChemicals = true;
-                chemicalName = chemData.chemicalName();
-                chemicalAmount = chemData.amount();
-                chemicalCapacity = chemData.capacity();
-                hasAnyCapability = true;
+        if (allowChemicals) {
+            try {
+                var chemOpt = MekanismChemicalInspector.inspectChemicals(level, pos, null);
+                if (chemOpt.isPresent()) {
+                    var chemData = chemOpt.get();
+                    hasChemicals = true;
+                    chemicalName = chemData.chemicalName();
+                    chemicalAmount = chemData.amount();
+                    chemicalCapacity = chemData.capacity();
+                    hasAnyCapability = true;
+                }
+            } catch (Throwable ignored) {
             }
-        } catch (Throwable ignored) {
         }
 
 
