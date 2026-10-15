@@ -13,6 +13,7 @@ public class ServerConfig {
     public static final ModConfigSpec.BooleanValue ALLOW_KINETIC;
     public static final ModConfigSpec.BooleanValue ALLOW_CHEMICALS;
     public static final ModConfigSpec.BooleanValue ALLOW_SIDE_METRICS;
+    public static final ModConfigSpec.BooleanValue ALLOW_AE2;
 
     // Debug
     public static final ModConfigSpec.BooleanValue DEBUG_LOGGING;
@@ -46,6 +47,10 @@ public class ServerConfig {
         ALLOW_SIDE_METRICS = builder
                 .comment("Allow sending per-side / per-face throughput metrics to clients")
                 .define("allow_side_metrics_telemetry", true);
+
+        ALLOW_AE2 = builder
+                .comment("Allow sending Applied Energistics 2 grid power and stability metrics to clients")
+                .define("allow_ae2_telemetry", true);
 
         builder.pop();
 

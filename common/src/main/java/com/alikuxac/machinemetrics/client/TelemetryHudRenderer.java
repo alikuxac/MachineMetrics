@@ -1,5 +1,7 @@
 package com.alikuxac.machinemetrics.client;
 
+import com.alikuxac.machinemetrics.compat.ae2.AE2NetworkInspector;
+import com.alikuxac.machinemetrics.compat.ae2.AE2NetworkInspector.AE2StabilityState;
 import com.alikuxac.machinemetrics.compat.create.CreateKineticInspector;
 import com.alikuxac.machinemetrics.compat.infohud.InfoHudDetector;
 import com.alikuxac.machinemetrics.compat.mekanism.MekanismChemicalInspector;
@@ -7,6 +9,7 @@ import com.alikuxac.machinemetrics.config.ClientConfig;
 import com.alikuxac.machinemetrics.network.RequestTelemetryPayload;
 import com.alikuxac.machinemetrics.platform.Services.ClientSampler;
 import com.alikuxac.machinemetrics.telemetry.TelemetryData;
+import net.minecraft.ChatFormatting;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.GuiGraphics;
@@ -134,8 +137,24 @@ public class TelemetryHudRenderer {
         if (showTitle || showBadge) {
             Component headerComponent;
             Component nameComp = Component.literal(showTitle ? machineName : "");
-            if (showBadge && data.bottleneckState() != null) {
-                Component stateComp = MetricResolver.getStateComponent(data.bottleneckState());
+            Component stateComp = null;
+
+            if (showBadge) {
+                if (data.hasAe2Network() && !data.isAe2DisabledByServer()) {
+                    AE2StabilityState stab = AE2StabilityState.fromOrdinal(data.aeStabilityState());
+                    stateComp = switch (stab) {
+                        case BROWNOUT -> Component.translatable("machinemetrics.ae2.state.brownout").withStyle(ChatFormatting.RED, ChatFormatting.BOLD);
+                        case BOOTING -> Component.translatable("machinemetrics.ae2.state.booting").withStyle(ChatFormatting.YELLOW);
+                        case DISCHARGING -> Component.translatable("machinemetrics.ae2.state.discharging").withStyle(ChatFormatting.GOLD);
+                        case CREATIVE -> Component.translatable("machinemetrics.ae2.state.creative").withStyle(ChatFormatting.GOLD);
+                        case STABLE -> Component.translatable("machinemetrics.ae2.state.stable").withStyle(ChatFormatting.GREEN);
+                    };
+                } else if (data.bottleneckState() != null) {
+                    stateComp = MetricResolver.getStateComponent(data.bottleneckState());
+                }
+            }
+
+            if (stateComp != null) {
                 if (showTitle) {
                     headerComponent = Component.empty()
                             .append(nameComp)
@@ -163,7 +182,7 @@ public class TelemetryHudRenderer {
         if (isCreateInstalled) {
             boolean kineticDisabledByServer = data.isKineticDisabledByServer();
             boolean hasKinetic = data.hasKinetic() || Math.abs(data.kineticSpeed()) > 0.001f || data.kineticCapacity() > 0.001f;
-            if (kineticDisabledByServer) {
+            if (hasKinetic && kineticDisabledByServer) {
                 boolean showSpeed = ClientConfig.SHOW_SPEED == null || ClientConfig.SHOW_SPEED.get();
                 if (showSpeed) {
                     Component speedComp = Component.translatable("machinemetrics.metrics.speed")
@@ -232,12 +251,13 @@ public class TelemetryHudRenderer {
         }
 
         boolean showItems = ClientConfig.SHOW_ITEMS_THROUGHPUT == null || ClientConfig.SHOW_ITEMS_THROUGHPUT.get();
-        if (showItems) {
+        boolean hasItemsPresent = data.hasItems() || data.itemThroughput() > 0.001f;
+        if (showItems && hasItemsPresent) {
             if (data.isItemsDisabledByServer()) {
                 Component itemComp = Component.translatable("machinemetrics.metrics.items")
                         .append(Component.literal(": [")).append(disabledServerComp).append(Component.literal("]"));
                 lines.add(new HudLine(itemComp, disabledColor));
-            } else if (data.hasItems() || data.itemThroughput() > 0.001f) {
+            } else if (data.itemThroughput() > 0.001f || !data.hasAe2Network()) {
                 String itemVal = MetricResolver.formatItemRate(data.itemThroughput());
                 Component itemComp = Component.translatable("machinemetrics.metrics.items")
                         .append(Component.literal(": " + itemVal));
@@ -246,12 +266,13 @@ public class TelemetryHudRenderer {
         }
 
         boolean showFluids = ClientConfig.SHOW_FLUIDS_THROUGHPUT == null || ClientConfig.SHOW_FLUIDS_THROUGHPUT.get();
-        if (showFluids) {
+        boolean hasFluidsPresent = data.hasFluids() || data.fluidThroughput() > 0.001f;
+        if (showFluids && hasFluidsPresent) {
             if (data.isFluidsDisabledByServer()) {
                 Component fluidComp = Component.translatable("machinemetrics.metrics.fluids")
                         .append(Component.literal(": [")).append(disabledServerComp).append(Component.literal("]"));
                 lines.add(new HudLine(fluidComp, disabledColor));
-            } else if (data.hasFluids() || data.fluidThroughput() > 0.001f) {
+            } else if (data.fluidThroughput() > 0.001f || !data.hasAe2Network()) {
                 String fluidVal = MetricResolver.formatFluidRate(data.fluidThroughput());
                 Component fluidComp = Component.translatable("machinemetrics.metrics.fluids")
                         .append(Component.literal(": " + fluidVal));
@@ -262,12 +283,13 @@ public class TelemetryHudRenderer {
         boolean isMekanismInstalled = MekanismChemicalInspector.isMekanismLoaded();
         if (isMekanismInstalled) {
             boolean showChemicals = ClientConfig.SHOW_CHEMICALS_THROUGHPUT == null || ClientConfig.SHOW_CHEMICALS_THROUGHPUT.get();
-            if (showChemicals) {
+            boolean hasChemPresent = data.hasChemicals() || data.chemicalThroughput() > 0.001f;
+            if (showChemicals && hasChemPresent) {
                 if (data.isChemicalsDisabledByServer()) {
                     Component chemComp = Component.translatable("machinemetrics.metrics.chemicals")
                             .append(Component.literal(": [")).append(disabledServerComp).append(Component.literal("]"));
                     lines.add(new HudLine(chemComp, disabledColor));
-                } else if (data.hasChemicals() || data.chemicalThroughput() > 0.001f) {
+                } else if (data.chemicalThroughput() > 0.001f || !data.hasAe2Network()) {
                     String chemVal = MetricResolver.formatFluidRate(data.chemicalThroughput());
                     Component chemComp = Component.translatable("machinemetrics.metrics.chemicals")
                             .append(Component.literal(": " + chemVal));
@@ -277,12 +299,13 @@ public class TelemetryHudRenderer {
         }
 
         boolean showEnergy = ClientConfig.SHOW_ENERGY_FE == null || ClientConfig.SHOW_ENERGY_FE.get();
-        if (showEnergy) {
+        boolean hasEnergyPresent = data.hasEnergy() || Math.abs(data.energyDelta()) > 0.001f;
+        if (showEnergy && hasEnergyPresent) {
             if (data.isEnergyDisabledByServer()) {
                 Component energyComp = Component.translatable("machinemetrics.metrics.energy")
                         .append(Component.literal(": [")).append(disabledServerComp).append(Component.literal("]"));
                 lines.add(new HudLine(energyComp, disabledColor));
-            } else if (data.hasEnergy() || data.energyDelta() != 0f) {
+            } else if (Math.abs(data.energyDelta()) > 0.001f || !data.hasAe2Network()) {
                 float delta = data.energyDelta();
                 int color = delta > 0 ? positiveEnergyColor : (delta < 0 ? negativeEnergyColor : neutralEnergyColor);
                 String prefix = delta > 0 ? "+" : "";
@@ -290,6 +313,126 @@ public class TelemetryHudRenderer {
                 Component energyComp = Component.translatable("machinemetrics.metrics.energy")
                         .append(Component.literal(String.format(": %s%s %s", prefix, MetricResolver.formatCompactNumber(delta), feUnit)));
                 lines.add(new HudLine(energyComp, color));
+            }
+        }
+
+        // Applied Energistics 2 - Grid Power & Stability
+        if (data.hasAe2Network()) {
+            int ae2Color = ClientConfig.parseHexColor(ClientConfig.COLOR_AE2_POWER, 0xA259FF);
+            int brownoutColor = ClientConfig.parseHexColor(ClientConfig.COLOR_AE2_BROWNOUT, 0xFF3333);
+
+            if (data.isAe2DisabledByServer()) {
+                Component aeDisabledComp = Component.translatable("machinemetrics.metrics.ae_power")
+                        .append(Component.literal(": [")).append(disabledServerComp).append(Component.literal("]"));
+                lines.add(new HudLine(aeDisabledComp, disabledColor));
+            } else {
+                boolean showAePower = ClientConfig.SHOW_AE2_POWER == null || ClientConfig.SHOW_AE2_POWER.get();
+                boolean showAeStability = ClientConfig.SHOW_AE2_STABILITY == null || ClientConfig.SHOW_AE2_STABILITY.get();
+
+                String unitConfig = ClientConfig.AE2_POWER_UNIT != null ? ClientConfig.AE2_POWER_UNIT.get() : "AUTO";
+                boolean isFeUnit;
+                if ("AUTO".equalsIgnoreCase(unitConfig)) {
+                    String clientSelectedUnit = AE2NetworkInspector.getClientSelectedPowerUnit();
+                    isFeUnit = "FE".equalsIgnoreCase(clientSelectedUnit);
+                } else {
+                    isFeUnit = "FE".equalsIgnoreCase(unitConfig);
+                }
+
+                float multiplier = isFeUnit ? 2.0f : 1.0f;
+                String unitLabel = isFeUnit ? Component.translatable("machinemetrics.metrics.unit.fe_per_tick").getString()
+                        : Component.translatable("machinemetrics.metrics.unit.ae_per_tick").getString();
+
+                float displayRate = data.aePowerRate() * multiplier;
+                String ratePrefix = displayRate > 0 ? "+" : "";
+                String rateFormatted = String.format("%s%s %s", ratePrefix, MetricResolver.formatCompactNumber(displayRate), unitLabel);
+
+                if (showAePower) {
+                    if (data.aeIsCreative()) {
+                        // Creative source: suppress buffer bar/percentage completely, report drain/rate cleanly
+                        Component powerComp = Component.translatable("machinemetrics.metrics.ae_drain")
+                                .append(Component.literal(": " + rateFormatted + " "))
+                                .append(Component.literal("[").withStyle(ChatFormatting.GOLD))
+                                .append(Component.translatable("machinemetrics.ae2.state.creative").withStyle(ChatFormatting.GOLD))
+                                .append(Component.literal("]").withStyle(ChatFormatting.GOLD));
+                        lines.add(new HudLine(powerComp, ae2Color));
+                    } else {
+                        // Standard Grid: Grid Power + Buffer %
+                        double maxP = data.aeMaxPower();
+                        double storedP = data.aeStoredPower();
+                        String bufferStr = "";
+                        if (maxP > 0.001) {
+                            float bufferPct = (float) ((storedP / maxP) * 100.0);
+                            bufferStr = String.format(" | %s: %.0f%%", Component.translatable("machinemetrics.ae2.buffer").getString(), bufferPct);
+                        }
+                        Component powerComp = Component.translatable("machinemetrics.metrics.ae_power")
+                                .append(Component.literal(": " + rateFormatted + bufferStr));
+                        lines.add(new HudLine(powerComp, ae2Color));
+
+                        float powerDrain = data.aePowerDrain() * multiplier;
+                        float subnetDrain = data.aeSubnetDrain() * multiplier;
+                        if (powerDrain > 0.001f || subnetDrain > 0.001f) {
+                            String drainStr = MetricResolver.formatCompactNumber(powerDrain) + " " + unitLabel;
+                            Component drainComp = Component.translatable("machinemetrics.metrics.ae_drain")
+                                    .append(Component.literal(": " + drainStr));
+                            if (data.aeSubnetCount() > 0) {
+                                String subnetStr = String.format(" | %s (%d): +%s %s",
+                                        Component.translatable("machinemetrics.ae2.subnets").getString(),
+                                        data.aeSubnetCount(),
+                                        MetricResolver.formatCompactNumber(subnetDrain),
+                                        unitLabel);
+                                drainComp = drainComp.copy().append(Component.literal(subnetStr).withStyle(ChatFormatting.AQUA));
+                            }
+                            lines.add(new HudLine(drainComp, ae2Color));
+                        }
+                    }
+                }
+
+                // If showBadge is disabled, render AE2 stability as a standalone line
+                if (showAeStability && !showBadge) {
+                    AE2StabilityState stab = AE2StabilityState.fromOrdinal(data.aeStabilityState());
+
+                    Component stabComp;
+                    int stabColor;
+                    switch (stab) {
+                        case BROWNOUT -> {
+                            stabComp = Component.translatable("machinemetrics.ae2.state.brownout").withStyle(ChatFormatting.BOLD);
+                            stabColor = brownoutColor;
+                        }
+                        case BOOTING -> {
+                            stabComp = Component.literal("State: ").append(Component.translatable("machinemetrics.ae2.state.booting").withStyle(ChatFormatting.YELLOW));
+                            stabColor = 0xFFD54F;
+                        }
+                        case DISCHARGING -> {
+                            stabComp = Component.literal("State: ").append(Component.translatable("machinemetrics.ae2.state.discharging").withStyle(ChatFormatting.GOLD));
+                            stabColor = 0xFFA726;
+                        }
+                        case CREATIVE -> {
+                            stabComp = null;
+                            stabColor = ae2Color;
+                        }
+                        case STABLE -> {
+                            stabComp = Component.literal("State: ").append(Component.translatable("machinemetrics.ae2.state.stable").withStyle(ChatFormatting.GREEN));
+                            stabColor = 0x69F0AE;
+                        }
+                        default -> {
+                            stabComp = Component.literal("State: ").append(Component.translatable("machinemetrics.ae2.state.stable").withStyle(ChatFormatting.GREEN));
+                            stabColor = 0x69F0AE;
+                        }
+                    }
+                    if (stabComp != null) {
+                        lines.add(new HudLine(stabComp, stabColor));
+                    }
+                }
+
+                boolean autoHideChannels = ClientConfig.AUTO_HIDE_AE2_CHANNELS_WITH_INFOHUD == null || ClientConfig.AUTO_HIDE_AE2_CHANNELS_WITH_INFOHUD.get();
+                boolean showChannelsConfig = ClientConfig.SHOW_AE2_CHANNELS == null || ClientConfig.SHOW_AE2_CHANNELS.get();
+                boolean shouldDisplayChannels = showChannelsConfig && (!autoHideChannels || !isInfoHudPresent);
+
+                if (shouldDisplayChannels && data.aeMaxChannels() > 0) {
+                    Component channelComp = Component.translatable("machinemetrics.metrics.ae_channels")
+                            .append(Component.literal(String.format(": %d / %d", data.aeUsedChannels(), data.aeMaxChannels())));
+                    lines.add(new HudLine(channelComp, ae2Color));
+                }
             }
         }
 

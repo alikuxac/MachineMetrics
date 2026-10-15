@@ -1,5 +1,6 @@
 package com.alikuxac.machinemetrics.neoforge.telemetry;
 
+import com.alikuxac.machinemetrics.compat.ae2.AE2NetworkInspector;
 import com.alikuxac.machinemetrics.compat.create.CreateKineticInspector;
 import com.alikuxac.machinemetrics.compat.mekanism.MekanismChemicalInspector;
 import com.alikuxac.machinemetrics.config.ServerConfig;
@@ -88,7 +89,10 @@ public class ServerTelemetrySampler {
         }
 
         String beClassName = be.getClass().getName().toLowerCase();
-        if ((beClassName.contains("appeng") && (beClassName.contains("cable") || beClassName.contains("multipart") || beClassName.contains("bus")))
+        boolean allowAe2 = ServerConfig.ALLOW_AE2 == null || ServerConfig.ALLOW_AE2.get();
+        boolean isAe2Block = beClassName.contains("appeng");
+
+        if ((isAe2Block && !allowAe2 && (beClassName.contains("cable") || beClassName.contains("multipart") || beClassName.contains("bus")))
                 || beClassName.contains("waystone") || beClassName.contains("drawer") || beClassName.contains("chest") || beClassName.contains("barrel")
                 || beClassName.contains("storage") || beClassName.contains("shulker") || beClassName.contains("vault")
                 || beClassName.contains("bin") || beClassName.contains("crate")) {
@@ -376,6 +380,49 @@ public class ServerTelemetrySampler {
         }
 
 
+        boolean hasAe2Network = false;
+        float aePowerRate = 0f;
+        float aePowerDrain = 0f;
+        float aeSubnetDrain = 0f;
+        int aeSubnetCount = 0;
+        double aeStoredPower = 0.0;
+        double aeMaxPower = 0.0;
+        byte aeStabilityState = 0;
+        boolean aeIsCreative = false;
+        int aeUsedChannels = 0;
+        int aeMaxChannels = 0;
+
+        if (allowAe2) {
+            try {
+                var aeOpt = AE2NetworkInspector.inspectNetwork(level, pos, hitFace);
+                if (aeOpt.isPresent()) {
+                    var aeData = aeOpt.get();
+                    hasAe2Network = true;
+                    aePowerRate = aeData.powerRate();
+                    aePowerDrain = aeData.powerDrain();
+                    aeSubnetDrain = aeData.subnetDrain();
+                    aeSubnetCount = aeData.subnetCount();
+                    aeStoredPower = aeData.storedPower();
+                    aeMaxPower = aeData.maxPower();
+                    aeStabilityState = aeData.stabilityState();
+                    aeIsCreative = aeData.isCreative();
+                    aeUsedChannels = aeData.usedChannels();
+                    aeMaxChannels = aeData.maxChannels();
+                    hasAnyCapability = true;
+                }
+            } catch (Throwable ignored) {
+            }
+        }
+
+        short disabledMask = 0;
+        if (!allowItems) disabledMask |= TelemetryData.MASK_ITEMS;
+        if (!allowFluids) disabledMask |= TelemetryData.MASK_FLUIDS;
+        if (!allowEnergy) disabledMask |= TelemetryData.MASK_ENERGY;
+        if (!allowKinetic) disabledMask |= TelemetryData.MASK_KINETIC;
+        if (!allowChemicals) disabledMask |= TelemetryData.MASK_CHEMICALS;
+        if (!allowSides) disabledMask |= TelemetryData.MASK_SIDES;
+        if (!allowAe2) disabledMask |= TelemetryData.MASK_AE2;
+
         boolean hasItems = maxItems > 0;
         boolean hasFluids = maxFluid > 0;
         boolean hasEnergy = maxEnergy > 0;
@@ -383,6 +430,8 @@ public class ServerTelemetrySampler {
         TelemetryData.BottleneckState state;
         if (isOverstressed) {
             state = TelemetryData.BottleneckState.OVERLOADED;
+        } else if (hasAe2Network && aeStabilityState == (byte) AE2NetworkInspector.AE2StabilityState.BROWNOUT.ordinal()) {
+            state = TelemetryData.BottleneckState.STARVED;
         } else if (hasKinetic && Math.abs(kineticSpeed) > 0.001f) {
             // Kinetic blocks with speed are always OPTIMAL
             state = TelemetryData.BottleneckState.OPTIMAL;
@@ -391,6 +440,17 @@ public class ServerTelemetrySampler {
             state = TelemetryData.BottleneckState.STARVED;
         } else if (isActive) {
             state = TelemetryData.BottleneckState.OPTIMAL;
+        } else if (hasAe2Network) {
+            // AE2 devices draw network power or convert FE; FE buffer is normally 0
+            if (aeStabilityState == (byte) AE2NetworkInspector.AE2StabilityState.STABLE.ordinal()
+                    || aeStabilityState == (byte) AE2NetworkInspector.AE2StabilityState.CREATIVE.ordinal()) {
+                state = TelemetryData.BottleneckState.OPTIMAL;
+            } else if (aeStabilityState == (byte) AE2NetworkInspector.AE2StabilityState.DISCHARGING.ordinal()
+                    || aeStabilityState == (byte) AE2NetworkInspector.AE2StabilityState.BOOTING.ordinal()) {
+                state = TelemetryData.BottleneckState.IDLE;
+            } else {
+                state = TelemetryData.BottleneckState.IDLE;
+            }
         } else {
             if (hasEnergy && maxEnergy > 0 && currentEnergy == 0) {
                 state = TelemetryData.BottleneckState.STARVED;
@@ -414,7 +474,9 @@ public class ServerTelemetrySampler {
                 energyDelta, hasEnergy,
                 chemicalThroughput, hasChemicals, chemicalName, chemicalAmount, chemicalCapacity,
                 kineticSpeed, kineticStress, kineticCapacity, kineticBlockStress, hasKinetic, kineticDirection,
-                state, allSlotCounts, allTankAmounts, sideRates
+                state, allSlotCounts, allTankAmounts, sideRates,
+                disabledMask,
+                hasAe2Network, aePowerRate, aePowerDrain, aeSubnetDrain, aeSubnetCount, aeStoredPower, aeMaxPower, aeStabilityState, aeIsCreative, aeUsedChannels, aeMaxChannels
         );
     }
 

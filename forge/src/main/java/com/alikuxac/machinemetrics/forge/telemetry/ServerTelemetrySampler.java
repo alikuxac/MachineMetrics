@@ -86,7 +86,10 @@ public class ServerTelemetrySampler {
         }
 
         String beClassName = be.getClass().getName().toLowerCase();
-        if ((beClassName.contains("appeng") && (beClassName.contains("cable") || beClassName.contains("multipart") || beClassName.contains("bus")))
+        boolean allowAe2 = ServerConfig.ALLOW_AE2 == null || ServerConfig.ALLOW_AE2.get();
+        boolean isAe2Block = beClassName.contains("appeng");
+
+        if ((isAe2Block && !allowAe2 && (beClassName.contains("cable") || beClassName.contains("multipart") || beClassName.contains("bus")))
                 || beClassName.contains("waystone") || beClassName.contains("drawer") || beClassName.contains("chest") || beClassName.contains("barrel")
                 || beClassName.contains("storage") || beClassName.contains("shulker") || beClassName.contains("vault")
                 || beClassName.contains("bin") || beClassName.contains("crate")) {

@@ -53,5 +53,16 @@
   "machinemetrics.preset.chemicals_only": "Chemicals Only",
   "machinemetrics.preset.energy_only": "Energy Only",
   "machinemetrics.preset.items_only": "Items Only",
-  "machinemetrics.preset.fluids_only": "Fluids Only"
+  "machinemetrics.preset.fluids_only": "Fluids Only",
+  "machinemetrics.metrics.ae_power": "ME Power",
+  "machinemetrics.metrics.ae_drain": "Drain",
+  "machinemetrics.metrics.ae_channels": "Channels",
+  "machinemetrics.metrics.unit.ae_per_tick": "AE/t",
+  "machinemetrics.ae2.buffer": "Buffer",
+  "machinemetrics.ae2.subnets": "Subnets",
+  "machinemetrics.ae2.state.stable": "STABLE",
+  "machinemetrics.ae2.state.discharging": "DISCHARGING",
+  "machinemetrics.ae2.state.brownout": "🔴 GRID BROWNOUT",
+  "machinemetrics.ae2.state.booting": "🟡 BOOTING",
+  "machinemetrics.ae2.state.creative": "CREATIVE"
 }

@@ -32,7 +32,18 @@ public record SyncTelemetryPayload(
         float[] sideMetrics,
         IntArrayList allSlotCounts,
         IntArrayList allTankAmounts,
-        short serverDisabledMask
+        short serverDisabledMask,
+        boolean hasAe2Network,
+        float aePowerRate,
+        float aePowerDrain,
+        float aeSubnetDrain,
+        int aeSubnetCount,
+        double aeStoredPower,
+        double aeMaxPower,
+        byte aeStabilityState,
+        boolean aeIsCreative,
+        int aeUsedChannels,
+        int aeMaxChannels
 ) implements CustomPacketPayload {
     public static final Type<SyncTelemetryPayload> TYPE = new Type<>(ResourceLocation.fromNamespaceAndPath("machinemetrics", "sync_telemetry"));
 
@@ -68,7 +79,18 @@ public record SyncTelemetryPayload(
                 data.sideMetrics(),
                 data.allSlotCounts(),
                 data.allTankAmounts(),
-                serverDisabledMask
+                serverDisabledMask,
+                data.hasAe2Network(),
+                data.aePowerRate(),
+                data.aePowerDrain(),
+                data.aeSubnetDrain(),
+                data.aeSubnetCount(),
+                data.aeStoredPower(),
+                data.aeMaxPower(),
+                data.aeStabilityState(),
+                data.aeIsCreative(),
+                data.aeUsedChannels(),
+                data.aeMaxChannels()
         );
     }
 
@@ -99,92 +121,219 @@ public record SyncTelemetryPayload(
                 allSlotCounts != null ? allSlotCounts : new IntArrayList(),
                 allTankAmounts != null ? allTankAmounts : new IntArrayList(),
                 sideMetrics != null ? sideMetrics : new float[18],
-                serverDisabledMask
+                serverDisabledMask,
+                hasAe2Network,
+                aePowerRate,
+                aePowerDrain,
+                aeSubnetDrain,
+                aeSubnetCount,
+                aeStoredPower,
+                aeMaxPower,
+                aeStabilityState,
+                aeIsCreative,
+                aeUsedChannels,
+                aeMaxChannels
         );
     }
 
+    public static final int FLAG_ITEMS     = 1 << 0;
+    public static final int FLAG_FLUIDS    = 1 << 1;
+    public static final int FLAG_ENERGY    = 1 << 2;
+    public static final int FLAG_KINETIC   = 1 << 3;
+    public static final int FLAG_CHEMICALS = 1 << 4;
+    public static final int FLAG_AE2       = 1 << 5;
+    public static final int FLAG_SIDES     = 1 << 6;
+    public static final int FLAG_DISABLED  = 1 << 7;
+
+    private static boolean hasActiveSides(float[] sides) {
+        if (sides == null) return false;
+        for (float val : sides) {
+            if (val > 0.01f) return true;
+        }
+        return false;
+    }
+
     private static void encode(FriendlyByteBuf buf, SyncTelemetryPayload payload) {
+        int flags = 0;
+        if (payload.hasItems || payload.itemThroughput > 0.001f) {
+            flags |= FLAG_ITEMS;
+        }
+        if (payload.hasFluids || payload.fluidThroughput > 0.001f) {
+            flags |= FLAG_FLUIDS;
+        }
+        if (payload.hasEnergy || Math.abs(payload.energyDelta) > 0.001f) {
+            flags |= FLAG_ENERGY;
+        }
+        if (payload.hasKinetic || Math.abs(payload.kineticSpeed) > 0.001f || payload.kineticCapacity > 0.001f) {
+            flags |= FLAG_KINETIC;
+        }
+        if (payload.hasChemicals || payload.chemicalThroughput > 0.001f) {
+            flags |= FLAG_CHEMICALS;
+        }
+        if (payload.hasAe2Network) {
+            flags |= FLAG_AE2;
+        }
+        if (hasActiveSides(payload.sideMetrics)) {
+            flags |= FLAG_SIDES;
+        }
+        if (payload.serverDisabledMask != 0) {
+            flags |= FLAG_DISABLED;
+        }
+
         buf.writeBlockPos(payload.targetPos);
-        buf.writeFloat(payload.itemThroughput);
-        buf.writeBoolean(payload.hasItems);
-        buf.writeFloat(payload.fluidThroughput);
-        buf.writeBoolean(payload.hasFluids);
-        buf.writeFloat(payload.energyDelta);
-        buf.writeBoolean(payload.hasEnergy);
-        buf.writeFloat(payload.chemicalThroughput);
-        buf.writeBoolean(payload.hasChemicals);
-        buf.writeUtf(payload.chemicalName != null ? payload.chemicalName : "");
-        buf.writeVarLong(payload.chemicalAmount);
-        buf.writeVarLong(payload.chemicalCapacity);
-        buf.writeFloat(payload.kineticSpeed);
-        buf.writeFloat(payload.kineticStress);
-        buf.writeFloat(payload.kineticCapacity);
-        buf.writeFloat(payload.kineticBlockStress);
-        buf.writeBoolean(payload.hasKinetic);
-        buf.writeByte(payload.kineticDirection);
         buf.writeByte(payload.machineState);
+        buf.writeByte(flags);
 
-        IntArrayList slots = payload.allSlotCounts;
-        int slotSize = slots != null ? slots.size() : 0;
-        buf.writeVarInt(slotSize);
-        for (int i = 0; i < slotSize; i++) {
-            buf.writeVarInt(slots.getInt(i));
+        if ((flags & FLAG_DISABLED) != 0) {
+            buf.writeShort(payload.serverDisabledMask);
         }
 
-        IntArrayList tanks = payload.allTankAmounts;
-        int tankSize = tanks != null ? tanks.size() : 0;
-        buf.writeVarInt(tankSize);
-        for (int i = 0; i < tankSize; i++) {
-            buf.writeVarInt(tanks.getInt(i));
+        if ((flags & FLAG_ITEMS) != 0) {
+            buf.writeFloat(payload.itemThroughput);
+            buf.writeBoolean(payload.hasItems);
         }
 
-        float[] sideMetrics = payload.sideMetrics;
-        for (int i = 0; i < 18; i++) {
-            buf.writeFloat(sideMetrics != null && i < sideMetrics.length ? sideMetrics[i] : 0.0f);
+        if ((flags & FLAG_FLUIDS) != 0) {
+            buf.writeFloat(payload.fluidThroughput);
+            buf.writeBoolean(payload.hasFluids);
         }
 
-        buf.writeShort(payload.serverDisabledMask);
+        if ((flags & FLAG_ENERGY) != 0) {
+            buf.writeFloat(payload.energyDelta);
+            buf.writeBoolean(payload.hasEnergy);
+        }
+
+        if ((flags & FLAG_KINETIC) != 0) {
+            buf.writeFloat(payload.kineticSpeed);
+            buf.writeFloat(payload.kineticStress);
+            buf.writeFloat(payload.kineticCapacity);
+            buf.writeFloat(payload.kineticBlockStress);
+            buf.writeByte(payload.kineticDirection);
+        }
+
+        if ((flags & FLAG_CHEMICALS) != 0) {
+            buf.writeFloat(payload.chemicalThroughput);
+            buf.writeUtf(payload.chemicalName != null ? payload.chemicalName : "");
+            buf.writeVarLong(payload.chemicalAmount);
+            buf.writeVarLong(payload.chemicalCapacity);
+        }
+
+        if ((flags & FLAG_AE2) != 0) {
+            buf.writeFloat(payload.aePowerRate);
+            buf.writeFloat(payload.aePowerDrain);
+            buf.writeFloat(payload.aeSubnetDrain);
+            buf.writeVarInt(payload.aeSubnetCount);
+            buf.writeDouble(payload.aeStoredPower);
+            buf.writeDouble(payload.aeMaxPower);
+            buf.writeByte(payload.aeStabilityState);
+            buf.writeBoolean(payload.aeIsCreative);
+            buf.writeVarInt(payload.aeUsedChannels);
+            buf.writeVarInt(payload.aeMaxChannels);
+        }
+
+        if ((flags & FLAG_SIDES) != 0) {
+            int nonZeroMask = 0;
+            for (int i = 0; i < 18; i++) {
+                if (payload.sideMetrics != null && i < payload.sideMetrics.length && payload.sideMetrics[i] > 0.01f) {
+                    nonZeroMask |= (1 << i);
+                }
+            }
+            buf.writeVarInt(nonZeroMask);
+            for (int i = 0; i < 18; i++) {
+                if ((nonZeroMask & (1 << i)) != 0) {
+                    buf.writeFloat(payload.sideMetrics[i]);
+                }
+            }
+        }
     }
 
     private static SyncTelemetryPayload decode(FriendlyByteBuf buf) {
         BlockPos targetPos = buf.readBlockPos();
-        float itemThroughput = buf.readFloat();
-        boolean hasItems = buf.readBoolean();
-        float fluidThroughput = buf.readFloat();
-        boolean hasFluids = buf.readBoolean();
-        float energyDelta = buf.readFloat();
-        boolean hasEnergy = buf.readBoolean();
-        float chemicalThroughput = buf.readFloat();
-        boolean hasChemicals = buf.readBoolean();
-        String chemicalName = buf.readUtf();
-        long chemicalAmount = buf.readVarLong();
-        long chemicalCapacity = buf.readVarLong();
-        float kineticSpeed = buf.readFloat();
-        float kineticStress = buf.readFloat();
-        float kineticCapacity = buf.readFloat();
-        float kineticBlockStress = buf.readFloat();
-        boolean hasKinetic = buf.readBoolean();
-        byte kineticDirection = buf.readByte();
         byte machineState = buf.readByte();
+        int flags = buf.readUnsignedByte();
 
-        int slotCount = buf.readVarInt();
-        IntArrayList allSlotCounts = new IntArrayList(slotCount);
-        for (int i = 0; i < slotCount; i++) {
-            allSlotCounts.add(buf.readVarInt());
+        short serverDisabledMask = (flags & FLAG_DISABLED) != 0 ? buf.readShort() : (short) 0;
+
+        float itemThroughput = 0.0f;
+        boolean hasItems = false;
+        if ((flags & FLAG_ITEMS) != 0) {
+            itemThroughput = buf.readFloat();
+            hasItems = buf.readBoolean();
         }
 
-        int tankCount = buf.readVarInt();
-        IntArrayList allTankAmounts = new IntArrayList(tankCount);
-        for (int i = 0; i < tankCount; i++) {
-            allTankAmounts.add(buf.readVarInt());
+        float fluidThroughput = 0.0f;
+        boolean hasFluids = false;
+        if ((flags & FLAG_FLUIDS) != 0) {
+            fluidThroughput = buf.readFloat();
+            hasFluids = buf.readBoolean();
+        }
+
+        float energyDelta = 0.0f;
+        boolean hasEnergy = false;
+        if ((flags & FLAG_ENERGY) != 0) {
+            energyDelta = buf.readFloat();
+            hasEnergy = buf.readBoolean();
+        }
+
+        float kineticSpeed = 0.0f;
+        float kineticStress = 0.0f;
+        float kineticCapacity = 0.0f;
+        float kineticBlockStress = 0.0f;
+        boolean hasKinetic = (flags & FLAG_KINETIC) != 0;
+        byte kineticDirection = 2; // STATIONARY
+        if (hasKinetic) {
+            kineticSpeed = buf.readFloat();
+            kineticStress = buf.readFloat();
+            kineticCapacity = buf.readFloat();
+            kineticBlockStress = buf.readFloat();
+            kineticDirection = buf.readByte();
+        }
+
+        float chemicalThroughput = 0.0f;
+        boolean hasChemicals = (flags & FLAG_CHEMICALS) != 0;
+        String chemicalName = "";
+        long chemicalAmount = 0L;
+        long chemicalCapacity = 0L;
+        if (hasChemicals) {
+            chemicalThroughput = buf.readFloat();
+            chemicalName = buf.readUtf();
+            chemicalAmount = buf.readVarLong();
+            chemicalCapacity = buf.readVarLong();
+        }
+
+        boolean hasAe2Network = (flags & FLAG_AE2) != 0;
+        float aePowerRate = 0.0f;
+        float aePowerDrain = 0.0f;
+        float aeSubnetDrain = 0.0f;
+        int aeSubnetCount = 0;
+        double aeStoredPower = 0.0;
+        double aeMaxPower = 0.0;
+        byte aeStabilityState = 0;
+        boolean aeIsCreative = false;
+        int aeUsedChannels = 0;
+        int aeMaxChannels = 0;
+        if (hasAe2Network) {
+            aePowerRate = buf.readFloat();
+            aePowerDrain = buf.readFloat();
+            aeSubnetDrain = buf.readFloat();
+            aeSubnetCount = buf.readVarInt();
+            aeStoredPower = buf.readDouble();
+            aeMaxPower = buf.readDouble();
+            aeStabilityState = buf.readByte();
+            aeIsCreative = buf.readBoolean();
+            aeUsedChannels = buf.readVarInt();
+            aeMaxChannels = buf.readVarInt();
         }
 
         float[] sideMetrics = new float[18];
-        for (int i = 0; i < 18; i++) {
-            sideMetrics[i] = buf.readFloat();
+        if ((flags & FLAG_SIDES) != 0) {
+            int nonZeroMask = buf.readVarInt();
+            for (int i = 0; i < 18; i++) {
+                if ((nonZeroMask & (1 << i)) != 0) {
+                    sideMetrics[i] = buf.readFloat();
+                }
+            }
         }
-
-        short serverDisabledMask = buf.readShort();
 
         return new SyncTelemetryPayload(
                 targetPos,
@@ -207,9 +356,20 @@ public record SyncTelemetryPayload(
                 kineticDirection,
                 machineState,
                 sideMetrics,
-                allSlotCounts,
-                allTankAmounts,
-                serverDisabledMask
+                new IntArrayList(),
+                new IntArrayList(),
+                serverDisabledMask,
+                hasAe2Network,
+                aePowerRate,
+                aePowerDrain,
+                aeSubnetDrain,
+                aeSubnetCount,
+                aeStoredPower,
+                aeMaxPower,
+                aeStabilityState,
+                aeIsCreative,
+                aeUsedChannels,
+                aeMaxChannels
         );
     }
 

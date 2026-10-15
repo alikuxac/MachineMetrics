@@ -1,8 +1,11 @@
 package com.alikuxac.machinemetrics.neoforge.telemetry;
 
-import com.alikuxac.machinemetrics.telemetry.TelemetryData;
-import com.alikuxac.machinemetrics.config.ServerConfig;
+import com.alikuxac.machinemetrics.compat.ae2.AE2NetworkInspector;
+import com.alikuxac.machinemetrics.compat.ae2.AE2NetworkInspector.AE2StabilityState;
 import com.alikuxac.machinemetrics.compat.create.CreateKineticInspector;
+import com.alikuxac.machinemetrics.config.ServerConfig;
+import com.alikuxac.machinemetrics.telemetry.TelemetryData;
+import it.unimi.dsi.fastutil.ints.IntArrayList;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.multiplayer.ClientLevel;
 import net.minecraft.core.BlockPos;
@@ -12,16 +15,12 @@ import net.neoforged.neoforge.capabilities.Capabilities;
 import net.neoforged.neoforge.energy.IEnergyStorage;
 import net.neoforged.neoforge.fluids.capability.IFluidHandler;
 import net.neoforged.neoforge.items.IItemHandler;
-
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import it.unimi.dsi.fastutil.ints.IntArrayList;
 
-import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.IdentityHashMap;
-import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
@@ -78,7 +77,8 @@ public class NeoForgeTelemetrySampler {
         }
 
         String beClassName = be.getClass().getName().toLowerCase();
-        if ((beClassName.contains("appeng") && (beClassName.contains("cable") || beClassName.contains("multipart") || beClassName.contains("bus")))
+        boolean isAe2Block = beClassName.contains("appeng");
+        if ((isAe2Block && !AE2NetworkInspector.isAE2Loaded() && (beClassName.contains("cable") || beClassName.contains("multipart") || beClassName.contains("bus")))
                 || beClassName.contains("waystone") || beClassName.contains("drawer") || beClassName.contains("chest") || beClassName.contains("barrel")
                 || beClassName.contains("storage") || beClassName.contains("shulker") || beClassName.contains("vault")
                 || beClassName.contains("bin") || beClassName.contains("crate")) {
@@ -215,8 +215,39 @@ public class NeoForgeTelemetrySampler {
             }
         } catch (Throwable ignored) {
         }
+        boolean hasAe2Network = false;
+        float aePowerRate = 0f;
+        float aePowerDrain = 0f;
+        float aeSubnetDrain = 0f;
+        int aeSubnetCount = 0;
+        double aeStoredPower = 0.0;
+        double aeMaxPower = 0.0;
+        byte aeStabilityState = 0;
+        boolean aeIsCreative = false;
+        int aeUsedChannels = 0;
+        int aeMaxChannels = 0;
 
-        if (!hasAnyCapability || (maxItems == 0 && maxFluid == 0 && maxEnergy == 0 && !hasKinetic)) {
+        try {
+            var aeOpt = AE2NetworkInspector.inspectNetwork(level, pos, hitFace);
+            if (aeOpt.isPresent()) {
+                var aeData = aeOpt.get();
+                hasAe2Network = true;
+                aePowerRate = aeData.powerRate();
+                aePowerDrain = aeData.powerDrain();
+                aeSubnetDrain = aeData.subnetDrain();
+                aeSubnetCount = aeData.subnetCount();
+                aeStoredPower = aeData.storedPower();
+                aeMaxPower = aeData.maxPower();
+                aeStabilityState = aeData.stabilityState();
+                aeIsCreative = aeData.isCreative();
+                aeUsedChannels = aeData.usedChannels();
+                aeMaxChannels = aeData.maxChannels();
+                hasAnyCapability = true;
+            }
+        } catch (Throwable ignored) {
+        }
+
+        if (!hasAnyCapability || (maxItems == 0 && maxFluid == 0 && maxEnergy == 0 && !hasKinetic && !hasAe2Network)) {
             return TelemetryData.empty();
         }
 
@@ -318,12 +349,21 @@ public class NeoForgeTelemetrySampler {
         TelemetryData.BottleneckState state;
         if (isOverstressed) {
             state = TelemetryData.BottleneckState.OVERLOADED;
+        } else if (hasAe2Network && aeStabilityState == (byte) AE2StabilityState.BROWNOUT.ordinal()) {
+            state = TelemetryData.BottleneckState.STARVED;
         } else if (hasKinetic && Math.abs(kineticSpeed) > 0.001f) {
             state = TelemetryData.BottleneckState.OPTIMAL;
         } else if (hasKinetic && Math.abs(kineticSpeed) <= 0.001f) {
             state = TelemetryData.BottleneckState.STARVED;
         } else if (isActive) {
             state = TelemetryData.BottleneckState.OPTIMAL;
+        } else if (hasAe2Network) {
+            if (aeStabilityState == (byte) AE2StabilityState.STABLE.ordinal()
+                    || aeStabilityState == (byte) AE2StabilityState.CREATIVE.ordinal()) {
+                state = TelemetryData.BottleneckState.OPTIMAL;
+            } else {
+                state = TelemetryData.BottleneckState.IDLE;
+            }
         } else {
             if (hasEnergy && maxEnergy > 0 && currentEnergy == 0) {
                 state = TelemetryData.BottleneckState.STARVED;
@@ -352,7 +392,9 @@ public class NeoForgeTelemetrySampler {
                 energyDelta, hasEnergy,
                 0f, false, "", 0L, 0L,
                 kineticSpeed, kineticStress, kineticCapacity, kineticBlockStress, hasKinetic, kineticDirection,
-                state, allSlotCounts, allTankAmounts, sideRates
+                state, allSlotCounts, allTankAmounts, sideRates,
+                (short) 0,
+                hasAe2Network, aePowerRate, aePowerDrain, aeSubnetDrain, aeSubnetCount, aeStoredPower, aeMaxPower, aeStabilityState, aeIsCreative, aeUsedChannels, aeMaxChannels
         );
     }
 

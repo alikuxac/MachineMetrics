@@ -39,6 +39,11 @@ public class ClientConfig {
     public static final ModConfigSpec.BooleanValue SHOW_HEADROOM;
     public static final ModConfigSpec.BooleanValue SHOW_ENERGY_FE;
     public static final ModConfigSpec.BooleanValue SHOW_SIDES;
+    public static final ModConfigSpec.BooleanValue SHOW_AE2_POWER;
+    public static final ModConfigSpec.BooleanValue SHOW_AE2_STABILITY;
+    public static final ModConfigSpec.BooleanValue AUTO_HIDE_AE2_CHANNELS_WITH_INFOHUD;
+    public static final ModConfigSpec.BooleanValue SHOW_AE2_CHANNELS;
+    public static final ModConfigSpec.ConfigValue<String> AE2_POWER_UNIT;
 
     // Compact Formatting
     public static final ModConfigSpec.BooleanValue COMPACT_MODE;
@@ -54,6 +59,8 @@ public class ClientConfig {
     public static final ModConfigSpec.ConfigValue<String> COLOR_ENERGY_NEGATIVE;
     public static final ModConfigSpec.ConfigValue<String> COLOR_ENERGY_NEUTRAL;
     public static final ModConfigSpec.ConfigValue<String> COLOR_SIDES;
+    public static final ModConfigSpec.ConfigValue<String> COLOR_AE2_POWER;
+    public static final ModConfigSpec.ConfigValue<String> COLOR_AE2_BROWNOUT;
 
     public static final ModConfigSpec.ConfigValue<String> COLOR_STATE_OPTIMAL;
     public static final ModConfigSpec.ConfigValue<String> COLOR_STATE_STARVED;
@@ -150,6 +157,26 @@ public class ClientConfig {
                 .comment("Show per-side rates when active")
                 .define("show_sides", true);
 
+        SHOW_AE2_POWER = builder
+                .comment("Show AE2 grid power drain & buffer percentage")
+                .define("show_ae2_power", true);
+
+        SHOW_AE2_STABILITY = builder
+                .comment("Show AE2 grid stability state and brownout warnings")
+                .define("show_ae2_stability", true);
+
+        AUTO_HIDE_AE2_CHANNELS_WITH_INFOHUD = builder
+                .comment("Automatically delegate and hide AE2 channels if Jade/WTHIT is installed")
+                .define("auto_hide_ae2_channels_with_info_mods", true);
+
+        SHOW_AE2_CHANNELS = builder
+                .comment("Show AE2 node used/max channels (will be hidden if Jade is present and auto-hide is true)")
+                .define("show_ae2_channels", true);
+
+        AE2_POWER_UNIT = builder
+                .comment("Display unit for AE2 power: 'AUTO' (syncs with AE2 client option button), 'AE', or 'FE' (1 AE = 2 FE)")
+                .define("ae2_power_unit", "AUTO");
+
         builder.pop();
 
         builder.comment("Compact Template").push("formatting");
@@ -201,6 +228,14 @@ public class ClientConfig {
         COLOR_SIDES = builder
                 .comment("Per-side metrics color")
                 .define("sidesColor", "#69F0AE");
+
+        COLOR_AE2_POWER = builder
+                .comment("AE2 grid power color (Fluix purple)")
+                .define("ae2PowerColor", "#A259FF");
+
+        COLOR_AE2_BROWNOUT = builder
+                .comment("AE2 grid brownout alert color")
+                .define("ae2BrownoutColor", "#FF3333");
 
         COLOR_STATE_OPTIMAL = builder
                 .comment("OPTIMAL status color")

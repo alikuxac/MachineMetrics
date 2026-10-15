@@ -26,7 +26,18 @@ public record TelemetryData(
         IntArrayList allSlotCounts,
         IntArrayList allTankAmounts,
         float[] sideMetrics,
-        short serverDisabledMask
+        short serverDisabledMask,
+        boolean hasAe2Network,
+        float aePowerRate,
+        float aePowerDrain,
+        float aeSubnetDrain,
+        int aeSubnetCount,
+        double aeStoredPower,
+        double aeMaxPower,
+        byte aeStabilityState,
+        boolean aeIsCreative,
+        int aeUsedChannels,
+        int aeMaxChannels
 ) {
     public enum BottleneckState {
         OPTIMAL,
@@ -42,6 +53,7 @@ public record TelemetryData(
     public static final short MASK_KINETIC = 1 << 3;
     public static final short MASK_CHEMICALS = 1 << 4;
     public static final short MASK_SIDES = 1 << 5;
+    public static final short MASK_AE2 = 1 << 6;
 
     public TelemetryData(
             float itemThroughput,
@@ -74,7 +86,8 @@ public record TelemetryData(
                 kineticSpeed, kineticStress, kineticCapacity, kineticBlockStress, hasKinetic,
                 kineticDirection, bottleneckState,
                 allSlotCounts, allTankAmounts, sideMetrics,
-                (short) 0
+                (short) 0,
+                false, 0f, 0f, 0f, 0, 0.0, 0.0, (byte) 0, false, 0, 0
         );
     }
 
@@ -88,7 +101,8 @@ public record TelemetryData(
             BottleneckState.IDLE,
             new IntArrayList(), new IntArrayList(),
             new float[18],
-            (short) 0
+            (short) 0,
+            false, 0f, 0f, 0f, 0, 0.0, 0.0, (byte) 0, false, 0, 0
     );
 
     public static TelemetryData empty() {
@@ -96,7 +110,7 @@ public record TelemetryData(
     }
 
     public boolean isEmpty() {
-        return !hasItems && !hasFluids && !hasEnergy && !hasChemicals && !hasKinetic && serverDisabledMask == 0;
+        return !hasItems && !hasFluids && !hasEnergy && !hasChemicals && !hasKinetic && !hasAe2Network && serverDisabledMask == 0;
     }
 
     public boolean isItemsDisabledByServer() {
@@ -121,6 +135,10 @@ public record TelemetryData(
 
     public boolean isSidesDisabledByServer() {
         return (serverDisabledMask & MASK_SIDES) != 0;
+    }
+
+    public boolean isAe2DisabledByServer() {
+        return (serverDisabledMask & MASK_AE2) != 0;
     }
 
     public float getItemSideRate(Direction dir) {
@@ -151,7 +169,18 @@ public record TelemetryData(
         if (this.serverDisabledMask != other.serverDisabledMask) return true;
         if (this.bottleneckState != other.bottleneckState) return true;
         if (this.kineticDirection != other.kineticDirection) return true;
-        if (this.hasItems != other.hasItems || this.hasFluids != other.hasFluids || this.hasEnergy != other.hasEnergy || this.hasChemicals != other.hasChemicals || this.hasKinetic != other.hasKinetic) return true;
+        if (this.hasItems != other.hasItems || this.hasFluids != other.hasFluids || this.hasEnergy != other.hasEnergy || this.hasChemicals != other.hasChemicals || this.hasKinetic != other.hasKinetic || this.hasAe2Network != other.hasAe2Network) return true;
+        if (this.hasAe2Network) {
+            if (this.aeStabilityState != other.aeStabilityState) return true;
+            if (this.aeIsCreative != other.aeIsCreative) return true;
+            if (this.aeUsedChannels != other.aeUsedChannels) return true;
+            if (this.aeSubnetCount != other.aeSubnetCount) return true;
+            if (Math.abs(this.aePowerRate - other.aePowerRate) > 1.0f) return true;
+            if (Math.abs(this.aePowerDrain - other.aePowerDrain) > 1.0f) return true;
+            if (Math.abs(this.aeSubnetDrain - other.aeSubnetDrain) > 1.0f) return true;
+            if (Math.abs(this.aeStoredPower - other.aeStoredPower) > 10.0) return true;
+            if (Math.abs(this.aeMaxPower - other.aeMaxPower) > 10.0) return true;
+        }
         if (Math.abs(this.itemThroughput - other.itemThroughput) > 0.1f) return true;
         if (Math.abs(this.fluidThroughput - other.fluidThroughput) > 1.0f) return true;
         if (Math.abs(this.chemicalThroughput - other.chemicalThroughput) > 1.0f) return true;

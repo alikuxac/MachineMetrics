@@ -1,5 +1,7 @@
 package com.alikuxac.machinemetrics.client;
 
+import com.alikuxac.machinemetrics.config.ClientConfig;
+import com.alikuxac.machinemetrics.compat.ae2.AE2NetworkInspector;
 import com.alikuxac.machinemetrics.compat.create.CreateKineticInspector;
 import com.alikuxac.machinemetrics.telemetry.TelemetryData;
 import net.minecraft.ChatFormatting;
@@ -137,6 +139,35 @@ public class MetricResolver {
         String itemsStr = itemsDisabled ? disabledLabel : formatItemRate(data != null ? data.itemThroughput() : 0f);
         String fluidsStr = fluidsDisabled ? disabledLabel : formatFluidRate(data != null ? data.fluidThroughput() : 0f);
 
+        String aePowerStr = "—";
+        String aeStateStr = "—";
+        String aeDrainStr = "—";
+        String aeSubnetsStr = "—";
+        if (data != null && data.hasAe2Network()) {
+            if (data.isAe2DisabledByServer()) {
+                aePowerStr = disabledLabel;
+                aeStateStr = disabledLabel;
+                aeDrainStr = disabledLabel;
+                aeSubnetsStr = disabledLabel;
+            } else {
+                String unitConfig = ClientConfig.AE2_POWER_UNIT != null
+                        ? ClientConfig.AE2_POWER_UNIT.get() : "AUTO";
+                boolean isFe = "FE".equalsIgnoreCase(unitConfig);
+                if ("AUTO".equalsIgnoreCase(unitConfig)) {
+                    isFe = "FE".equalsIgnoreCase(AE2NetworkInspector.getClientSelectedPowerUnit());
+                }
+                float mult = isFe ? 2.0f : 1.0f;
+                String unitStr = isFe ? "FE/t" : "AE/t";
+                aePowerStr = formatCompactNumber(data.aePowerRate() * mult) + " " + unitStr;
+                aeDrainStr = formatCompactNumber(data.aePowerDrain() * mult) + " " + unitStr;
+                aeSubnetsStr = String.format(Locale.ROOT, "%d (+%s %s)",
+                        data.aeSubnetCount(),
+                        formatCompactNumber(data.aeSubnetDrain() * mult),
+                        unitStr);
+                aeStateStr = AE2NetworkInspector.AE2StabilityState.fromOrdinal(data.aeStabilityState()).name();
+            }
+        }
+
         return template
                 .replace("{name}", blockName != null ? blockName : Component.translatable("machinemetrics.hud.title").getString())
                 .replace("{speed}", kineticDisabled ? "—" : speedStr)
@@ -147,6 +178,10 @@ public class MetricResolver {
                 .replace("{load_pct}", kineticDisabled ? "—" : loadPctStr)
                 .replace("{state}", stateStr)
                 .replace("{items}", itemsStr)
-                .replace("{fluids}", fluidsStr);
+                .replace("{fluids}", fluidsStr)
+                .replace("{ae_power}", aePowerStr)
+                .replace("{ae_drain}", aeDrainStr)
+                .replace("{ae_subnets}", aeSubnetsStr)
+                .replace("{ae_state}", aeStateStr);
     }
 }

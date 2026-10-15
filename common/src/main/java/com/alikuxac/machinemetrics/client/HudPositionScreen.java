@@ -1,5 +1,7 @@
 package com.alikuxac.machinemetrics.client;
 
+import com.alikuxac.machinemetrics.compat.ae2.AE2NetworkInspector;
+import com.alikuxac.machinemetrics.compat.ae2.AE2NetworkInspector.AE2StabilityState;
 import com.alikuxac.machinemetrics.compat.create.CreateKineticInspector;
 import com.alikuxac.machinemetrics.compat.infohud.InfoHudDetector;
 import com.alikuxac.machinemetrics.compat.mekanism.MekanismChemicalInspector;
@@ -11,6 +13,7 @@ import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.network.chat.Component;
+import net.neoforged.neoforge.common.ModConfigSpec;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -355,7 +358,7 @@ public class HudPositionScreen extends Screen {
         }
     }
 
-    private static void setSafe(net.neoforged.neoforge.common.ModConfigSpec.BooleanValue config, boolean val) {
+    private static void setSafe(ModConfigSpec.BooleanValue config, boolean val) {
         if (config != null) config.set(val);
     }
 
@@ -367,6 +370,8 @@ public class HudPositionScreen extends Screen {
         sampleSides[net.minecraft.core.Direction.DOWN.ordinal()] = 8.5f;       // Item output on DOWN
         sampleSides[6 + net.minecraft.core.Direction.NORTH.ordinal()] = 250.0f; // Fluid input on NORTH
 
+        boolean hasAe2 = AE2NetworkInspector.isAE2Loaded();
+
         return new TelemetryData(
                 12.5f, true,
                 250.0f, true,
@@ -376,7 +381,19 @@ public class HudPositionScreen extends Screen {
                 CreateKineticInspector.RotationDirection.CLOCKWISE,
                 TelemetryData.BottleneckState.OPTIMAL,
                 new IntArrayList(), new IntArrayList(),
-                sampleSides
+                sampleSides,
+                (short) 0,
+                hasAe2,
+                -3400.0f,
+                3400.0f,
+                450.0f,
+                2,
+                164000.0,
+                200000.0,
+                (byte) AE2StabilityState.STABLE.ordinal(),
+                false,
+                3,
+                8
         );
     }
 
