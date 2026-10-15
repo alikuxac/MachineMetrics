@@ -55,6 +55,7 @@ Machine Metrics is a client-side and server-synced telemetry HUD for Minecraft. 
   - Client visual settings, offsets, presets, and colors: `config/machinemetrics-client.toml` or via the in-game editor.
   - Server metrics permissions and toggles: `config/machinemetrics-server.toml`.
   - See the [Configuration Guide](docs/configuration.md) for keys and compact template placeholders.
+  - See the [Telemetry Data Flow](docs/data-flow.md) for network packet flow and capability sampling architecture.
 
 ---
 

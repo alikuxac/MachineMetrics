@@ -1,84 +1,85 @@
 # Configuration Guide
 
-Machine Metrics settings are split between client-side HUD options and server-side metric permissions.
+Machine Metrics settings are split between client HUD options and server telemetry permissions.
 
 ---
 
 ## In-Game HUD Editor
 
-You can configure HUD placement directly from the UI without entering a world:
-1. **From Main Menu:** Go to `Mods` -> select `Machine Metrics` -> click **Config**.
-2. **In-Game:** Open the pause menu (`ESC`) and click **Machinemetrics HUD** in the top-right corner.
+Configure HUD placement and presets directly in-game without editing config files:
+- **Main Menu**: Open `Mods` > select `Machine Metrics` > click **Config**.
+- **In-Game**: Open the pause menu (`ESC`) and click **Machinemetrics HUD** in the top-right corner.
 
-### Controls:
-- **Move:** Click and drag the HUD anywhere on screen. Offsets calculate relative to the active anchor.
-- **Anchor:** Click `Anchor: ...` to cycle points (`TOP_LEFT`, `TOP_RIGHT`, `BOTTOM_LEFT`, `BOTTOM_RIGHT`, `CROSSHAIR`).
-- **Reset:** Click `Reset to Default` to restore offset defaults.
-- **Block Name:** Click `Block Name: SHOW / HIDE` to toggle the machine title line.
-- **Presets:** Click `Preset: ...` to pick a starting layout:
-   - **Full Diagnostic:** Shows all metrics (Title, Status, Items, Fluids, Energy, and mod metrics if installed).
-   - **Minimalist Bar:** Compact single-line template mode.
-   - **Create Only:** Kinetic diagnostics (Speed, Direction, Network SU, Headroom) (requires Create).
-   - **Chemicals Only:** Chemical transfer rates and tank capacities (requires Mekanism).
-   - **Energy Only:** Power rate (FE/t).
-   - **Items Only:** Item transfer rate (Items/s).
-   - **Fluids Only:** Fluid transfer rates (mB/s, B/s) without chemicals.
+### Controls
+
+| Control | Action | Description |
+| :--- | :--- | :--- |
+| **Drag HUD** | Click and drag | Moves HUD across the screen. Offsets calculate from the active anchor. |
+| **Anchor** | Click button | Cycles anchor points: `TOP_LEFT`, `TOP_RIGHT`, `BOTTOM_LEFT`, `BOTTOM_RIGHT`, `CROSSHAIR`. |
+| **Reset** | Click button | Resets offsets to defaults (`x: 10`, `y: 10`). |
+| **Block Name** | Click toggle | Toggles the targeted block name line on or off. |
+| **Preset** | Click button | Applies a layout preset. |
+
+### Presets
+
+- **Full Diagnostic**: Displays title, status badges, items, fluids, energy, and all installed mod metrics.
+- **Minimalist Bar**: Enables compact single-line mode.
+- **Create Only**: Shows rotational speed, direction, network stress, and headroom (requires Create).
+- **Chemicals Only**: Shows chemical throughput and container capacities (requires Mekanism).
+- **Energy Only**: Shows Forge Energy throughput (`FE/t`).
+- **Items Only**: Shows item transfer rate (`Items/s`).
+- **Fluids Only**: Shows fluid transfer rate (`mB/s` or `B/s`).
 
 ---
 
 ## Client Config (`config/machinemetrics-client.toml`)
 
+### HUD Placement (`[hud]`)
+
 ```toml
 [hud]
-  # Enable or disable HUD
+  # Enable or disable HUD rendering
   hud_enabled = true
-  # Anchor: TOP_LEFT, TOP_RIGHT, BOTTOM_LEFT, BOTTOM_RIGHT, CROSSHAIR
+  # Anchor point: TOP_LEFT, TOP_RIGHT, BOTTOM_LEFT, BOTTOM_RIGHT, CROSSHAIR
   hud_anchor = "TOP_LEFT"
-  # Horizontal offset from anchor
+  # Horizontal and vertical offsets from anchor (range: -4000 to 4000)
   hud_x_offset = 10
-  # Vertical offset from anchor
   hud_y_offset = 10
-  # HUD scale multiplier (0.5 to 3.0)
+  # HUD scale multiplier (range: 0.5 to 3.0)
   hudScale = 1.0
-  # Background color (hex ARGB/RGB)
+  # Background and border colors in ARGB/RGB hex
   background_color = "#90000000"
-  # Border color (hex ARGB/RGB)
   border_color = "#FF00FFCC"
+```
 
-[elements]
-  # Show block name
-  show_machine_title = true
-  # Hide title when Jade/Waila/WTHIT/TOP is present
-  auto_hide_title_with_info_mods = true
-  # Show status (OPTIMAL, IDLE, etc.)
-  show_status_badge = true
-  # Show items throughput (Items/s)
-  show_items_throughput = true
-  # Show fluids throughput (mB/s)
-  show_fluids_throughput = true
-  # Show Mekanism chemicals throughput
-  show_chemicals_throughput = true
-  # Show Create speed (RPM)
-  show_speed = true
-  # Show rotation direction (CW/CCW)
-  show_rotation_direction = true
-  # Show local block stress impact
-  show_local_impact = false
-  # Show total network stress & capacity (SU)
-  show_network_stress = true
-  # Show remaining network capacity
-  show_headroom = true
-  # Show Forge Energy rate (FE/t)
-  show_energy_fe = true
-  # Show per-side rates when active
-  show_sides = true
+### Metric Toggles (`[elements]`)
 
-[formatting]
-  # Enable single-line compact HUD
-  compact_mode = false
-  # Placeholders: {name}, {speed}, {dir}, {stress}, {cap}, {headroom}, {load_pct}, {state}, {items}, {fluids}
-  compact_template = "{name} | {speed} RPM {dir} | {stress}/{cap} SU ({load_pct}%) | {state}"
+| Config Key | Default | Description |
+| :--- | :--- | :--- |
+| `show_machine_title` | `true` | Shows targeted block or machine name. |
+| `auto_hide_title_with_info_mods` | `true` | Hides title line when Jade, WAILA, WTHIT, or The One Probe is installed. |
+| `show_status_badge` | `true` | Shows bottleneck state (`OPTIMAL`, `STARVED`, `CLOGGED`, `IDLE`). |
+| `show_items_throughput` | `true` | Shows item transfer throughput (`Items/s`). |
+| `show_fluids_throughput` | `true` | Shows fluid transfer throughput (`mB/s` or `B/s`). |
+| `show_chemicals_throughput` | `true` | Shows Mekanism chemical throughput. |
+| `show_speed` | `true` | Shows Create rotational speed (`RPM`). |
+| `show_rotation_direction` | `true` | Shows Create rotation direction (`CW ↻` or `CCW ↺`). |
+| `show_local_impact` | `false` | Shows local block kinetic stress draw. |
+| `show_network_stress` | `true` | Shows total network kinetic stress and capacity (`SU`). |
+| `show_headroom` | `true` | Shows remaining network kinetic capacity. |
+| `show_energy_fe` | `true` | Shows Forge Energy transfer rate (`FE/t`). |
+| `show_sides` | `true` | Shows directional per-face transfer rates when active. |
+| `show_ae2_power` | `true` | Shows AE2 network power rate and buffer fill percentage. |
+| `show_ae2_stability` | `true` | Shows AE2 grid stability state and brownout warnings. |
+| `auto_hide_ae2_channels_with_info_mods` | `true` | Hides AE2 channel count if Jade or WTHIT is installed. |
+| `show_ae2_channels` | `true` | Shows AE2 node used and max channels. |
+| `ae2_power_unit` | `"AUTO"` | Power unit for AE2 metrics: `"AUTO"` (matches AE2 client button), `"AE"`, or `"FE"`. |
 
+### Colors (`[colors]`)
+
+Colors accept `#RRGGBB` or `#AARRGGBB` hex values:
+
+```toml
 [colors]
   headerColor = "#00FFCC"
   itemsColor = "#FFD54F"
@@ -89,6 +90,10 @@ You can configure HUD placement directly from the UI without entering a world:
   energyNegativeColor = "#FF5252"
   energyNeutralColor = "#E040FB"
   sidesColor = "#69F0AE"
+  ae2PowerColor = "#A259FF"
+  ae2BrownoutColor = "#FF3333"
+
+  # Bottleneck states
   stateOptimalColor = "#55FF55"
   stateStarvedColor = "#FFFF55"
   stateCloggedColor = "#FF5555"
@@ -98,9 +103,17 @@ You can configure HUD placement directly from the UI without entering a world:
 
 ---
 
-## Compact Template Placeholders
+## Compact Mode (`[formatting]`)
 
-When `compact_mode = true`, the HUD renders as a single line using `compact_template`:
+Single-line mode renders all active metrics as one continuous line formatted with `compact_template`:
+
+```toml
+[formatting]
+  compact_mode = false
+  compact_template = "{name} | {speed} RPM {dir} | {stress}/{cap} SU ({load_pct}%) | {state}"
+```
+
+### Template Placeholders
 
 | Placeholder | Output | Example |
 | :--- | :--- | :--- |
@@ -109,36 +122,47 @@ When `compact_mode = true`, the HUD renders as a single line using `compact_temp
 | `{dir}` | Rotation direction | `CW ↻`, `CCW ↺`, `—` |
 | `{stress}` | Kinetic stress draw | `8.2k`, `65.5k` |
 | `{cap}` | Network kinetic capacity | `65.5k`, `1.2M` |
-| `{headroom}` | Remaining capacity | `+57.3k`, `0` |
-| `{load_pct}` | Network stress load percentage | `12%`, `100%` |
-| `{state}` | Bottleneck state tag | `§aOPTIMAL`, `§cOVERSTRESSED`, `§7IDLE` |
+| `{headroom}` | Remaining kinetic capacity | `+57.3k`, `0` |
+| `{load_pct}` | Network stress percentage | `12%`, `100%` |
+| `{state}` | Bottleneck state badge with color code | `§aOPTIMAL`, `§cOVERLOADED`, `§7IDLE` |
 | `{items}` | Item transfer rate | `12.5 /s`, `0.0 /s` |
 | `{fluids}` | Fluid transfer rate | `250.0 mB/s`, `1.20 B/s` |
+| `{ae_power}` | AE2 network net power rate | `-3.4k AE/t`, `+1.2k AE/t` |
+| `{ae_drain}` | AE2 grid power drain | `180.0 AE/t` |
+| `{ae_subnets}` | AE2 connected subnet count and drain | `2 (+40.0 AE/t)` |
+| `{ae_state}` | AE2 grid stability state | `STABLE`, `BROWNOUT`, `DISCHARGING` |
 
 ---
 
 ## Server Config (`config/machinemetrics-server.toml`)
 
-Servers can restrict which metrics get sampled and sent to clients:
+Servers control which telemetry data is sampled and transmitted to connected clients:
 
 ```toml
 [features]
-  # Allow sending item transfer throughput metrics to clients (default: true)
+  # Send item transfer throughput metrics to clients
   allow_items_telemetry = true
-  # Allow sending fluid transfer throughput metrics to clients (default: true)
+  # Send fluid transfer throughput metrics to clients
   allow_fluids_telemetry = true
-  # Allow sending Forge Energy (FE/t) rate metrics to clients (default: true)
+  # Send Forge Energy (FE/t) rate metrics to clients
   allow_energy_telemetry = true
-  # Allow sending Create kinetic rotational metrics to clients (default: true)
+  # Send Create rotational speed, stress, and capacity to clients
   allow_kinetic_telemetry = true
-  # Allow sending Mekanism chemical metrics to clients (default: true)
+  # Send Mekanism chemical throughput and capacities to clients
   allow_chemicals_telemetry = true
-  # Allow sending per-side throughput metrics to clients (default: true)
+  # Send directional per-face throughput metrics to clients
   allow_side_metrics_telemetry = true
+  # Send AE2 grid power, subnets, and stability states to clients
+  allow_ae2_telemetry = true
 
 [debug]
-  # Enable telemetry debug logging in game console (default: false)
+  # Log telemetry queries and payloads to server console
   enableDebugLogging = false
 ```
 
-When a metric is disabled on the server, the client shows `[Disabled by the server]` in place of values, and the server skips querying those capabilities to save tick time. Mod metrics (Create, Mekanism) still require the corresponding mod installed on both server and client.
+### Behavior when disabled
+
+When a metric is disabled on the server:
+- The server stops sampling capability deltas for that metric, saving tick time.
+- The client HUD displays `[Disabled by the server]` in place of values.
+- Mod-specific metrics (Create, Mekanism, AE2) require the corresponding mod installed on both server and client.
