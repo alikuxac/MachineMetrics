@@ -28,6 +28,7 @@ public class ClientConfig {
     // Granular Element Switches
     public static final ModConfigSpec.BooleanValue SHOW_MACHINE_TITLE;
     public static final ModConfigSpec.BooleanValue AUTO_HIDE_TITLE_WITH_INFO_MODS;
+    public static final ModConfigSpec.BooleanValue AUTO_HIDE_REDUNDANT_WITH_INFOHUD;
     public static final ModConfigSpec.BooleanValue SHOW_STATUS_BADGE;
     public static final ModConfigSpec.BooleanValue SHOW_ITEMS_THROUGHPUT;
     public static final ModConfigSpec.BooleanValue SHOW_FLUIDS_THROUGHPUT;
@@ -112,6 +113,10 @@ public class ClientConfig {
         AUTO_HIDE_TITLE_WITH_INFO_MODS = builder
                 .comment("Hide title when Jade/Waila/WTHIT/TOP is present")
                 .define("auto_hide_title_with_info_mods", true);
+
+        AUTO_HIDE_REDUNDANT_WITH_INFOHUD = builder
+                .comment("Hide redundant zero-rate metrics when Jade/Waila/WTHIT/TOP is present")
+                .define("auto_hide_redundant_with_info_mods", true);
 
         SHOW_STATUS_BADGE = builder
                 .comment("Show status (OPTIMAL, IDLE, etc.)")

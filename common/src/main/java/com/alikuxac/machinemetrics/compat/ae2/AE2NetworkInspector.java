@@ -63,9 +63,9 @@ public class AE2NetworkInspector {
     public static boolean isAE2Loaded() {
         if (ae2LoadedCache == null) {
             try {
-                Class.forName("appeng.api.networking.IGridNode");
+                Class.forName("appeng.api.networking.IGridNode", false, AE2NetworkInspector.class.getClassLoader());
                 ae2LoadedCache = true;
-            } catch (ClassNotFoundException e) {
+            } catch (Throwable ignored) {
                 ae2LoadedCache = false;
             }
         }
@@ -81,72 +81,9 @@ public class AE2NetworkInspector {
             return null;
         }
         try {
-            Class<?> aeConfigClass = Class.forName("appeng.core.AEConfig");
-            Object instance = aeConfigClass.getMethod("instance").invoke(null);
-            if (instance != null) {
-                Object unit = aeConfigClass.getMethod("getSelectedEnergyUnit").invoke(instance);
-                if (unit != null) {
-                    return unit.toString();
-                }
-            }
+            return Ae2Worker.getClientSelectedPowerUnit();
         } catch (Throwable ignored) {
-        }
-        return null;
-    }
-
-    /**
-     * Traverses subnets connected across cross-grid connections (e.g. Quartz Fiber)
-     * using a bounded BFS to prevent circular graph traversal and excessive work.
-     */
-    public static SubnetDrainResult calculateSubnetDrain(IGrid rootGrid, int maxDepth) {
-        if (rootGrid == null) {
-            return new SubnetDrainResult(0f, 0);
-        }
-
-        try {
-            Set<IGrid> visited = new HashSet<>();
-            visited.add(rootGrid);
-
-            Queue<IGrid> queue = new ArrayDeque<>();
-            queue.add(rootGrid);
-
-            double totalSubnetDrain = 0.0;
-            int subnetCount = 0;
-            int depth = 0;
-
-            while (!queue.isEmpty() && depth < maxDepth && visited.size() <= 16) {
-                int levelSize = queue.size();
-                depth++;
-
-                for (int i = 0; i < levelSize; i++) {
-                    IGrid current = queue.poll();
-                    if (current == null) continue;
-
-                    for (IGridNode n : current.getNodes()) {
-                        for (IGridConnection conn : n.getConnections()) {
-                            try {
-                                IGridNode otherNode = conn.getOtherSide(n);
-                                if (otherNode == null) continue;
-
-                                IGrid otherGrid = otherNode.getGrid();
-                                if (otherGrid != null && visited.add(otherGrid)) {
-                                    subnetCount++;
-                                    IEnergyService es = otherGrid.getService(IEnergyService.class);
-                                    if (es != null) {
-                                        totalSubnetDrain += es.getAvgPowerUsage();
-                                    }
-                                    queue.add(otherGrid);
-                                }
-                            } catch (Throwable ignored) {
-                            }
-                        }
-                    }
-                }
-            }
-
-            return new SubnetDrainResult((float) totalSubnetDrain, subnetCount);
-        } catch (Throwable ignored) {
-            return new SubnetDrainResult(0f, 0);
+            return null;
         }
     }
 
@@ -154,123 +91,204 @@ public class AE2NetworkInspector {
         if (level == null || pos == null || !isAE2Loaded()) {
             return Optional.empty();
         }
-
         try {
-            BlockEntity be = level.getBlockEntity(pos);
-            if (be == null) {
-                return Optional.empty();
-            }
-
-            IGridNode node = null;
-            IInWorldGridNodeHost host = null;
-            if (be instanceof IInWorldGridNodeHost directHost) {
-                host = directHost;
-            } else {
-                try {
-                    host = GridHelper.getNodeHost(level, pos);
-                } catch (Throwable ignored) {
-                }
-            }
-
-            if (host != null) {
-                if (side != null) {
-                    node = host.getGridNode(side);
-                }
-                if (node == null) {
-                    // Center ME cable / internal bus node
-                    node = host.getGridNode(null);
-                }
-                if (node == null) {
-                    for (Direction d : Direction.values()) {
-                        node = host.getGridNode(d);
-                        if (node != null) break;
-                    }
-                }
-            }
-
-            if (node == null) {
-                try {
-                    if (side != null) {
-                        node = GridHelper.getExposedNode(level, pos, side);
-                    }
-                    if (node == null) {
-                        node = GridHelper.getExposedNode(level, pos, null);
-                    }
-                } catch (Throwable ignored) {
-                }
-            }
-
-            if (node == null) {
-                return Optional.empty();
-            }
-
-            IGrid grid = node.getGrid();
-            if (grid == null) {
-                return Optional.empty();
-            }
-
-            IEnergyService energyService = grid.getService(IEnergyService.class);
-            IPathingService pathingService = grid.getService(IPathingService.class);
-
-            if (energyService == null) {
-                return Optional.empty();
-            }
-
-            double storedPower = energyService.getStoredPower();
-            double maxPower = energyService.getMaxStoredPower();
-            double avgUsage = energyService.getAvgPowerUsage();
-            double avgInjection = energyService.getAvgPowerInjection();
-            boolean isPowered = energyService.isNetworkPowered();
-
-            boolean isBooting = pathingService != null && pathingService.isNetworkBooting();
-
-            boolean isCreative = Double.isInfinite(storedPower) || Double.isInfinite(maxPower) || maxPower >= 1.0E12;
-
-            float powerRate = (float) (avgInjection - avgUsage);
-            float powerDrain = (float) avgUsage;
-
-            // Discover and calculate subnet drain
-            SubnetDrainResult subnetResult = calculateSubnetDrain(grid, 3);
-
-            // Determine Stability State
-            AE2StabilityState stabilityState;
-            if (isCreative) {
-                stabilityState = AE2StabilityState.CREATIVE;
-            } else if (!isPowered || (isBooting && storedPower <= Math.max(10.0, avgUsage * 2.0))) {
-                // Network power is starved or trapped in boot-loop
-                stabilityState = AE2StabilityState.BROWNOUT;
-            } else if (isBooting) {
-                stabilityState = AE2StabilityState.BOOTING;
-            } else if (powerRate < -0.01f && maxPower > 0 && (storedPower / maxPower) <= 0.50) {
-                stabilityState = AE2StabilityState.DISCHARGING;
-            } else {
-                stabilityState = AE2StabilityState.STABLE;
-            }
-
-            int usedChannels = 0;
-            int maxChannels = 32;
-            try {
-                usedChannels = node.getUsedChannels();
-                maxChannels = node.getMaxChannels();
-            } catch (Throwable ignored) {
-            }
-
-            return Optional.of(new AE2MetricData(
-                    true,
-                    powerRate,
-                    powerDrain,
-                    subnetResult.totalSubnetDrain(),
-                    subnetResult.subnetCount(),
-                    storedPower,
-                    maxPower,
-                    (byte) stabilityState.ordinal(),
-                    isCreative,
-                    usedChannels,
-                    maxChannels
-            ));
-
+            return Ae2Worker.inspectNetwork(level, pos, side);
         } catch (Throwable ignored) {
             return Optional.empty();
+        }
+    }
+
+    private static final class Ae2Worker {
+
+        private static String getClientSelectedPowerUnit() {
+            try {
+                Class<?> aeConfigClass = Class.forName("appeng.core.AEConfig");
+                Object instance = aeConfigClass.getMethod("instance").invoke(null);
+                if (instance != null) {
+                    Object unit = aeConfigClass.getMethod("getSelectedEnergyUnit").invoke(instance);
+                    if (unit != null) {
+                        return unit.toString();
+                    }
+                }
+            } catch (Throwable ignored) {
+            }
+            return null;
+        }
+
+        /**
+         * Traverses subnets connected across cross-grid connections (e.g. Quartz Fiber)
+         * using a bounded BFS to prevent circular graph traversal and excessive work.
+         */
+        private static SubnetDrainResult calculateSubnetDrain(IGrid rootGrid, int maxDepth) {
+            if (rootGrid == null) {
+                return new SubnetDrainResult(0f, 0);
+            }
+
+            try {
+                Set<IGrid> visited = new HashSet<>();
+                visited.add(rootGrid);
+
+                Queue<IGrid> queue = new ArrayDeque<>();
+                queue.add(rootGrid);
+
+                double totalSubnetDrain = 0.0;
+                int subnetCount = 0;
+                int depth = 0;
+
+                while (!queue.isEmpty() && depth < maxDepth && visited.size() <= 16) {
+                    int levelSize = queue.size();
+                    depth++;
+
+                    for (int i = 0; i < levelSize; i++) {
+                        IGrid current = queue.poll();
+                        if (current == null) continue;
+
+                        for (IGridNode n : current.getNodes()) {
+                            for (IGridConnection conn : n.getConnections()) {
+                                try {
+                                    IGridNode otherNode = conn.getOtherSide(n);
+                                    if (otherNode == null) continue;
+
+                                    IGrid otherGrid = otherNode.getGrid();
+                                    if (otherGrid != null && visited.add(otherGrid)) {
+                                        subnetCount++;
+                                        IEnergyService es = otherGrid.getService(IEnergyService.class);
+                                        if (es != null) {
+                                            totalSubnetDrain += es.getAvgPowerUsage();
+                                        }
+                                        queue.add(otherGrid);
+                                    }
+                                } catch (Throwable ignored) {
+                                }
+                            }
+                        }
+                    }
+                }
+
+                return new SubnetDrainResult((float) totalSubnetDrain, subnetCount);
+            } catch (Throwable ignored) {
+                return new SubnetDrainResult(0f, 0);
+            }
+        }
+
+        private static Optional<AE2MetricData> inspectNetwork(Level level, BlockPos pos, Direction side) {
+            try {
+                BlockEntity be = level.getBlockEntity(pos);
+                if (be == null) {
+                    return Optional.empty();
+                }
+
+                IGridNode node = null;
+                IInWorldGridNodeHost host = null;
+                if (be instanceof IInWorldGridNodeHost directHost) {
+                    host = directHost;
+                } else {
+                    try {
+                        host = GridHelper.getNodeHost(level, pos);
+                    } catch (Throwable ignored) {
+                    }
+                }
+
+                if (host != null) {
+                    if (side != null) {
+                        node = host.getGridNode(side);
+                    }
+                    if (node == null) {
+                        // Center ME cable / internal bus node
+                        node = host.getGridNode(null);
+                    }
+                    if (node == null) {
+                        for (Direction d : Direction.values()) {
+                            node = host.getGridNode(d);
+                            if (node != null) break;
+                        }
+                    }
+                }
+
+                if (node == null) {
+                    try {
+                        if (side != null) {
+                            node = GridHelper.getExposedNode(level, pos, side);
+                        }
+                        if (node == null) {
+                            node = GridHelper.getExposedNode(level, pos, null);
+                        }
+                    } catch (Throwable ignored) {
+                    }
+                }
+
+                if (node == null) {
+                    return Optional.empty();
+                }
+
+                IGrid grid = node.getGrid();
+                if (grid == null) {
+                    return Optional.empty();
+                }
+
+                IEnergyService energyService = grid.getService(IEnergyService.class);
+                IPathingService pathingService = grid.getService(IPathingService.class);
+
+                if (energyService == null) {
+                    return Optional.empty();
+                }
+
+                double storedPower = energyService.getStoredPower();
+                double maxPower = energyService.getMaxStoredPower();
+                double avgUsage = energyService.getAvgPowerUsage();
+                double avgInjection = energyService.getAvgPowerInjection();
+                boolean isPowered = energyService.isNetworkPowered();
+
+                boolean isBooting = pathingService != null && pathingService.isNetworkBooting();
+
+                boolean isCreative = Double.isInfinite(storedPower) || Double.isInfinite(maxPower) || maxPower >= 1.0E12;
+
+                float powerRate = (float) (avgInjection - avgUsage);
+                float powerDrain = (float) avgUsage;
+
+                // Discover and calculate subnet drain
+                SubnetDrainResult subnetResult = calculateSubnetDrain(grid, 3);
+
+                // Determine Stability State
+                AE2StabilityState stabilityState;
+                if (isCreative) {
+                    stabilityState = AE2StabilityState.CREATIVE;
+                } else if (!isPowered || (isBooting && storedPower <= Math.max(10.0, avgUsage * 2.0))) {
+                    // Network power is starved or trapped in boot-loop
+                    stabilityState = AE2StabilityState.BROWNOUT;
+                } else if (isBooting) {
+                    stabilityState = AE2StabilityState.BOOTING;
+                } else if (powerRate < -0.01f && maxPower > 0 && (storedPower / maxPower) <= 0.50) {
+                    stabilityState = AE2StabilityState.DISCHARGING;
+                } else {
+                    stabilityState = AE2StabilityState.STABLE;
+                }
+
+                int usedChannels = 0;
+                int maxChannels = 32;
+                try {
+                    usedChannels = node.getUsedChannels();
+                    maxChannels = node.getMaxChannels();
+                } catch (Throwable ignored) {
+                }
+
+                return Optional.of(new AE2MetricData(
+                        true,
+                        powerRate,
+                        powerDrain,
+                        subnetResult.totalSubnetDrain(),
+                        subnetResult.subnetCount(),
+                        storedPower,
+                        maxPower,
+                        (byte) stabilityState.ordinal(),
+                        isCreative,
+                        usedChannels,
+                        maxChannels
+                ));
+
+            } catch (Throwable ignored) {
+                return Optional.empty();
+            }
         }
     }
 }

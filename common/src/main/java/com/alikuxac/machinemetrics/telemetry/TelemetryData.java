@@ -176,8 +176,12 @@ public record TelemetryData(
             if (this.aeUsedChannels != other.aeUsedChannels) return true;
             if (this.aeSubnetCount != other.aeSubnetCount) return true;
             if (Math.abs(this.aePowerRate - other.aePowerRate) > 1.0f) return true;
-            if (Math.abs(this.aePowerDrain - other.aePowerDrain) > 1.0f) return true;
-            if (Math.abs(this.aeSubnetDrain - other.aeSubnetDrain) > 1.0f) return true;
+            float maxDrain = Math.max(Math.abs(this.aePowerDrain), Math.abs(other.aePowerDrain));
+            float drainDeadband = Math.max(1.0f, maxDrain * 0.05f);
+            if (Math.abs(this.aePowerDrain - other.aePowerDrain) > drainDeadband) return true;
+            float maxSubnetDrain = Math.max(Math.abs(this.aeSubnetDrain), Math.abs(other.aeSubnetDrain));
+            float subnetDrainDeadband = Math.max(1.0f, maxSubnetDrain * 0.05f);
+            if (Math.abs(this.aeSubnetDrain - other.aeSubnetDrain) > subnetDrainDeadband) return true;
             if (Math.abs(this.aeStoredPower - other.aeStoredPower) > 10.0) return true;
             if (Math.abs(this.aeMaxPower - other.aeMaxPower) > 10.0) return true;
         }

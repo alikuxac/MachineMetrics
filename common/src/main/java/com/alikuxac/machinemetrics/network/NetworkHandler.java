@@ -16,7 +16,8 @@ import java.util.concurrent.ConcurrentHashMap;
 
 public class NetworkHandler {
 
-    private static final Map<BlockPos, TelemetryData> LAST_SENT_TO_CLIENT = new ConcurrentHashMap<>();
+    private record SentEntry(TelemetryData data, long timestampMs) {}
+    private static final Map<BlockPos, SentEntry> LAST_SENT_TO_CLIENT = new ConcurrentHashMap<>();
 
     public static void register(RegisterPayloadHandlersEvent event) {
         var registrar = event.registrar("1.0.0").optional();
@@ -62,9 +63,13 @@ public class NetworkHandler {
                     disabledMask |= TelemetryData.MASK_SIDES;
                 }
 
-                LAST_SENT_TO_CLIENT.put(targetPos, data);
-                SyncTelemetryPayload response = SyncTelemetryPayload.from(targetPos, data, disabledMask);
-                context.reply(response);
+                long now = System.currentTimeMillis();
+                SentEntry lastSent = LAST_SENT_TO_CLIENT.get(targetPos);
+                if (lastSent == null || data.hasSignificantDelta(lastSent.data) || (now - lastSent.timestampMs >= 1500L)) {
+                    LAST_SENT_TO_CLIENT.put(targetPos, new SentEntry(data, now));
+                    SyncTelemetryPayload response = SyncTelemetryPayload.from(targetPos, data, disabledMask);
+                    context.reply(response);
+                }
             }
         });
     }

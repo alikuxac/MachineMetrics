@@ -53,5 +53,16 @@
   "machinemetrics.preset.chemicals_only": "Apenas Químicos",
   "machinemetrics.preset.energy_only": "Apenas Energia",
   "machinemetrics.preset.items_only": "Apenas Itens",
-  "machinemetrics.preset.fluids_only": "Apenas Fluidos"
+  "machinemetrics.preset.fluids_only": "Apenas Fluidos",
+  "machinemetrics.metrics.ae_power": "Energia ME",
+  "machinemetrics.metrics.ae_drain": "Consumo",
+  "machinemetrics.metrics.ae_channels": "Canais",
+  "machinemetrics.metrics.unit.ae_per_tick": "AE/t",
+  "machinemetrics.ae2.buffer": "Buffer",
+  "machinemetrics.ae2.subnets": "Sub-redes",
+  "machinemetrics.ae2.state.stable": "STABLE",
+  "machinemetrics.ae2.state.discharging": "DISCHARGING",
+  "machinemetrics.ae2.state.brownout": "🔴 QUEDA NA REDE",
+  "machinemetrics.ae2.state.booting": "🟡 INICIALIZANDO",
+  "machinemetrics.ae2.state.creative": "CREATIVE"
 }

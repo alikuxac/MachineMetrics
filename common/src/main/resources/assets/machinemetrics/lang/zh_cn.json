@@ -53,5 +53,16 @@
   "machinemetrics.preset.chemicals_only": "仅化学品",
   "machinemetrics.preset.energy_only": "仅能量",
   "machinemetrics.preset.items_only": "仅物品",
-  "machinemetrics.preset.fluids_only": "仅流体"
+  "machinemetrics.preset.fluids_only": "仅流体",
+  "machinemetrics.metrics.ae_power": "ME 能量",
+  "machinemetrics.metrics.ae_drain": "消耗",
+  "machinemetrics.metrics.ae_channels": "频道",
+  "machinemetrics.metrics.unit.ae_per_tick": "AE/t",
+  "machinemetrics.ae2.buffer": "缓存",
+  "machinemetrics.ae2.subnets": "子网",
+  "machinemetrics.ae2.state.stable": "STABLE",
+  "machinemetrics.ae2.state.discharging": "DISCHARGING",
+  "machinemetrics.ae2.state.brownout": "🔴 电网欠压",
+  "machinemetrics.ae2.state.booting": "🟡 引导中",
+  "machinemetrics.ae2.state.creative": "CREATIVE"
 }

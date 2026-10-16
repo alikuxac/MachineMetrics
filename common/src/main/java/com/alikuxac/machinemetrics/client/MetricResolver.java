@@ -16,6 +16,12 @@ import java.util.Locale;
 public class MetricResolver {
 
     public static String formatCompactNumber(float value) {
+        if (Float.isNaN(value)) {
+            return "0";
+        }
+        if (Float.isInfinite(value)) {
+            return "∞";
+        }
         float abs = Math.abs(value);
         if (abs >= 1_000_000_000f) {
             return String.format(Locale.ROOT, "%.1fG", value / 1_000_000_000f);
@@ -158,7 +164,14 @@ public class MetricResolver {
                 }
                 float mult = isFe ? 2.0f : 1.0f;
                 String unitStr = isFe ? "FE/t" : "AE/t";
-                aePowerStr = formatCompactNumber(data.aePowerRate() * mult) + " " + unitStr;
+                boolean isInfiniteEnergy = data.aeIsCreative()
+                        || Double.isInfinite(data.aeStoredPower())
+                        || Double.isInfinite(data.aeMaxPower());
+                if (isInfiniteEnergy) {
+                    aePowerStr = "∞ " + (isFe ? "FE" : "AE");
+                } else {
+                    aePowerStr = formatCompactNumber(data.aePowerRate() * mult) + " " + unitStr;
+                }
                 aeDrainStr = formatCompactNumber(data.aePowerDrain() * mult) + " " + unitStr;
                 aeSubnetsStr = String.format(Locale.ROOT, "%d (+%s %s)",
                         data.aeSubnetCount(),
@@ -168,8 +181,17 @@ public class MetricResolver {
             }
         }
 
-        return template
-                .replace("{name}", blockName != null ? blockName : Component.translatable("machinemetrics.hud.title").getString())
+        boolean autoHideTitle = ClientConfig.AUTO_HIDE_TITLE_WITH_INFO_MODS == null || ClientConfig.AUTO_HIDE_TITLE_WITH_INFO_MODS.get();
+        boolean hideTitle = autoHideTitle && com.alikuxac.machinemetrics.compat.infohud.InfoHudDetector.isInfoHudPresent();
+        String effectiveTemplate = template;
+        if (hideTitle && effectiveTemplate.startsWith("{name} | ")) {
+            effectiveTemplate = effectiveTemplate.substring("{name} | ".length());
+        } else if (hideTitle && effectiveTemplate.startsWith("{name} ")) {
+            effectiveTemplate = effectiveTemplate.substring("{name} ".length());
+        }
+
+        return effectiveTemplate
+                .replace("{name}", hideTitle ? "" : (blockName != null ? blockName : Component.translatable("machinemetrics.hud.title").getString()))
                 .replace("{speed}", kineticDisabled ? "—" : speedStr)
                 .replace("{dir}", kineticDisabled ? "—" : dirStr)
                 .replace("{stress}", kineticDisabled ? "—" : stressStr)

@@ -53,5 +53,16 @@
   "machinemetrics.preset.chemicals_only": "Nur Chemikalien",
   "machinemetrics.preset.energy_only": "Nur Energie",
   "machinemetrics.preset.items_only": "Nur Gegenstände",
-  "machinemetrics.preset.fluids_only": "Nur Flüssigkeiten"
+  "machinemetrics.preset.fluids_only": "Nur Flüssigkeiten",
+  "machinemetrics.metrics.ae_power": "ME-Energie",
+  "machinemetrics.metrics.ae_drain": "Verbrauch",
+  "machinemetrics.metrics.ae_channels": "Kanäle",
+  "machinemetrics.metrics.unit.ae_per_tick": "AE/t",
+  "machinemetrics.ae2.buffer": "Puffer",
+  "machinemetrics.ae2.subnets": "Subnetze",
+  "machinemetrics.ae2.state.stable": "STABLE",
+  "machinemetrics.ae2.state.discharging": "DISCHARGING",
+  "machinemetrics.ae2.state.brownout": "🔴 NETZ-SPANNUNGSABFALL",
+  "machinemetrics.ae2.state.booting": "🟡 STARTET",
+  "machinemetrics.ae2.state.creative": "CREATIVE"
 }

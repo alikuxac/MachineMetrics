@@ -53,5 +53,16 @@
   "machinemetrics.preset.chemicals_only": "Только Химикаты",
   "machinemetrics.preset.energy_only": "Только Энергия",
   "machinemetrics.preset.items_only": "Только Предметы",
-  "machinemetrics.preset.fluids_only": "Только Жидкости"
+  "machinemetrics.preset.fluids_only": "Только Жидкости",
+  "machinemetrics.metrics.ae_power": "Энергия МЭ",
+  "machinemetrics.metrics.ae_drain": "Потребление",
+  "machinemetrics.metrics.ae_channels": "Каналы",
+  "machinemetrics.metrics.unit.ae_per_tick": "AE/t",
+  "machinemetrics.ae2.buffer": "Буфер",
+  "machinemetrics.ae2.subnets": "Подсети",
+  "machinemetrics.ae2.state.stable": "STABLE",
+  "machinemetrics.ae2.state.discharging": "DISCHARGING",
+  "machinemetrics.ae2.state.brownout": "🔴 ПРОСАДКА СЕТИ",
+  "machinemetrics.ae2.state.booting": "🟡 ЗАГРУЗКА",
+  "machinemetrics.ae2.state.creative": "CREATIVE"
 }
