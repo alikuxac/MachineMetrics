@@ -3,6 +3,7 @@ package com.alikuxac.machinemetrics.neoforge.telemetry;
 import com.alikuxac.machinemetrics.compat.ae2.AE2NetworkInspector;
 import com.alikuxac.machinemetrics.compat.ae2.AE2NetworkInspector.AE2StabilityState;
 import com.alikuxac.machinemetrics.compat.create.CreateKineticInspector;
+import com.alikuxac.machinemetrics.compat.storage.DrawerStorageAdapter;
 import com.alikuxac.machinemetrics.config.ServerConfig;
 import com.alikuxac.machinemetrics.telemetry.TelemetryData;
 import it.unimi.dsi.fastutil.ints.IntArrayList;
@@ -271,7 +272,13 @@ public class NeoForgeTelemetrySampler {
         } catch (Throwable ignored) {
         }
 
-        if (!hasAnyCapability || (maxItems == 0 && maxFluid == 0 && maxEnergy == 0 && !hasKinetic && !hasAe2Network)) {
+        boolean isAe2Storage = AE2NetworkInspector.isAE2Loaded() && isAe2Block;
+        boolean isDrawerStorage = DrawerStorageAdapter.isFunctionalStorageLoaded() || DrawerStorageAdapter.isStorageDrawersLoaded();
+
+        if (!hasAnyCapability && !hasKinetic && !hasAe2Network && !isAe2Storage && !isDrawerStorage) {
+            return TelemetryData.empty();
+        }
+        if ((maxItems == 0 && maxFluid == 0 && maxEnergy == 0 && !hasKinetic && !hasAe2Network && !isAe2Storage && !isDrawerStorage)) {
             return TelemetryData.empty();
         }
 
@@ -420,39 +427,76 @@ public class NeoForgeTelemetrySampler {
         long storageMax = 0L;
         float primaryNetRate = 0f;
         boolean hasStorage = false;
+        boolean isInfiniteStorage = false;
 
-        boolean isFluidBlock = beClassName.contains("tank") || beClassName.contains("fluid") || (maxFluid > 0 && maxItems <= 128 && maxFluid > maxItems);
-        boolean isEnergyBlock = beClassName.contains("energy") || beClassName.contains("battery") || beClassName.contains("capacitor") || beClassName.contains("cell") || (maxEnergy > 0 && maxItems == 0 && maxFluid == 0);
-
-        if (isFluidBlock && maxFluid > 0) {
-            storageCurrent = currentFluid;
-            storageMax = maxFluid;
-            primaryNetRate = fluidNetRate;
-            hasStorage = true;
-        } else if (isEnergyBlock && maxEnergy > 0) {
-            storageCurrent = currentEnergy;
-            storageMax = maxEnergy;
-            primaryNetRate = energyNetRate;
-            hasStorage = true;
-        } else if (maxItems > 0) {
-            storageCurrent = currentItems;
-            storageMax = maxItems;
-            primaryNetRate = itemNetRate;
-            hasStorage = true;
-        } else if (maxFluid > 0) {
-            storageCurrent = currentFluid;
-            storageMax = maxFluid;
-            primaryNetRate = fluidNetRate;
-            hasStorage = true;
-        } else if (maxEnergy > 0) {
-            storageCurrent = currentEnergy;
-            storageMax = maxEnergy;
-            primaryNetRate = energyNetRate;
-            hasStorage = true;
+        try {
+            var aeCellOpt = AE2NetworkInspector.inspectCellStorage(level, pos);
+            if (aeCellOpt.isPresent() && aeCellOpt.get().isCellStorage()) {
+                var aeCell = aeCellOpt.get();
+                storageCurrent = aeCell.usedBytes();
+                storageMax = aeCell.totalBytes();
+                primaryNetRate = itemNetRate;
+                hasStorage = true;
+                if (aeCell.isInfinite()) {
+                    isInfiniteStorage = true;
+                }
+            }
+        } catch (Throwable ignored) {
         }
 
-        boolean isInfinite = beClassName.contains("creative")
+        if (!hasStorage) {
+            try {
+                var drawerOpt = DrawerStorageAdapter.inspectDrawer(level, pos);
+                if (drawerOpt.isPresent() && drawerOpt.get().isDrawer()) {
+                    var drawer = drawerOpt.get();
+                    storageCurrent = drawer.storedItems();
+                    storageMax = drawer.maxCapacity();
+                    primaryNetRate = itemNetRate;
+                    hasStorage = true;
+                    if (drawer.isInfinite()) {
+                        isInfiniteStorage = true;
+                    }
+                }
+            } catch (Throwable ignored) {
+            }
+        }
+
+        if (!hasStorage) {
+            boolean isFluidBlock = beClassName.contains("tank") || beClassName.contains("fluid") || (maxFluid > 0 && maxItems <= 128 && maxFluid > maxItems);
+            boolean isEnergyBlock = beClassName.contains("energy") || beClassName.contains("battery") || beClassName.contains("capacitor") || beClassName.contains("cell") || (maxEnergy > 0 && maxItems == 0 && maxFluid == 0);
+
+            if (isFluidBlock && maxFluid > 0) {
+                storageCurrent = currentFluid;
+                storageMax = maxFluid;
+                primaryNetRate = fluidNetRate;
+                hasStorage = true;
+            } else if (isEnergyBlock && maxEnergy > 0) {
+                storageCurrent = currentEnergy;
+                storageMax = maxEnergy;
+                primaryNetRate = energyNetRate;
+                hasStorage = true;
+            } else if (maxItems > 0) {
+                storageCurrent = currentItems;
+                storageMax = maxItems;
+                primaryNetRate = itemNetRate;
+                hasStorage = true;
+            } else if (maxFluid > 0) {
+                storageCurrent = currentFluid;
+                storageMax = maxFluid;
+                primaryNetRate = fluidNetRate;
+                hasStorage = true;
+            } else if (maxEnergy > 0) {
+                storageCurrent = currentEnergy;
+                storageMax = maxEnergy;
+                primaryNetRate = energyNetRate;
+                hasStorage = true;
+            }
+        }
+
+        boolean isInfinite = isInfiniteStorage
+                || beClassName.contains("creative")
                 || (storageMax == Integer.MAX_VALUE)
+                || (storageMax >= (Long.MAX_VALUE / 2))
                 || (hasAe2Network && aeIsCreative);
 
         boolean isDraining = primaryNetRate < -0.001f;

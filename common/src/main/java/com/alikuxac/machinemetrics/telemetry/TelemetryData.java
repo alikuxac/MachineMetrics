@@ -274,7 +274,7 @@ public record TelemetryData(
         if (this.logisticsFlags != other.logisticsFlags) return true;
         if (Math.abs(this.netRate - other.netRate) > 0.05f) return true;
         if (this.storageMax != other.storageMax) return true;
-        if (this.storageMax > 0) {
+        if (this.storageMax > 0 && !isStorageInfinite() && this.storageMax < (Long.MAX_VALUE / 2)) {
             double deadbandPct = ServerConfig.STORAGE_SYNC_DEADBAND_PERCENT != null ? ServerConfig.STORAGE_SYNC_DEADBAND_PERCENT.get() : 1.0;
             double deltaPct = (Math.abs(this.storageCurrent - other.storageCurrent) / (double) this.storageMax) * 100.0;
             if (deltaPct > deadbandPct) return true;

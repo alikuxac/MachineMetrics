@@ -1,5 +1,6 @@
 package com.alikuxac.machinemetrics.compat.ae2;
 
+import appeng.api.implementations.blockentities.IChestOrDrive;
 import appeng.api.networking.GridHelper;
 import appeng.api.networking.IGrid;
 import appeng.api.networking.IGridConnection;
@@ -7,11 +8,15 @@ import appeng.api.networking.IGridNode;
 import appeng.api.networking.IInWorldGridNodeHost;
 import appeng.api.networking.energy.IEnergyService;
 import appeng.api.networking.pathing.IPathingService;
+import appeng.api.storage.MEStorage;
+import appeng.api.storage.cells.StorageCell;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
+import net.minecraft.world.item.Item;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.entity.BlockEntity;
 
+import java.lang.reflect.Method;
 import java.util.ArrayDeque;
 import java.util.HashSet;
 import java.util.Optional;
@@ -58,6 +63,19 @@ public class AE2NetworkInspector {
 
     public record SubnetDrainResult(float totalSubnetDrain, int subnetCount) {}
 
+    public record AE2CellStorageData(
+            boolean isCellStorage,
+            long usedBytes,
+            long totalBytes,
+            boolean isInfinite
+    ) {
+        public static final AE2CellStorageData EMPTY = new AE2CellStorageData(false, 0L, 0L, false);
+
+        public boolean isEmpty() {
+            return !isCellStorage;
+        }
+    }
+
     private static Boolean ae2LoadedCache = null;
 
     public static boolean isAE2Loaded() {
@@ -93,6 +111,17 @@ public class AE2NetworkInspector {
         }
         try {
             return Ae2Worker.inspectNetwork(level, pos, side);
+        } catch (Throwable ignored) {
+            return Optional.empty();
+        }
+    }
+
+    public static Optional<AE2CellStorageData> inspectCellStorage(Level level, BlockPos pos) {
+        if (level == null || pos == null || !isAE2Loaded()) {
+            return Optional.empty();
+        }
+        try {
+            return Ae2Worker.inspectCellStorage(level, pos);
         } catch (Throwable ignored) {
             return Optional.empty();
         }
@@ -286,6 +315,141 @@ public class AE2NetworkInspector {
                         maxChannels
                 ));
 
+            } catch (Throwable ignored) {
+                return Optional.empty();
+            }
+        }
+
+        private static Optional<AE2CellStorageData> inspectCellStorage(Level level, BlockPos pos) {
+            try {
+                BlockEntity be = level.getBlockEntity(pos);
+                if (be == null) {
+                    return Optional.empty();
+                }
+
+                if (!(be instanceof IChestOrDrive chestOrDrive)) {
+                    return Optional.empty();
+                }
+
+                int cellCount = chestOrDrive.getCellCount();
+                if (cellCount <= 0) {
+                    return Optional.empty();
+                }
+
+                long sumUsedBytes = 0L;
+                long sumTotalBytes = 0L;
+                boolean isInfinite = false;
+
+                for (int slot = 0; slot < cellCount; slot++) {
+                    StorageCell cell = null;
+                    try {
+                        cell = chestOrDrive.getOriginalCellInventory(slot);
+                    } catch (Throwable ignored) {
+                    }
+
+                    MEStorage meStorage = null;
+                    try {
+                        meStorage = chestOrDrive.getCellInventory(slot);
+                    } catch (Throwable ignored) {
+                    }
+
+                    Item cellItem = null;
+                    try {
+                        cellItem = chestOrDrive.getCellItem(slot);
+                    } catch (Throwable ignored) {
+                    }
+
+                    if (cell == null && meStorage == null && cellItem == null) {
+                        continue;
+                    }
+
+                    boolean cellIsCreative = false;
+                    long cellUsed = 0L;
+                    long cellTotal = 0L;
+
+                    if (cellItem != null) {
+                        String itemName = cellItem.toString().toLowerCase();
+                        if (itemName.contains("creative")) {
+                            cellIsCreative = true;
+                        }
+                    }
+
+                    Object target = cell != null ? cell : meStorage;
+                    if (target != null) {
+                        String className = target.getClass().getName().toLowerCase();
+                        if (className.contains("creative")) {
+                            cellIsCreative = true;
+                        }
+
+                        try {
+                            Method m = target.getClass().getMethod("getUsedBytes");
+                            Object res = m.invoke(target);
+                            if (res instanceof Number num) {
+                                cellUsed = num.longValue();
+                            }
+                        } catch (Throwable ignored) {
+                            try {
+                                Method m = target.getClass().getMethod("usedBytes");
+                                Object res = m.invoke(target);
+                                if (res instanceof Number num) {
+                                    cellUsed = num.longValue();
+                                }
+                            } catch (Throwable ignored2) {
+                                try {
+                                    Method m = target.getClass().getMethod("getStoredItemCount");
+                                    Object res = m.invoke(target);
+                                    if (res instanceof Number num) {
+                                        cellUsed = num.longValue();
+                                    }
+                                } catch (Throwable ignored3) {
+                                }
+                            }
+                        }
+
+                        try {
+                            Method m = target.getClass().getMethod("getTotalBytes");
+                            Object res = m.invoke(target);
+                            if (res instanceof Number num) {
+                                cellTotal = num.longValue();
+                            }
+                        } catch (Throwable ignored) {
+                            try {
+                                Method m = target.getClass().getMethod("totalBytes");
+                                Object res = m.invoke(target);
+                                if (res instanceof Number num) {
+                                    cellTotal = num.longValue();
+                                }
+                            } catch (Throwable ignored2) {
+                                try {
+                                    Method m = target.getClass().getMethod("getBytes");
+                                    Object res = m.invoke(target);
+                                    if (res instanceof Number num) {
+                                        cellTotal = num.longValue();
+                                    }
+                                } catch (Throwable ignored3) {
+                                }
+                            }
+                        }
+                    }
+
+                    if (cellTotal >= (Long.MAX_VALUE / 2) || cellUsed >= (Long.MAX_VALUE / 2) || cellIsCreative) {
+                        isInfinite = true;
+                    } else {
+                        sumUsedBytes += Math.max(0L, cellUsed);
+                        sumTotalBytes += Math.max(0L, cellTotal);
+                    }
+                }
+
+                if (sumTotalBytes >= (Long.MAX_VALUE / 2)) {
+                    isInfinite = true;
+                }
+
+                return Optional.of(new AE2CellStorageData(
+                        true,
+                        sumUsedBytes,
+                        isInfinite ? (Long.MAX_VALUE / 2) : sumTotalBytes,
+                        isInfinite
+                ));
             } catch (Throwable ignored) {
                 return Optional.empty();
             }

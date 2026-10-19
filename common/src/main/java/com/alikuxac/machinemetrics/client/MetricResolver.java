@@ -36,6 +36,31 @@ public class MetricResolver {
         }
     }
 
+    public static String formatCompactNumber(long value) {
+        if (value >= (Long.MAX_VALUE / 2) || value < 0) {
+            return "∞";
+        }
+        return formatCompactNumber((float) value);
+    }
+
+    public static String formatStorageNumber(long value, boolean isInfinite) {
+        if (isInfinite || value >= (Long.MAX_VALUE / 2) || value < 0) {
+            return "∞";
+        }
+        return formatCompactNumber(value);
+    }
+
+    public static String formatStoragePercent(long current, long max, boolean isInfinite) {
+        if (isInfinite || max >= (Long.MAX_VALUE / 2)) {
+            return "∞";
+        }
+        if (max <= 0) {
+            return "0%";
+        }
+        float pct = (float) ((current / (double) max) * 100.0);
+        return String.format(Locale.ROOT, "%.1f%%", pct);
+    }
+
     public static String formatHeadroom(float headroom) {
         if (headroom > 0.001f) {
             return "+" + formatCompactNumber(headroom);

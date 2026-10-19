@@ -1,5 +1,7 @@
 package com.alikuxac.machinemetrics.forge.telemetry;
 
+import com.alikuxac.machinemetrics.compat.ae2.AE2NetworkInspector;
+import com.alikuxac.machinemetrics.compat.storage.DrawerStorageAdapter;
 import com.alikuxac.machinemetrics.config.ServerConfig;
 import com.alikuxac.machinemetrics.telemetry.TelemetryData;
 
@@ -241,7 +243,14 @@ public class ServerTelemetrySampler {
             }
         }
 
-        if (!hasAnyCapability || (maxItems == 0 && maxFluid == 0 && maxEnergy == 0)) {
+        boolean isAe2Storage = allowAe2 && isAe2Block;
+        boolean isDrawerStorage = DrawerStorageAdapter.isFunctionalStorageLoaded() || DrawerStorageAdapter.isStorageDrawersLoaded();
+
+        if (!hasAnyCapability && !isAe2Storage && !isDrawerStorage) {
+            INERT_BLOCK_CACHE.put(pos, now);
+            return TelemetryData.empty();
+        }
+        if ((maxItems == 0 && maxFluid == 0 && maxEnergy == 0 && !isAe2Storage && !isDrawerStorage)) {
             INERT_BLOCK_CACHE.put(pos, now);
             return TelemetryData.empty();
         }
@@ -367,39 +376,78 @@ public class ServerTelemetrySampler {
         long storageMax = 0L;
         float primaryNetRate = 0f;
         boolean hasStorage = false;
+        boolean isInfiniteStorage = false;
 
-        boolean isFluidBlock = beClassName.contains("tank") || beClassName.contains("fluid") || (maxFluid > 0 && maxItems <= 128 && maxFluid > maxItems);
-        boolean isEnergyBlock = beClassName.contains("energy") || beClassName.contains("battery") || beClassName.contains("capacitor") || beClassName.contains("cell") || (maxEnergy > 0 && maxItems == 0 && maxFluid == 0);
-
-        if (isFluidBlock && maxFluid > 0) {
-            storageCurrent = currentFluid;
-            storageMax = maxFluid;
-            primaryNetRate = fluidNetRate;
-            hasStorage = true;
-        } else if (isEnergyBlock && maxEnergy > 0) {
-            storageCurrent = currentEnergy;
-            storageMax = maxEnergy;
-            primaryNetRate = energyNetRate;
-            hasStorage = true;
-        } else if (maxItems > 0) {
-            storageCurrent = currentItems;
-            storageMax = maxItems;
-            primaryNetRate = itemNetRate;
-            hasStorage = true;
-        } else if (maxFluid > 0) {
-            storageCurrent = currentFluid;
-            storageMax = maxFluid;
-            primaryNetRate = fluidNetRate;
-            hasStorage = true;
-        } else if (maxEnergy > 0) {
-            storageCurrent = currentEnergy;
-            storageMax = maxEnergy;
-            primaryNetRate = energyNetRate;
-            hasStorage = true;
+        if (allowAe2) {
+            try {
+                var aeCellOpt = AE2NetworkInspector.inspectCellStorage(level, pos);
+                if (aeCellOpt.isPresent() && aeCellOpt.get().isCellStorage()) {
+                    var aeCell = aeCellOpt.get();
+                    storageCurrent = aeCell.usedBytes();
+                    storageMax = aeCell.totalBytes();
+                    primaryNetRate = itemNetRate;
+                    hasStorage = true;
+                    if (aeCell.isInfinite()) {
+                        isInfiniteStorage = true;
+                    }
+                }
+            } catch (Throwable ignored) {
+            }
         }
 
-        boolean isInfinite = beClassName.contains("creative")
-                || (storageMax == Integer.MAX_VALUE);
+        if (!hasStorage) {
+            try {
+                var drawerOpt = DrawerStorageAdapter.inspectDrawer(level, pos);
+                if (drawerOpt.isPresent() && drawerOpt.get().isDrawer()) {
+                    var drawer = drawerOpt.get();
+                    storageCurrent = drawer.storedItems();
+                    storageMax = drawer.maxCapacity();
+                    primaryNetRate = itemNetRate;
+                    hasStorage = true;
+                    if (drawer.isInfinite()) {
+                        isInfiniteStorage = true;
+                    }
+                }
+            } catch (Throwable ignored) {
+            }
+        }
+
+        if (!hasStorage) {
+            boolean isFluidBlock = beClassName.contains("tank") || beClassName.contains("fluid") || (maxFluid > 0 && maxItems <= 128 && maxFluid > maxItems);
+            boolean isEnergyBlock = beClassName.contains("energy") || beClassName.contains("battery") || beClassName.contains("capacitor") || beClassName.contains("cell") || (maxEnergy > 0 && maxItems == 0 && maxFluid == 0);
+
+            if (isFluidBlock && maxFluid > 0) {
+                storageCurrent = currentFluid;
+                storageMax = maxFluid;
+                primaryNetRate = fluidNetRate;
+                hasStorage = true;
+            } else if (isEnergyBlock && maxEnergy > 0) {
+                storageCurrent = currentEnergy;
+                storageMax = maxEnergy;
+                primaryNetRate = energyNetRate;
+                hasStorage = true;
+            } else if (maxItems > 0) {
+                storageCurrent = currentItems;
+                storageMax = maxItems;
+                primaryNetRate = itemNetRate;
+                hasStorage = true;
+            } else if (maxFluid > 0) {
+                storageCurrent = currentFluid;
+                storageMax = maxFluid;
+                primaryNetRate = fluidNetRate;
+                hasStorage = true;
+            } else if (maxEnergy > 0) {
+                storageCurrent = currentEnergy;
+                storageMax = maxEnergy;
+                primaryNetRate = energyNetRate;
+                hasStorage = true;
+            }
+        }
+
+        boolean isInfinite = isInfiniteStorage
+                || beClassName.contains("creative")
+                || (storageMax == Integer.MAX_VALUE)
+                || (storageMax >= (Long.MAX_VALUE / 2));
 
         boolean isDraining = primaryNetRate < -0.001f;
 
@@ -426,9 +474,6 @@ public class ServerTelemetrySampler {
                 storageCurrent, storageMax, primaryNetRate, logisticsFlags
         );
     }
-
-
-
 
     private static void cleanupStaleEntries(long now) {
         CACHE.entrySet().removeIf(entry -> now - entry.getValue().lastAccessMs > CLEANUP_EXPIRE_MS);
