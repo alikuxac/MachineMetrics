@@ -18,6 +18,9 @@ public class ServerConfig {
     // Debug
     public static final ModConfigSpec.BooleanValue DEBUG_LOGGING;
 
+    // Synchronization & Throttling
+    public static final ModConfigSpec.DoubleValue STORAGE_SYNC_DEADBAND_PERCENT;
+
     static {
         ModConfigSpec.Builder builder = new ModConfigSpec.Builder();
 
@@ -59,6 +62,14 @@ public class ServerConfig {
         DEBUG_LOGGING = builder
                 .comment("Enable detailed telemetry debug logging in game console")
                 .define("enableDebugLogging", false);
+
+        builder.pop();
+
+        builder.comment("Telemetry Synchronization & Throttling Configuration").push("sync");
+
+        STORAGE_SYNC_DEADBAND_PERCENT = builder
+                .comment("Storage synchronization deadband percentage (only sync when container fill percentage changes by more than this threshold)")
+                .defineInRange("storage_sync_deadband_percent", 1.0, 0.0, 100.0);
 
         builder.pop();
         SPEC = builder.build();

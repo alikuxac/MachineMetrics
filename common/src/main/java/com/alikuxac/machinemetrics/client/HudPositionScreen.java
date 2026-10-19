@@ -393,7 +393,11 @@ public class HudPositionScreen extends Screen {
                 (byte) AE2StabilityState.STABLE.ordinal(),
                 false,
                 3,
-                8
+                8,
+                1728L,
+                1728L,
+                0.0f,
+                TelemetryData.HAS_STORAGE
         );
     }
 

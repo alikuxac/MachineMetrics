@@ -43,6 +43,8 @@ public class ServerTelemetrySampler {
         private float lastFluidTp;
         private float lastEnergyDelta;
         private float[] lastSideRates = new float[18];
+        private int cachedItemSlotCount = -1;
+        private int cachedMaxItemCapacity = 0;
 
         public SampleHistory(Sample initialSample) {
             this.lastSample = initialSample;
@@ -90,13 +92,12 @@ public class ServerTelemetrySampler {
         boolean isAe2Block = beClassName.contains("appeng");
 
         if ((isAe2Block && !allowAe2 && (beClassName.contains("cable") || beClassName.contains("multipart") || beClassName.contains("bus")))
-                || beClassName.contains("waystone") || beClassName.contains("drawer") || beClassName.contains("chest") || beClassName.contains("barrel")
-                || beClassName.contains("storage") || beClassName.contains("shulker") || beClassName.contains("vault")
-                || beClassName.contains("bin") || beClassName.contains("crate")) {
+                || beClassName.contains("waystone")) {
             INERT_BLOCK_CACHE.put(pos, now);
             return TelemetryData.empty();
         }
 
+        SampleHistory existingHistory = CACHE.get(pos);
 
         boolean allowItems = ServerConfig.ALLOW_ITEMS == null || ServerConfig.ALLOW_ITEMS.get();
         boolean allowFluids = ServerConfig.ALLOW_FLUIDS == null || ServerConfig.ALLOW_FLUIDS.get();
@@ -139,17 +140,40 @@ public class ServerTelemetrySampler {
                 }
                 
                 if (processedItemHandlers.add(itemHandler)) {
-                    for (int i = 0; i < itemHandler.getSlots(); i++) {
-                        var stack = itemHandler.getStackInSlot(i);
-                        if (!stack.isEmpty()) {
-                            currentItems += stack.getCount();
-                            maxItems += stack.getMaxStackSize();
-                            allSlotCounts.add(stack.getCount());
-                        } else {
-                            maxItems += 64;
-                            allSlotCounts.add(0);
+                    int slotCount = itemHandler.getSlots();
+                    boolean useCachedLimit = existingHistory != null && existingHistory.cachedItemSlotCount == slotCount && existingHistory.cachedMaxItemCapacity > 0;
+                    int handlerMaxCap = 0;
+
+                    if (useCachedLimit) {
+                        handlerMaxCap = existingHistory.cachedMaxItemCapacity;
+                        for (int i = 0; i < slotCount; i++) {
+                            var stack = itemHandler.getStackInSlot(i);
+                            if (!stack.isEmpty()) {
+                                int count = stack.getCount();
+                                currentItems += count;
+                                allSlotCounts.add(count);
+                            } else {
+                                allSlotCounts.add(0);
+                            }
+                        }
+                    } else {
+                        for (int i = 0; i < slotCount; i++) {
+                            handlerMaxCap += itemHandler.getSlotLimit(i);
+                            var stack = itemHandler.getStackInSlot(i);
+                            if (!stack.isEmpty()) {
+                                int count = stack.getCount();
+                                currentItems += count;
+                                allSlotCounts.add(count);
+                            } else {
+                                allSlotCounts.add(0);
+                            }
+                        }
+                        if (existingHistory != null) {
+                            existingHistory.cachedItemSlotCount = slotCount;
+                            existingHistory.cachedMaxItemCapacity = handlerMaxCap;
                         }
                     }
+                    maxItems += handlerMaxCap;
                 }
             }
         }
@@ -235,6 +259,9 @@ public class ServerTelemetrySampler {
         float fluidThroughput = 0f;
         float energyDelta = 0f;
         float[] sideRates = new float[18];
+        float itemNetRate = 0f;
+        float fluidNetRate = 0f;
+        float energyNetRate = 0f;
 
         if (history.previousSample != null) {
             float timeDiffSec = (history.lastSample.timestampMs() - history.previousSample.timestampMs()) / 1000f;
@@ -249,6 +276,7 @@ public class ServerTelemetrySampler {
                     slotDeltaSum += Math.abs(c - p);
                 }
                 itemThroughput = (slotDeltaSum / 2.0f) / timeDiffSec;
+                itemNetRate = (history.lastSample.totalItems() - history.previousSample.totalItems()) / timeDiffSec;
 
                 int[] prevTanks = history.previousSample.fluidTanks();
                 int[] currTanks = history.lastSample.fluidTanks();
@@ -260,9 +288,11 @@ public class ServerTelemetrySampler {
                     tankDeltaSum += Math.abs(c - p);
                 }
                 fluidThroughput = (tankDeltaSum / 2.0f) / timeDiffSec;
+                fluidNetRate = (history.lastSample.totalFluid() - history.previousSample.totalFluid()) / timeDiffSec;
 
                 float timeDiffTicks = timeDiffSec * 20f;
                 energyDelta = (history.lastSample.energyAmount() - history.previousSample.energyAmount()) / timeDiffTicks;
+                energyNetRate = energyDelta;
 
                 float[] prevSideMetrics = history.previousSample.sideMetrics();
                 float[] currSideMetrics = history.lastSample.sideMetrics();
@@ -333,13 +363,67 @@ public class ServerTelemetrySampler {
             }
         }
 
+        long storageCurrent = 0L;
+        long storageMax = 0L;
+        float primaryNetRate = 0f;
+        boolean hasStorage = false;
+
+        boolean isFluidBlock = beClassName.contains("tank") || beClassName.contains("fluid") || (maxFluid > 0 && maxItems <= 128 && maxFluid > maxItems);
+        boolean isEnergyBlock = beClassName.contains("energy") || beClassName.contains("battery") || beClassName.contains("capacitor") || beClassName.contains("cell") || (maxEnergy > 0 && maxItems == 0 && maxFluid == 0);
+
+        if (isFluidBlock && maxFluid > 0) {
+            storageCurrent = currentFluid;
+            storageMax = maxFluid;
+            primaryNetRate = fluidNetRate;
+            hasStorage = true;
+        } else if (isEnergyBlock && maxEnergy > 0) {
+            storageCurrent = currentEnergy;
+            storageMax = maxEnergy;
+            primaryNetRate = energyNetRate;
+            hasStorage = true;
+        } else if (maxItems > 0) {
+            storageCurrent = currentItems;
+            storageMax = maxItems;
+            primaryNetRate = itemNetRate;
+            hasStorage = true;
+        } else if (maxFluid > 0) {
+            storageCurrent = currentFluid;
+            storageMax = maxFluid;
+            primaryNetRate = fluidNetRate;
+            hasStorage = true;
+        } else if (maxEnergy > 0) {
+            storageCurrent = currentEnergy;
+            storageMax = maxEnergy;
+            primaryNetRate = energyNetRate;
+            hasStorage = true;
+        }
+
+        boolean isInfinite = beClassName.contains("creative")
+                || (storageMax == Integer.MAX_VALUE);
+
+        boolean isDraining = primaryNetRate < -0.001f;
+
+        byte logisticsFlags = 0;
+        if (hasStorage) {
+            logisticsFlags |= TelemetryData.FLAG_LOGISTICS_HAS_STORAGE;
+        }
+        if (isInfinite) {
+            logisticsFlags |= TelemetryData.FLAG_LOGISTICS_IS_INFINITE;
+        }
+        if (isDraining) {
+            logisticsFlags |= TelemetryData.FLAG_LOGISTICS_IS_DRAINING;
+        }
+
         return new TelemetryData(
                 itemThroughput, hasItems,
                 fluidThroughput, hasFluids,
                 energyDelta, hasEnergy,
                 0f, false, "", 0L, 0L,
                 0f, 0f, 0f, 0f, false, null,
-                state, allSlotCounts, allTankAmounts, sideRates
+                state, allSlotCounts, allTankAmounts, sideRates,
+                (short) 0,
+                false, 0f, 0f, 0f, 0, 0.0, 0.0, (byte) 0, false, 0, 0,
+                storageCurrent, storageMax, primaryNetRate, logisticsFlags
         );
     }
 

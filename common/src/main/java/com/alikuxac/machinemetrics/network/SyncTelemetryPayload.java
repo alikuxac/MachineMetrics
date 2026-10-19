@@ -43,7 +43,11 @@ public record SyncTelemetryPayload(
         byte aeStabilityState,
         boolean aeIsCreative,
         int aeUsedChannels,
-        int aeMaxChannels
+        int aeMaxChannels,
+        long storageCurrent,
+        long storageMax,
+        float netRate,
+        byte logisticsFlags
 ) implements CustomPacketPayload {
     public static final Type<SyncTelemetryPayload> TYPE = new Type<>(ResourceLocation.fromNamespaceAndPath("machinemetrics", "sync_telemetry"));
 
@@ -90,7 +94,11 @@ public record SyncTelemetryPayload(
                 data.aeStabilityState(),
                 data.aeIsCreative(),
                 data.aeUsedChannels(),
-                data.aeMaxChannels()
+                data.aeMaxChannels(),
+                data.storageCurrent(),
+                data.storageMax(),
+                data.netRate(),
+                data.logisticsFlags()
         );
     }
 
@@ -132,7 +140,11 @@ public record SyncTelemetryPayload(
                 aeStabilityState,
                 aeIsCreative,
                 aeUsedChannels,
-                aeMaxChannels
+                aeMaxChannels,
+                storageCurrent,
+                storageMax,
+                netRate,
+                logisticsFlags
         );
     }
 
@@ -144,6 +156,7 @@ public record SyncTelemetryPayload(
     public static final int FLAG_AE2       = 1 << 5;
     public static final int FLAG_SIDES     = 1 << 6;
     public static final int FLAG_DISABLED  = 1 << 7;
+    public static final int FLAG_STORAGE   = 1 << 8;
 
     private static boolean hasActiveSides(float[] sides) {
         if (sides == null) return false;
@@ -179,10 +192,13 @@ public record SyncTelemetryPayload(
         if (payload.serverDisabledMask != 0) {
             flags |= FLAG_DISABLED;
         }
+        if (payload.storageMax > 0 || payload.storageCurrent > 0 || (payload.logisticsFlags & TelemetryData.FLAG_LOGISTICS_HAS_STORAGE) != 0 || Math.abs(payload.netRate) > 0.001f) {
+            flags |= FLAG_STORAGE;
+        }
 
         buf.writeBlockPos(payload.targetPos);
         buf.writeByte(payload.machineState);
-        buf.writeByte(flags);
+        buf.writeVarInt(flags);
 
         if ((flags & FLAG_DISABLED) != 0) {
             buf.writeShort(payload.serverDisabledMask);
@@ -245,12 +261,19 @@ public record SyncTelemetryPayload(
                 }
             }
         }
+
+        if ((flags & FLAG_STORAGE) != 0) {
+            buf.writeVarLong(payload.storageCurrent);
+            buf.writeVarLong(payload.storageMax);
+            buf.writeFloat(payload.netRate);
+            buf.writeByte(payload.logisticsFlags);
+        }
     }
 
     private static SyncTelemetryPayload decode(FriendlyByteBuf buf) {
         BlockPos targetPos = buf.readBlockPos();
         byte machineState = buf.readByte();
-        int flags = buf.readUnsignedByte();
+        int flags = buf.readVarInt();
 
         short serverDisabledMask = (flags & FLAG_DISABLED) != 0 ? buf.readShort() : (short) 0;
 
@@ -335,6 +358,17 @@ public record SyncTelemetryPayload(
             }
         }
 
+        long storageCurrent = 0L;
+        long storageMax = 0L;
+        float netRate = 0.0f;
+        byte logisticsFlags = (byte) 0;
+        if ((flags & FLAG_STORAGE) != 0) {
+            storageCurrent = buf.readVarLong();
+            storageMax = buf.readVarLong();
+            netRate = buf.readFloat();
+            logisticsFlags = buf.readByte();
+        }
+
         return new SyncTelemetryPayload(
                 targetPos,
                 itemThroughput,
@@ -369,7 +403,11 @@ public record SyncTelemetryPayload(
                 aeStabilityState,
                 aeIsCreative,
                 aeUsedChannels,
-                aeMaxChannels
+                aeMaxChannels,
+                storageCurrent,
+                storageMax,
+                netRate,
+                logisticsFlags
         );
     }
 

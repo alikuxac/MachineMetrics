@@ -1,6 +1,7 @@
 package com.alikuxac.machinemetrics.telemetry;
 
 import com.alikuxac.machinemetrics.compat.create.CreateKineticInspector.RotationDirection;
+import com.alikuxac.machinemetrics.config.ServerConfig;
 import net.minecraft.core.Direction;
 import it.unimi.dsi.fastutil.ints.IntArrayList;
 
@@ -37,7 +38,11 @@ public record TelemetryData(
         byte aeStabilityState,
         boolean aeIsCreative,
         int aeUsedChannels,
-        int aeMaxChannels
+        int aeMaxChannels,
+        long storageCurrent,
+        long storageMax,
+        float netRate,
+        byte logisticsFlags
 ) {
     public enum BottleneckState {
         OPTIMAL,
@@ -54,6 +59,26 @@ public record TelemetryData(
     public static final short MASK_CHEMICALS = 1 << 4;
     public static final short MASK_SIDES = 1 << 5;
     public static final short MASK_AE2 = 1 << 6;
+
+    public static final byte FLAG_LOGISTICS_HAS_STORAGE = 1 << 0;
+    public static final byte FLAG_LOGISTICS_IS_INFINITE  = 1 << 1;
+    public static final byte FLAG_LOGISTICS_IS_DRAINING  = 1 << 2;
+
+    public static final byte HAS_STORAGE = FLAG_LOGISTICS_HAS_STORAGE;
+    public static final byte IS_INFINITE = FLAG_LOGISTICS_IS_INFINITE;
+    public static final byte IS_DRAINING = FLAG_LOGISTICS_IS_DRAINING;
+
+    public boolean hasStorage() {
+        return (logisticsFlags & FLAG_LOGISTICS_HAS_STORAGE) != 0;
+    }
+
+    public boolean isStorageInfinite() {
+        return (logisticsFlags & FLAG_LOGISTICS_IS_INFINITE) != 0;
+    }
+
+    public boolean isStorageDraining() {
+        return (logisticsFlags & FLAG_LOGISTICS_IS_DRAINING) != 0;
+    }
 
     public TelemetryData(
             float itemThroughput,
@@ -87,7 +112,57 @@ public record TelemetryData(
                 kineticDirection, bottleneckState,
                 allSlotCounts, allTankAmounts, sideMetrics,
                 (short) 0,
-                false, 0f, 0f, 0f, 0, 0.0, 0.0, (byte) 0, false, 0, 0
+                false, 0f, 0f, 0f, 0, 0.0, 0.0, (byte) 0, false, 0, 0,
+                0L, 0L, 0.0f, (byte) 0
+        );
+    }
+
+    public TelemetryData(
+            float itemThroughput,
+            boolean hasItems,
+            float fluidThroughput,
+            boolean hasFluids,
+            float energyDelta,
+            boolean hasEnergy,
+            float chemicalThroughput,
+            boolean hasChemicals,
+            String chemicalName,
+            long chemicalAmount,
+            long chemicalCapacity,
+            float kineticSpeed,
+            float kineticStress,
+            float kineticCapacity,
+            float kineticBlockStress,
+            boolean hasKinetic,
+            RotationDirection kineticDirection,
+            BottleneckState bottleneckState,
+            IntArrayList allSlotCounts,
+            IntArrayList allTankAmounts,
+            float[] sideMetrics,
+            short serverDisabledMask,
+            boolean hasAe2Network,
+            float aePowerRate,
+            float aePowerDrain,
+            float aeSubnetDrain,
+            int aeSubnetCount,
+            double aeStoredPower,
+            double aeMaxPower,
+            byte aeStabilityState,
+            boolean aeIsCreative,
+            int aeUsedChannels,
+            int aeMaxChannels
+    ) {
+        this(
+                itemThroughput, hasItems,
+                fluidThroughput, hasFluids,
+                energyDelta, hasEnergy,
+                chemicalThroughput, hasChemicals, chemicalName, chemicalAmount, chemicalCapacity,
+                kineticSpeed, kineticStress, kineticCapacity, kineticBlockStress, hasKinetic,
+                kineticDirection, bottleneckState,
+                allSlotCounts, allTankAmounts, sideMetrics,
+                serverDisabledMask,
+                hasAe2Network, aePowerRate, aePowerDrain, aeSubnetDrain, aeSubnetCount, aeStoredPower, aeMaxPower, aeStabilityState, aeIsCreative, aeUsedChannels, aeMaxChannels,
+                0L, 0L, 0.0f, (byte) 0
         );
     }
 
@@ -102,7 +177,8 @@ public record TelemetryData(
             new IntArrayList(), new IntArrayList(),
             new float[18],
             (short) 0,
-            false, 0f, 0f, 0f, 0, 0.0, 0.0, (byte) 0, false, 0, 0
+            false, 0f, 0f, 0f, 0, 0.0, 0.0, (byte) 0, false, 0, 0,
+            0L, 0L, 0.0f, (byte) 0
     );
 
     public static TelemetryData empty() {
@@ -110,7 +186,7 @@ public record TelemetryData(
     }
 
     public boolean isEmpty() {
-        return !hasItems && !hasFluids && !hasEnergy && !hasChemicals && !hasKinetic && !hasAe2Network && serverDisabledMask == 0;
+        return !hasItems && !hasFluids && !hasEnergy && !hasChemicals && !hasKinetic && !hasAe2Network && !hasStorage() && serverDisabledMask == 0;
     }
 
     public boolean isItemsDisabledByServer() {
@@ -194,6 +270,19 @@ public record TelemetryData(
         if (Math.abs(this.kineticCapacity - other.kineticCapacity) > 0.5f) return true;
         if (Math.abs(this.kineticBlockStress - other.kineticBlockStress) > 0.5f) return true;
         if (this.chemicalAmount != other.chemicalAmount) return true;
+
+        if (this.logisticsFlags != other.logisticsFlags) return true;
+        if (Math.abs(this.netRate - other.netRate) > 0.05f) return true;
+        if (this.storageMax != other.storageMax) return true;
+        if (this.storageMax > 0) {
+            double deadbandPct = ServerConfig.STORAGE_SYNC_DEADBAND_PERCENT != null ? ServerConfig.STORAGE_SYNC_DEADBAND_PERCENT.get() : 1.0;
+            double deltaPct = (Math.abs(this.storageCurrent - other.storageCurrent) / (double) this.storageMax) * 100.0;
+            if (deltaPct > deadbandPct) return true;
+            if ((this.storageCurrent == 0) != (other.storageCurrent == 0)) return true;
+            if ((this.storageCurrent == this.storageMax) != (other.storageCurrent == other.storageMax)) return true;
+        } else if (this.storageCurrent != other.storageCurrent) {
+            return true;
+        }
 
         if (this.sideMetrics != null && other.sideMetrics != null) {
             int len = Math.min(this.sideMetrics.length, other.sideMetrics.length);
