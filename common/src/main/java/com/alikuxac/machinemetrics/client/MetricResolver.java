@@ -61,6 +61,93 @@ public class MetricResolver {
         return String.format(Locale.ROOT, "%.1f%%", pct);
     }
 
+    public enum EtaType {
+        FULL_IN,
+        EMPTY_IN,
+        STATIONARY,
+        INFINITE
+    }
+
+    public record EtaResult(EtaType type, long seconds) {
+        public boolean hasEta() {
+            return type == EtaType.FULL_IN || type == EtaType.EMPTY_IN;
+        }
+
+        public String formatted() {
+            return formatDuration(seconds);
+        }
+    }
+
+    public static final float DEFAULT_SMOOTHING_ALPHA = 0.15f;
+
+    public static EtaResult calculateEta(long current, long max, float netRate, boolean isInfinite, boolean isDraining) {
+        if (isInfinite || max >= (Long.MAX_VALUE / 2) || max < 0) {
+            return new EtaResult(EtaType.INFINITE, -1);
+        }
+        if (Float.isNaN(netRate) || Float.isInfinite(netRate) || Math.abs(netRate) <= 0.001f) {
+            return new EtaResult(EtaType.STATIONARY, -1);
+        }
+
+        if (netRate > 0 && !isDraining) {
+            if (current >= max) {
+                return new EtaResult(EtaType.FULL_IN, 0);
+            }
+            long remaining = Math.max(0L, max - current);
+            long sec = Math.round((double) remaining / netRate);
+            return new EtaResult(EtaType.FULL_IN, Math.max(0L, sec));
+        } else {
+            if (current <= 0) {
+                return new EtaResult(EtaType.EMPTY_IN, 0);
+            }
+            float absRate = Math.abs(netRate);
+            long sec = Math.round((double) current / absRate);
+            return new EtaResult(EtaType.EMPTY_IN, Math.max(0L, sec));
+        }
+    }
+
+    public static float smoothRate(float instantRate, float prevSmoothRate, float alpha, boolean isFirstSample) {
+        if (Float.isNaN(instantRate)) {
+            return isFirstSample ? 0.0f : prevSmoothRate;
+        }
+        if (isFirstSample) {
+            return instantRate;
+        }
+        float effectiveAlpha = Math.max(0.01f, Math.min(1.0f, alpha));
+        float smoothed = (effectiveAlpha * instantRate) + ((1.0f - effectiveAlpha) * prevSmoothRate);
+        if (Math.abs(smoothed) < 0.001f) {
+            return 0.0f;
+        }
+        return smoothed;
+    }
+
+    public static String formatDuration(long seconds) {
+        if (seconds < 0) {
+            return "—";
+        }
+        if (seconds < 60) {
+            return String.format(Locale.ROOT, "%ds", seconds);
+        }
+        long minutes = seconds / 60;
+        long remainingSec = seconds % 60;
+        if (minutes < 60) {
+            return String.format(Locale.ROOT, "%dm %02ds", minutes, remainingSec);
+        }
+        long hours = minutes / 60;
+        long remainingMin = minutes % 60;
+        return String.format(Locale.ROOT, "%dh %02dm", hours, remainingMin);
+    }
+
+    public static String formatEta(long seconds) {
+        return formatDuration(seconds);
+    }
+
+    public static String formatEta(float seconds) {
+        if (Float.isNaN(seconds) || seconds < 0) {
+            return "—";
+        }
+        return formatDuration(Math.round(seconds));
+    }
+
     public static String formatHeadroom(float headroom) {
         if (headroom > 0.001f) {
             return "+" + formatCompactNumber(headroom);

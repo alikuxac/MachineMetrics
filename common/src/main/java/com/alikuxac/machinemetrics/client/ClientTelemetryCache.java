@@ -35,15 +35,38 @@ public class ClientTelemetryCache {
             int headerColor
     ) {}
 
-    private record Entry(TelemetryData data, CachedHudRenderData renderData, long receivedTimeMs) {}
+    public record Entry(
+            TelemetryData data,
+            CachedHudRenderData renderData,
+            long receivedTimeMs,
+            float smoothedNetRate,
+            MetricResolver.EtaResult etaResult
+    ) {}
 
     private static final Map<BlockPos, Entry> CACHE = new ConcurrentHashMap<>();
     private static final long EXPIRE_MS = 2000L;
 
     public static void putSynced(BlockPos pos, TelemetryData data) {
         if (pos != null && data != null) {
+            Entry existing = CACHE.get(pos);
+            boolean hasExisting = existing != null && (System.currentTimeMillis() - existing.receivedTimeMs < EXPIRE_MS);
+            float smoothedRate = MetricResolver.smoothRate(
+                    data.netRate(),
+                    hasExisting ? existing.smoothedNetRate : 0.0f,
+                    MetricResolver.DEFAULT_SMOOTHING_ALPHA,
+                    !hasExisting
+            );
+
+            MetricResolver.EtaResult eta = MetricResolver.calculateEta(
+                    data.storageCurrent(),
+                    data.storageMax(),
+                    smoothedRate,
+                    data.isStorageInfinite(),
+                    data.isStorageDraining()
+            );
+
             CachedHudRenderData renderData = buildRenderData(data);
-            CACHE.put(pos, new Entry(data, renderData, System.currentTimeMillis()));
+            CACHE.put(pos, new Entry(data, renderData, System.currentTimeMillis(), smoothedRate, eta));
         }
     }
 
@@ -54,8 +77,23 @@ public class ClientTelemetryCache {
             if (existing != null && (System.currentTimeMillis() - existing.receivedTimeMs < EXPIRE_MS)) {
                 return;
             }
+            float smoothedRate = MetricResolver.smoothRate(
+                    data.netRate(),
+                    0.0f,
+                    MetricResolver.DEFAULT_SMOOTHING_ALPHA,
+                    true
+            );
+
+            MetricResolver.EtaResult eta = MetricResolver.calculateEta(
+                    data.storageCurrent(),
+                    data.storageMax(),
+                    smoothedRate,
+                    data.isStorageInfinite(),
+                    data.isStorageDraining()
+            );
+
             CachedHudRenderData renderData = buildRenderData(data);
-            CACHE.put(pos, new Entry(data, renderData, System.currentTimeMillis()));
+            CACHE.put(pos, new Entry(data, renderData, System.currentTimeMillis(), smoothedRate, eta));
         }
     }
 
@@ -64,12 +102,29 @@ public class ClientTelemetryCache {
         return entry != null ? entry.data : TelemetryData.empty();
     }
 
+    public static float getSmoothedNetRate(BlockPos pos) {
+        Entry entry = getEntry(pos);
+        return entry != null ? entry.smoothedNetRate : 0.0f;
+    }
+
+    public static MetricResolver.EtaResult getEta(BlockPos pos) {
+        Entry entry = getEntry(pos);
+        if (entry != null && entry.etaResult != null) {
+            return entry.etaResult;
+        }
+        return new MetricResolver.EtaResult(MetricResolver.EtaType.STATIONARY, -1);
+    }
+
     public static CachedHudRenderData getRenderData(BlockPos pos, TelemetryData rawDataFallback) {
         Entry entry = getEntry(pos);
         if (entry != null && entry.renderData != null) {
             return entry.renderData;
         }
         return buildRenderData(rawDataFallback != null ? rawDataFallback : TelemetryData.empty());
+    }
+
+    public static Entry getCacheEntry(BlockPos pos) {
+        return getEntry(pos);
     }
 
     private static Entry getEntry(BlockPos pos) {
