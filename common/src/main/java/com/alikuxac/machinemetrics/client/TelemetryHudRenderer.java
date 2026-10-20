@@ -98,7 +98,8 @@ public class TelemetryHudRenderer {
         }
 
         String machineName = MetricResolver.getBlockOrMachineName(mc.level, targetPos);
-        List<HudLine> lines = buildHudLines(machineName, data);
+        MetricResolver.EtaResult eta = ClientTelemetryCache.getEta(targetPos);
+        List<HudLine> lines = buildHudLines(machineName, data, eta);
 
         if (lines.isEmpty()) {
             return;
@@ -108,12 +109,34 @@ public class TelemetryHudRenderer {
     }
 
     public static List<HudLine> buildHudLines(String machineName, TelemetryData data) {
+        return buildHudLines(machineName, data, null);
+    }
+
+    public static List<HudLine> buildHudLines(String machineName, TelemetryData data, MetricResolver.EtaResult cachedEta) {
         List<HudLine> lines = new ArrayList<>();
 
         boolean isCompact = ClientConfig.COMPACT_MODE != null && ClientConfig.COMPACT_MODE.get();
         if (isCompact) {
             String template = ClientConfig.COMPACT_TEMPLATE != null ? ClientConfig.COMPACT_TEMPLATE.get() : "{name} | {speed} RPM {dir} | {stress}/{cap} SU ({load_pct}%) | {state}";
-            String resolved = MetricResolver.resolveTemplate(template, machineName, data);
+            MetricResolver.EtaResult eta = cachedEta != null && cachedEta.hasEta() ? cachedEta : MetricResolver.calculateEta(
+                    data.storageCurrent(),
+                    data.storageMax(),
+                    data.netRate(),
+                    data.isStorageInfinite(),
+                    data.isStorageDraining()
+            );
+            String resolved = MetricResolver.resolveTemplate(template, machineName, data, eta);
+            if (data.hasStorage() && !template.contains("{storage}")) {
+                boolean showCap = ClientConfig.SHOW_STORAGE_CAPACITY == null || ClientConfig.SHOW_STORAGE_CAPACITY.get();
+                boolean showEta = ClientConfig.SHOW_TIME_TO_FULL == null || ClientConfig.SHOW_TIME_TO_FULL.get();
+                if (showCap && showEta) {
+                    resolved = resolved + " | " + MetricResolver.formatCompactStorageSummary(data.storageCurrent(), data.storageMax(), data.isStorageInfinite(), eta);
+                } else if (showCap) {
+                    resolved = resolved + " | " + MetricResolver.formatCompactStorage(data.storageCurrent(), data.storageMax(), data.isStorageInfinite());
+                } else if (showEta && eta.hasEta()) {
+                    resolved = resolved + " | " + MetricResolver.formatCompactEta(eta);
+                }
+            }
             int headerColor = ClientConfig.parseHexColor(ClientConfig.COLOR_HEADER, 0x00FFCC);
             lines.add(new HudLine(Component.literal(resolved), headerColor));
             return lines;
@@ -461,6 +484,34 @@ public class TelemetryHudRenderer {
                     Component channelComp = Component.translatable("machinemetrics.metrics.ae_channels")
                             .append(Component.literal(String.format(": %d / %d", data.aeUsedChannels(), data.aeMaxChannels())));
                     lines.add(new HudLine(channelComp, ae2Color));
+                }
+            }
+        }
+
+        if (data.hasStorage()) {
+            boolean showStorage = ClientConfig.SHOW_STORAGE_CAPACITY == null || ClientConfig.SHOW_STORAGE_CAPACITY.get();
+            if (showStorage) {
+                String progressBar = MetricResolver.buildStorageProgressBar(data.storageCurrent(), data.storageMax(), data.isStorageInfinite());
+                int barColor = MetricResolver.getStorageBarColor(data.storageCurrent(), data.storageMax(), data.isStorageInfinite());
+                lines.add(new HudLine(Component.literal(progressBar), barColor));
+            }
+
+            boolean showTimeToFull = ClientConfig.SHOW_TIME_TO_FULL == null || ClientConfig.SHOW_TIME_TO_FULL.get();
+            if (showTimeToFull) {
+                MetricResolver.EtaResult eta = cachedEta != null && cachedEta.hasEta() ? cachedEta : MetricResolver.calculateEta(
+                        data.storageCurrent(),
+                        data.storageMax(),
+                        data.netRate(),
+                        data.isStorageInfinite(),
+                        data.isStorageDraining()
+                );
+
+                if (eta.hasEta()) {
+                    Component etaComp = (eta.type() == MetricResolver.EtaType.FULL_IN)
+                            ? Component.translatable("machinemetrics.hud.storage.full_in", eta.formatted())
+                            : Component.translatable("machinemetrics.hud.storage.empty_in", eta.formatted());
+                    int etaColor = MetricResolver.getEtaColor(eta.seconds());
+                    lines.add(new HudLine(etaComp, etaColor));
                 }
             }
         }

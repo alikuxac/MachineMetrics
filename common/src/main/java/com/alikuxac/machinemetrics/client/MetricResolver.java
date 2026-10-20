@@ -50,6 +50,16 @@ public class MetricResolver {
         return formatCompactNumber(value);
     }
 
+    public static String formatStorageCount(long value, boolean isInfinite) {
+        if (isInfinite || value >= (Long.MAX_VALUE / 2) || value < 0) {
+            return "∞";
+        }
+        if (value >= 10_000_000L) {
+            return formatCompactNumber(value);
+        }
+        return String.format(Locale.ROOT, "%,d", value);
+    }
+
     public static String formatStoragePercent(long current, long max, boolean isInfinite) {
         if (isInfinite || max >= (Long.MAX_VALUE / 2)) {
             return "∞";
@@ -59,6 +69,97 @@ public class MetricResolver {
         }
         float pct = (float) ((current / (double) max) * 100.0);
         return String.format(Locale.ROOT, "%.1f%%", pct);
+    }
+
+    public static final int DEFAULT_STORAGE_BAR_LENGTH = 10;
+
+    public static String buildStorageProgressBar(long current, long max, boolean isInfinite) {
+        return buildStorageProgressBar(current, max, isInfinite, DEFAULT_STORAGE_BAR_LENGTH);
+    }
+
+    public static String buildStorageProgressBar(long current, long max, boolean isInfinite, int barLength) {
+        StringBuilder sb = new StringBuilder("[");
+        if (isInfinite || max >= (Long.MAX_VALUE / 2)) {
+            sb.append("█".repeat(Math.max(1, barLength)));
+            sb.append("] ∞% (∞ / ∞)");
+            return sb.toString();
+        }
+        double ratio = max <= 0 ? 0.0 : Math.max(0.0, Math.min(1.0, (double) current / (double) max));
+        int filled = (int) Math.round(ratio * barLength);
+        filled = Math.max(0, Math.min(barLength, filled));
+        int unfilled = barLength - filled;
+
+        sb.append("█".repeat(filled));
+        sb.append("░".repeat(unfilled));
+        sb.append("] ");
+        sb.append(String.format(Locale.ROOT, "%.1f%%", ratio * 100.0));
+        sb.append(String.format(Locale.ROOT, " (%s / %s)", formatStorageCount(current, false), formatStorageCount(max, false)));
+        return sb.toString();
+    }
+
+    public static int getStorageBarColor(long current, long max, boolean isInfinite) {
+        int normalColor = ClientConfig.parseHexColor(ClientConfig.COLOR_STORAGE_NORMAL, 0x55FF55);
+        int warningColor = ClientConfig.parseHexColor(ClientConfig.COLOR_STORAGE_WARNING, 0xFFA726);
+        int criticalColor = ClientConfig.parseHexColor(ClientConfig.COLOR_STORAGE_CRITICAL, 0xFF5555);
+
+        if (isInfinite || max <= 0) {
+            return normalColor;
+        }
+
+        double warningThreshold = ClientConfig.STORAGE_WARNING_THRESHOLD != null ? ClientConfig.STORAGE_WARNING_THRESHOLD.get() : 80.0;
+        double criticalThreshold = ClientConfig.STORAGE_CRITICAL_THRESHOLD != null ? ClientConfig.STORAGE_CRITICAL_THRESHOLD.get() : 95.0;
+
+        double pct = ((double) current / (double) max) * 100.0;
+        if (pct >= criticalThreshold) {
+            return criticalColor;
+        } else if (pct >= warningThreshold) {
+            return warningColor;
+        } else {
+            return normalColor;
+        }
+    }
+
+    public static int getEtaColor(long seconds) {
+        int normalColor = ClientConfig.parseHexColor(ClientConfig.COLOR_ETA_NORMAL, 0x55FF55);
+        int warningColor = ClientConfig.parseHexColor(ClientConfig.COLOR_ETA_WARNING, 0xFFA726);
+        int criticalColor = ClientConfig.parseHexColor(ClientConfig.COLOR_ETA_CRITICAL, 0xFF3333);
+
+        if (seconds < 0) {
+            return normalColor;
+        }
+
+        int warningSeconds = ClientConfig.ETA_WARNING_THRESHOLD_SECONDS != null ? ClientConfig.ETA_WARNING_THRESHOLD_SECONDS.get() : 60;
+        int criticalSeconds = ClientConfig.ETA_CRITICAL_THRESHOLD_SECONDS != null ? ClientConfig.ETA_CRITICAL_THRESHOLD_SECONDS.get() : 15;
+
+        if (seconds < criticalSeconds) {
+            // Flashing red alert at 2.5 Hz (400ms period)
+            boolean flash = (System.currentTimeMillis() / 400L) % 2L == 0;
+            return flash ? criticalColor : warningColor;
+        } else if (seconds < warningSeconds) {
+            return warningColor;
+        } else {
+            return normalColor;
+        }
+    }
+
+    public static String formatCompactStorage(long current, long max, boolean isInfinite) {
+        String pct = formatStoragePercent(current, max, isInfinite);
+        return "📦 " + pct;
+    }
+
+    public static String formatCompactEta(EtaResult eta) {
+        if (eta != null && eta.hasEta()) {
+            return "⏳ " + eta.formatted();
+        }
+        return "—";
+    }
+
+    public static String formatCompactStorageSummary(long current, long max, boolean isInfinite, EtaResult eta) {
+        String storagePart = formatCompactStorage(current, max, isInfinite);
+        if (eta != null && eta.hasEta()) {
+            return storagePart + " | " + formatCompactEta(eta);
+        }
+        return storagePart;
     }
 
     public enum EtaType {
@@ -229,6 +330,15 @@ public class MetricResolver {
             String blockName,
             TelemetryData data
     ) {
+        return resolveTemplate(template, blockName, data, null);
+    }
+
+    public static String resolveTemplate(
+            String template,
+            String blockName,
+            TelemetryData data,
+            EtaResult eta
+    ) {
         if (template == null || template.isEmpty()) {
             return "";
         }
@@ -293,6 +403,20 @@ public class MetricResolver {
             }
         }
 
+        String storageStr = "—";
+        String etaStr = "—";
+        if (data != null && data.hasStorage()) {
+            storageStr = formatCompactStorage(data.storageCurrent(), data.storageMax(), data.isStorageInfinite());
+            EtaResult effectiveEta = eta != null ? eta : calculateEta(
+                    data.storageCurrent(),
+                    data.storageMax(),
+                    data.netRate(),
+                    data.isStorageInfinite(),
+                    data.isStorageDraining()
+            );
+            etaStr = formatCompactEta(effectiveEta);
+        }
+
         boolean autoHideTitle = ClientConfig.AUTO_HIDE_TITLE_WITH_INFO_MODS == null || ClientConfig.AUTO_HIDE_TITLE_WITH_INFO_MODS.get();
         boolean hideTitle = autoHideTitle && com.alikuxac.machinemetrics.compat.infohud.InfoHudDetector.isInfoHudPresent();
         String effectiveTemplate = template;
@@ -313,6 +437,8 @@ public class MetricResolver {
                 .replace("{state}", stateStr)
                 .replace("{items}", itemsStr)
                 .replace("{fluids}", fluidsStr)
+                .replace("{storage}", storageStr)
+                .replace("{eta}", etaStr)
                 .replace("{ae_power}", aePowerStr)
                 .replace("{ae_drain}", aeDrainStr)
                 .replace("{ae_subnets}", aeSubnetsStr)

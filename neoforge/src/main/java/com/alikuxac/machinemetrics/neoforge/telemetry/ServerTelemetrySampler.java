@@ -3,6 +3,7 @@ package com.alikuxac.machinemetrics.neoforge.telemetry;
 import com.alikuxac.machinemetrics.compat.ae2.AE2NetworkInspector;
 import com.alikuxac.machinemetrics.compat.create.CreateKineticInspector;
 import com.alikuxac.machinemetrics.compat.mekanism.MekanismChemicalInspector;
+import com.alikuxac.machinemetrics.compat.mekanism.MekanismTransporterInspector;
 import com.alikuxac.machinemetrics.compat.storage.DrawerStorageAdapter;
 import com.alikuxac.machinemetrics.config.ServerConfig;
 import com.alikuxac.machinemetrics.telemetry.TelemetryData;
@@ -125,61 +126,80 @@ public class ServerTelemetrySampler {
         IntArrayList allSlotCounts = new IntArrayList();
         Set<IItemHandler> processedItemHandlers = Collections.newSetFromMap(new IdentityHashMap<>());
 
+        var transporterOpt = MekanismTransporterInspector.inspect(be);
+        boolean isTransporter = transporterOpt.isPresent() && transporterOpt.get().isTransporter();
+
         if (allowItems) {
-            for (Direction side : sidesToQuery) {
-                IItemHandler itemHandler = level.getCapability(Capabilities.ItemHandler.BLOCK, pos, side);
-                if (itemHandler == null || itemHandler.getSlots() <= 0) {
-                    continue;
-                }
-
+            if (isTransporter) {
+                var tData = transporterOpt.get();
                 hasAnyCapability = true;
-
-                if (side != null && allowSides) {
-                    int sideCount = 0;
-                    for (int i = 0; i < itemHandler.getSlots(); i++) {
-                        var stack = itemHandler.getStackInSlot(i);
-                        if (!stack.isEmpty()) {
-                            sideCount += stack.getCount();
-                        }
-                    }
-                    sideMetrics[side.ordinal()] = (float) sideCount;
+                currentItems = tData.currentItems();
+                maxItems = tData.maxCapacity();
+                for (int count : tData.slotCounts()) {
+                    allSlotCounts.add(count);
                 }
-                
-                if (processedItemHandlers.add(itemHandler)) {
-                    int slotCount = itemHandler.getSlots();
-                    boolean useCachedLimit = existingHistory != null && existingHistory.cachedItemSlotCount == slotCount && existingHistory.cachedMaxItemCapacity > 0;
-                    int handlerMaxCap = 0;
-
-                    if (useCachedLimit) {
-                        handlerMaxCap = existingHistory.cachedMaxItemCapacity;
-                        for (int i = 0; i < slotCount; i++) {
-                            var stack = itemHandler.getStackInSlot(i);
-                            if (!stack.isEmpty()) {
-                                int count = stack.getCount();
-                                currentItems += count;
-                                allSlotCounts.add(count);
-                            } else {
-                                allSlotCounts.add(0);
-                            }
-                        }
-                    } else {
-                        for (int i = 0; i < slotCount; i++) {
-                            handlerMaxCap += itemHandler.getSlotLimit(i);
-                            var stack = itemHandler.getStackInSlot(i);
-                            if (!stack.isEmpty()) {
-                                int count = stack.getCount();
-                                currentItems += count;
-                                allSlotCounts.add(count);
-                            } else {
-                                allSlotCounts.add(0);
-                            }
-                        }
-                        if (existingHistory != null) {
-                            existingHistory.cachedItemSlotCount = slotCount;
-                            existingHistory.cachedMaxItemCapacity = handlerMaxCap;
-                        }
+                if (allowSides) {
+                    float[] sideCounts = tData.sideItemCounts();
+                    for (int i = 0; i < 6; i++) {
+                        sideMetrics[i] = sideCounts[i];
                     }
-                    maxItems += handlerMaxCap;
+                }
+            } else {
+                for (Direction side : sidesToQuery) {
+                    IItemHandler itemHandler = level.getCapability(Capabilities.ItemHandler.BLOCK, pos, side);
+                    if (itemHandler == null || itemHandler.getSlots() <= 0) {
+                        continue;
+                    }
+
+                    hasAnyCapability = true;
+
+                    if (side != null && allowSides) {
+                        int sideCount = 0;
+                        for (int i = 0; i < itemHandler.getSlots(); i++) {
+                            var stack = itemHandler.getStackInSlot(i);
+                            if (!stack.isEmpty()) {
+                                sideCount += stack.getCount();
+                            }
+                        }
+                        sideMetrics[side.ordinal()] = (float) sideCount;
+                    }
+                    
+                    if (processedItemHandlers.add(itemHandler)) {
+                        int slotCount = itemHandler.getSlots();
+                        boolean useCachedLimit = existingHistory != null && existingHistory.cachedItemSlotCount == slotCount && existingHistory.cachedMaxItemCapacity > 0;
+                        int handlerMaxCap = 0;
+
+                        if (useCachedLimit) {
+                            handlerMaxCap = existingHistory.cachedMaxItemCapacity;
+                            for (int i = 0; i < slotCount; i++) {
+                                var stack = itemHandler.getStackInSlot(i);
+                                if (!stack.isEmpty()) {
+                                    int count = stack.getCount();
+                                    currentItems += count;
+                                    allSlotCounts.add(count);
+                                } else {
+                                    allSlotCounts.add(0);
+                                }
+                            }
+                        } else {
+                            for (int i = 0; i < slotCount; i++) {
+                                handlerMaxCap += itemHandler.getSlotLimit(i);
+                                var stack = itemHandler.getStackInSlot(i);
+                                if (!stack.isEmpty()) {
+                                    int count = stack.getCount();
+                                    currentItems += count;
+                                    allSlotCounts.add(count);
+                                } else {
+                                    allSlotCounts.add(0);
+                                }
+                            }
+                            if (existingHistory != null) {
+                                existingHistory.cachedItemSlotCount = slotCount;
+                                existingHistory.cachedMaxItemCapacity = handlerMaxCap;
+                            }
+                        }
+                        maxItems += handlerMaxCap;
+                    }
                 }
             }
         }
@@ -331,6 +351,13 @@ public class ServerTelemetrySampler {
                 itemThroughput = (slotDeltaSum / 2.0f) / timeDiffSec;
                 itemNetRate = (history.lastSample.totalItems() - history.previousSample.totalItems()) / timeDiffSec;
 
+                if (isTransporter) {
+                    float transporterRate = transporterOpt.get().throughputRate();
+                    if (transporterRate > 0.001f) {
+                        itemThroughput = Math.max(itemThroughput, transporterRate);
+                    }
+                }
+
                 int[] prevTanks = history.previousSample.fluidTanks();
                 int[] currTanks = history.lastSample.fluidTanks();
                 int tankDeltaSum = 0;
@@ -357,6 +384,10 @@ public class ServerTelemetrySampler {
                     }
                 }
             }
+        }
+
+        if (isTransporter && itemThroughput <= 0.001f) {
+            itemThroughput = transporterOpt.get().throughputRate();
         }
 
         boolean hasImmediateActivity = itemThroughput > 0.001f || fluidThroughput > 0.001f || Math.abs(energyDelta) > 0.1f || Math.abs(kineticSpeed) > 0.001f;
@@ -563,7 +594,7 @@ public class ServerTelemetrySampler {
             } else if (maxItems > 0) {
                 storageCurrent = currentItems;
                 storageMax = maxItems;
-                primaryNetRate = itemNetRate;
+                primaryNetRate = isTransporter ? 0f : itemNetRate;
                 hasStorage = true;
             } else if (maxFluid > 0) {
                 storageCurrent = currentFluid;

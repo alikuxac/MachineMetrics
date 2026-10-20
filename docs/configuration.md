@@ -74,6 +74,45 @@ Configure HUD placement and presets directly in-game without editing config file
 | `auto_hide_ae2_channels_with_info_mods` | `true` | Hides AE2 channel count if Jade or WTHIT is installed. |
 | `show_ae2_channels` | `true` | Shows AE2 node used and max channels. |
 | `ae2_power_unit` | `"AUTO"` | Power unit for AE2 metrics: `"AUTO"` (matches AE2 client button), `"AE"`, or `"FE"`. |
+| `show_storage_capacity` | `true` | Shows container capacity progress bar. |
+| `show_time_to_full` | `true` | Shows estimated time until storage fills or empties (ETA). |
+
+### Thresholds & Compact Settings (`[formatting]`)
+
+```toml
+[formatting]
+  compact_mode = false
+  compact_template = "{name} | {speed} RPM {dir} | {stress}/{cap} SU ({load_pct}%) | {state}"
+
+  # Storage capacity warning and critical percentage thresholds
+  storage_warning_threshold = 80.0
+  storage_critical_threshold = 95.0
+
+  # ETA alert thresholds in seconds
+  eta_warning_threshold_seconds = 60
+  eta_critical_threshold_seconds = 15
+```
+
+### Storage Progress Bar & ETA Behavior
+
+- **Progress Bar**: `[████░░░░░░] 41.9% (1,450 / 3,456)` (10 blocks, 1 block = 10%)
+  - Standard containers display exact slot or item counts up to 10M, and compact metric units (`10.5M`) above.
+  - Infinite or creative containers render as `[██████████] ∞% (∞ / ∞)`.
+  - Color shifts automatically:
+    - `< storage_warning_threshold` (default 80%): `storageNormalColor` (`#55FF55`)
+    - `storage_warning_threshold` to `storage_critical_threshold` (80% to 95%): `storageWarningColor` (`#FFA726`)
+    - `≥ storage_critical_threshold` (default 95%): `storageCriticalColor` (`#FF5555`)
+- **ETA Status Line**:
+  - `Full in: <time>` when filling, `Empty in: <time>` when draining.
+  - Formats duration in seconds (`45s`), minutes (`2m 40s`), or hours (`1h 15m`).
+  - Color shifts automatically:
+    - `≥ eta_warning_threshold_seconds` (default 60s): `etaNormalColor` (`#55FF55`)
+    - `< eta_warning_threshold_seconds`: `etaWarningColor` (`#FFA726`)
+    - `< eta_critical_threshold_seconds` (default 15s): flashes between `etaCriticalColor` (`#FF3333`) and `etaWarningColor` at 2.5 Hz.
+  - When transfer rate is 0, the HUD omits the ETA line.
+- **Transport Cables**:
+  - Item transport cables (such as Mekanism logistical transporters) display active in-flight items against standard stack capacity (64 items).
+  - The sampler holds net rate at 0 for in-transit items to suppress false empty/full ETA alerts while items pass through.
 
 ### Colors (`[colors]`)
 
@@ -92,6 +131,14 @@ Colors accept `#RRGGBB` or `#AARRGGBB` hex values:
   sidesColor = "#69F0AE"
   ae2PowerColor = "#A259FF"
   ae2BrownoutColor = "#FF3333"
+
+  # Storage capacity & ETA
+  storageNormalColor = "#55FF55"
+  storageWarningColor = "#FFA726"
+  storageCriticalColor = "#FF5555"
+  etaNormalColor = "#55FF55"
+  etaWarningColor = "#FFA726"
+  etaCriticalColor = "#FF3333"
 
   # Bottleneck states
   stateOptimalColor = "#55FF55"
@@ -113,6 +160,8 @@ Single-line mode renders all active metrics as one continuous line formatted wit
   compact_template = "{name} | {speed} RPM {dir} | {stress}/{cap} SU ({load_pct}%) | {state}"
 ```
 
+When targeting a storage container with `compact_mode = true`, the HUD compresses capacity and ETA into an icon summary (`📦 42% | ⏳ 2m 40s`) instead of rendering the multi-character bar.
+
 ### Template Placeholders
 
 | Placeholder | Output | Example |
@@ -127,6 +176,8 @@ Single-line mode renders all active metrics as one continuous line formatted wit
 | `{state}` | Bottleneck state badge with color code | `§aOPTIMAL`, `§cOVERLOADED`, `§7IDLE` |
 | `{items}` | Item transfer rate | `12.5 /s`, `0.0 /s` |
 | `{fluids}` | Fluid transfer rate | `250.0 mB/s`, `1.20 B/s` |
+| `{storage}` | Compact storage percentage icon | `📦 42%`, `📦 ∞%` |
+| `{eta}` | Compact ETA duration icon | `⏳ 2m 40s`, `—` |
 | `{ae_power}` | AE2 network net power rate | `-3.4k AE/t`, `+1.2k AE/t` |
 | `{ae_drain}` | AE2 grid power drain | `180.0 AE/t` |
 | `{ae_subnets}` | AE2 connected subnet count and drain | `2 (+40.0 AE/t)` |

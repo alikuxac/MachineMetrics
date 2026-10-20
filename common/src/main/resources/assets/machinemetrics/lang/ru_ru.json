@@ -64,5 +64,8 @@
   "machinemetrics.ae2.state.discharging": "DISCHARGING",
   "machinemetrics.ae2.state.brownout": "🔴 ПРОСАДКА СЕТИ",
   "machinemetrics.ae2.state.booting": "🟡 ЗАГРУЗКА",
-  "machinemetrics.ae2.state.creative": "CREATIVE"
+  "machinemetrics.ae2.state.creative": "CREATIVE",
+  "machinemetrics.hud.storage.capacity": "Вместимость",
+  "machinemetrics.hud.storage.full_in": "Заполнится через: %s",
+  "machinemetrics.hud.storage.empty_in": "Опустеет через: %s"
 }

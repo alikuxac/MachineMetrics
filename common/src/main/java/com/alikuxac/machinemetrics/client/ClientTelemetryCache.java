@@ -191,6 +191,14 @@ public class ClientTelemetryCache {
         } else if (data.hasEnergy() || data.energyDelta() != 0f) {
             compactMetricStr = formatEnergyRate(data.energyDelta());
             compactMetricColor = data.energyDelta() > 0 ? positiveEnergyColor : (data.energyDelta() < 0 ? negativeEnergyColor : neutralEnergyColor);
+        } else if (data.hasStorage()) {
+            compactMetricStr = MetricResolver.formatCompactStorageSummary(
+                    data.storageCurrent(),
+                    data.storageMax(),
+                    data.isStorageInfinite(),
+                    MetricResolver.calculateEta(data.storageCurrent(), data.storageMax(), data.netRate(), data.isStorageInfinite(), data.isStorageDraining())
+            );
+            compactMetricColor = MetricResolver.getStorageBarColor(data.storageCurrent(), data.storageMax(), data.isStorageInfinite());
         } else {
             compactMetricStr = Component.translatable("machinemetrics.state.idle").getString();
             compactMetricColor = idleColor;
@@ -304,6 +312,43 @@ public class ClientTelemetryCache {
                         energyColor,
                         font != null ? font.width(valStr) : 0
                 ));
+            }
+        }
+
+        if (data.hasStorage()) {
+            boolean showStorage = ClientConfig.SHOW_STORAGE_CAPACITY == null || ClientConfig.SHOW_STORAGE_CAPACITY.get();
+            if (showStorage) {
+                String progressBar = MetricResolver.buildStorageProgressBar(data.storageCurrent(), data.storageMax(), data.isStorageInfinite());
+                int barColor = MetricResolver.getStorageBarColor(data.storageCurrent(), data.storageMax(), data.isStorageInfinite());
+                detailedRows.add(new RenderRow(
+                        Component.literal(progressBar),
+                        Component.literal(""),
+                        barColor,
+                        0
+                ));
+            }
+
+            boolean showTimeToFull = ClientConfig.SHOW_TIME_TO_FULL == null || ClientConfig.SHOW_TIME_TO_FULL.get();
+            if (showTimeToFull) {
+                MetricResolver.EtaResult eta = MetricResolver.calculateEta(
+                        data.storageCurrent(),
+                        data.storageMax(),
+                        data.netRate(),
+                        data.isStorageInfinite(),
+                        data.isStorageDraining()
+                );
+                if (eta.hasEta()) {
+                    Component etaComp = (eta.type() == MetricResolver.EtaType.FULL_IN)
+                            ? Component.translatable("machinemetrics.hud.storage.full_in", eta.formatted())
+                            : Component.translatable("machinemetrics.hud.storage.empty_in", eta.formatted());
+                    int etaColor = MetricResolver.getEtaColor(eta.seconds());
+                    detailedRows.add(new RenderRow(
+                            etaComp,
+                            Component.literal(""),
+                            etaColor,
+                            0
+                    ));
+                }
             }
         }
 

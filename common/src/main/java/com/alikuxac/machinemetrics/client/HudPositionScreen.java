@@ -276,6 +276,8 @@ public class HudPositionScreen extends Screen {
                 setSafe(ClientConfig.SHOW_LOCAL_IMPACT, false);
                 setSafe(ClientConfig.SHOW_ENERGY_FE, true);
                 setSafe(ClientConfig.SHOW_SIDES, true);
+                setSafe(ClientConfig.SHOW_STORAGE_CAPACITY, true);
+                setSafe(ClientConfig.SHOW_TIME_TO_FULL, true);
             }
             case MINIMALIST_BAR -> {
                 setSafe(ClientConfig.COMPACT_MODE, true);
@@ -294,6 +296,8 @@ public class HudPositionScreen extends Screen {
                 setSafe(ClientConfig.SHOW_LOCAL_IMPACT, false);
                 setSafe(ClientConfig.SHOW_ENERGY_FE, false);
                 setSafe(ClientConfig.SHOW_SIDES, false);
+                setSafe(ClientConfig.SHOW_STORAGE_CAPACITY, false);
+                setSafe(ClientConfig.SHOW_TIME_TO_FULL, false);
             }
             case CHEMICALS_ONLY -> {
                 setSafe(ClientConfig.COMPACT_MODE, false);
@@ -309,6 +313,8 @@ public class HudPositionScreen extends Screen {
                 setSafe(ClientConfig.SHOW_LOCAL_IMPACT, false);
                 setSafe(ClientConfig.SHOW_ENERGY_FE, false);
                 setSafe(ClientConfig.SHOW_SIDES, true);
+                setSafe(ClientConfig.SHOW_STORAGE_CAPACITY, false);
+                setSafe(ClientConfig.SHOW_TIME_TO_FULL, false);
             }
             case ENERGY_ONLY -> {
                 setSafe(ClientConfig.COMPACT_MODE, false);
@@ -324,6 +330,8 @@ public class HudPositionScreen extends Screen {
                 setSafe(ClientConfig.SHOW_LOCAL_IMPACT, false);
                 setSafe(ClientConfig.SHOW_ENERGY_FE, true);
                 setSafe(ClientConfig.SHOW_SIDES, false);
+                setSafe(ClientConfig.SHOW_STORAGE_CAPACITY, false);
+                setSafe(ClientConfig.SHOW_TIME_TO_FULL, false);
             }
             case ITEMS_ONLY -> {
                 setSafe(ClientConfig.COMPACT_MODE, false);
@@ -339,6 +347,8 @@ public class HudPositionScreen extends Screen {
                 setSafe(ClientConfig.SHOW_LOCAL_IMPACT, false);
                 setSafe(ClientConfig.SHOW_ENERGY_FE, false);
                 setSafe(ClientConfig.SHOW_SIDES, true);
+                setSafe(ClientConfig.SHOW_STORAGE_CAPACITY, true);
+                setSafe(ClientConfig.SHOW_TIME_TO_FULL, true);
             }
             case FLUIDS_ONLY -> {
                 setSafe(ClientConfig.COMPACT_MODE, false);
@@ -354,6 +364,8 @@ public class HudPositionScreen extends Screen {
                 setSafe(ClientConfig.SHOW_LOCAL_IMPACT, false);
                 setSafe(ClientConfig.SHOW_ENERGY_FE, false);
                 setSafe(ClientConfig.SHOW_SIDES, true);
+                setSafe(ClientConfig.SHOW_STORAGE_CAPACITY, true);
+                setSafe(ClientConfig.SHOW_TIME_TO_FULL, true);
             }
         }
     }
@@ -367,8 +379,8 @@ public class HudPositionScreen extends Screen {
         boolean hasMek = MekanismChemicalInspector.isMekanismLoaded();
 
         float[] sampleSides = new float[18];
-        sampleSides[net.minecraft.core.Direction.DOWN.ordinal()] = 8.5f;       // Item output on DOWN
-        sampleSides[6 + net.minecraft.core.Direction.NORTH.ordinal()] = 250.0f; // Fluid input on NORTH
+        sampleSides[net.minecraft.core.Direction.DOWN.ordinal()] = 8.5f;    
+        sampleSides[6 + net.minecraft.core.Direction.NORTH.ordinal()] = 250.0f;
 
         boolean hasAe2 = AE2NetworkInspector.isAE2Loaded();
 
@@ -394,9 +406,9 @@ public class HudPositionScreen extends Screen {
                 false,
                 3,
                 8,
-                1728L,
-                1728L,
-                0.0f,
+                1450L,
+                3456L,
+                12.5f,
                 TelemetryData.HAS_STORAGE
         );
     }

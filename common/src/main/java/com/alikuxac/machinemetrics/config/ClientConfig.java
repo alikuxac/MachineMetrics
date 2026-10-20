@@ -45,10 +45,16 @@ public class ClientConfig {
     public static final ModConfigSpec.BooleanValue AUTO_HIDE_AE2_CHANNELS_WITH_INFOHUD;
     public static final ModConfigSpec.BooleanValue SHOW_AE2_CHANNELS;
     public static final ModConfigSpec.ConfigValue<String> AE2_POWER_UNIT;
+    public static final ModConfigSpec.BooleanValue SHOW_STORAGE_CAPACITY;
+    public static final ModConfigSpec.BooleanValue SHOW_TIME_TO_FULL;
 
-    // Compact Formatting
+    // Compact Formatting & Thresholds
     public static final ModConfigSpec.BooleanValue COMPACT_MODE;
     public static final ModConfigSpec.ConfigValue<String> COMPACT_TEMPLATE;
+    public static final ModConfigSpec.DoubleValue STORAGE_WARNING_THRESHOLD;
+    public static final ModConfigSpec.DoubleValue STORAGE_CRITICAL_THRESHOLD;
+    public static final ModConfigSpec.IntValue ETA_WARNING_THRESHOLD_SECONDS;
+    public static final ModConfigSpec.IntValue ETA_CRITICAL_THRESHOLD_SECONDS;
 
     // Metric Colors
     public static final ModConfigSpec.ConfigValue<String> COLOR_HEADER;
@@ -62,6 +68,12 @@ public class ClientConfig {
     public static final ModConfigSpec.ConfigValue<String> COLOR_SIDES;
     public static final ModConfigSpec.ConfigValue<String> COLOR_AE2_POWER;
     public static final ModConfigSpec.ConfigValue<String> COLOR_AE2_BROWNOUT;
+    public static final ModConfigSpec.ConfigValue<String> COLOR_STORAGE_NORMAL;
+    public static final ModConfigSpec.ConfigValue<String> COLOR_STORAGE_WARNING;
+    public static final ModConfigSpec.ConfigValue<String> COLOR_STORAGE_CRITICAL;
+    public static final ModConfigSpec.ConfigValue<String> COLOR_ETA_NORMAL;
+    public static final ModConfigSpec.ConfigValue<String> COLOR_ETA_WARNING;
+    public static final ModConfigSpec.ConfigValue<String> COLOR_ETA_CRITICAL;
 
     public static final ModConfigSpec.ConfigValue<String> COLOR_STATE_OPTIMAL;
     public static final ModConfigSpec.ConfigValue<String> COLOR_STATE_STARVED;
@@ -182,17 +194,41 @@ public class ClientConfig {
                 .comment("Display unit for AE2 power: 'AUTO' (syncs with AE2 client option button), 'AE', or 'FE' (1 AE = 2 FE)")
                 .define("ae2_power_unit", "AUTO");
 
+        SHOW_STORAGE_CAPACITY = builder
+                .comment("Show storage capacity progress bar")
+                .define("show_storage_capacity", true);
+
+        SHOW_TIME_TO_FULL = builder
+                .comment("Show estimated time until storage is full or empty (ETA)")
+                .define("show_time_to_full", true);
+
         builder.pop();
 
-        builder.comment("Compact Template").push("formatting");
+        builder.comment("Compact Template & Thresholds").push("formatting");
 
         COMPACT_MODE = builder
                 .comment("Enable single-line compact HUD")
                 .define("compact_mode", false);
 
         COMPACT_TEMPLATE = builder
-                .comment("Placeholders: {name}, {speed}, {dir}, {stress}, {cap}, {headroom}, {load_pct}, {state}, {items}, {fluids}")
+                .comment("Placeholders: {name}, {speed}, {dir}, {stress}, {cap}, {headroom}, {load_pct}, {state}, {items}, {fluids}, {storage}, {eta}")
                 .define("compact_template", "{name} | {speed} RPM {dir} | {stress}/{cap} SU ({load_pct}%) | {state}");
+
+        STORAGE_WARNING_THRESHOLD = builder
+                .comment("Storage capacity percentage threshold for warning color (0.0 to 100.0)")
+                .defineInRange("storage_warning_threshold", 80.0, 0.0, 100.0);
+
+        STORAGE_CRITICAL_THRESHOLD = builder
+                .comment("Storage capacity percentage threshold for critical color (0.0 to 100.0)")
+                .defineInRange("storage_critical_threshold", 95.0, 0.0, 100.0);
+
+        ETA_WARNING_THRESHOLD_SECONDS = builder
+                .comment("Remaining ETA seconds threshold for warning color")
+                .defineInRange("eta_warning_threshold_seconds", 60, 1, 3600);
+
+        ETA_CRITICAL_THRESHOLD_SECONDS = builder
+                .comment("Remaining ETA seconds threshold for critical blinking color")
+                .defineInRange("eta_critical_threshold_seconds", 15, 1, 3600);
 
         builder.pop();
 
@@ -241,6 +277,30 @@ public class ClientConfig {
         COLOR_AE2_BROWNOUT = builder
                 .comment("AE2 grid brownout alert color")
                 .define("ae2BrownoutColor", "#FF3333");
+
+        COLOR_STORAGE_NORMAL = builder
+                .comment("Storage capacity bar normal color (< warning threshold)")
+                .define("storageNormalColor", "#55FF55");
+
+        COLOR_STORAGE_WARNING = builder
+                .comment("Storage capacity bar warning color (>= warning threshold and < critical threshold)")
+                .define("storageWarningColor", "#FFA726");
+
+        COLOR_STORAGE_CRITICAL = builder
+                .comment("Storage capacity bar critical color (>= critical threshold)")
+                .define("storageCriticalColor", "#FF5555");
+
+        COLOR_ETA_NORMAL = builder
+                .comment("ETA line normal color")
+                .define("etaNormalColor", "#55FF55");
+
+        COLOR_ETA_WARNING = builder
+                .comment("ETA line warning color (< warning threshold seconds)")
+                .define("etaWarningColor", "#FFA726");
+
+        COLOR_ETA_CRITICAL = builder
+                .comment("ETA line critical alert color (< critical threshold seconds, flashes red)")
+                .define("etaCriticalColor", "#FF3333");
 
         COLOR_STATE_OPTIMAL = builder
                 .comment("OPTIMAL status color")

@@ -64,5 +64,8 @@
   "machinemetrics.ae2.state.discharging": "DISCHARGING",
   "machinemetrics.ae2.state.brownout": "🔴 CAÍDA DE RED",
   "machinemetrics.ae2.state.booting": "🟡 INICIANDO",
-  "machinemetrics.ae2.state.creative": "CREATIVE"
+  "machinemetrics.ae2.state.creative": "CREATIVE",
+  "machinemetrics.hud.storage.capacity": "Almacenamiento",
+  "machinemetrics.hud.storage.full_in": "Lleno en: %s",
+  "machinemetrics.hud.storage.empty_in": "Vacío en: %s"
 }

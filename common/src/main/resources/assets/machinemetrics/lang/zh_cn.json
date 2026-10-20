@@ -64,5 +64,8 @@
   "machinemetrics.ae2.state.discharging": "DISCHARGING",
   "machinemetrics.ae2.state.brownout": "🔴 电网欠压",
   "machinemetrics.ae2.state.booting": "🟡 引导中",
-  "machinemetrics.ae2.state.creative": "CREATIVE"
+  "machinemetrics.ae2.state.creative": "CREATIVE",
+  "machinemetrics.hud.storage.capacity": "存储容量",
+  "machinemetrics.hud.storage.full_in": "充满剩余: %s",
+  "machinemetrics.hud.storage.empty_in": "排空剩余: %s"
 }
