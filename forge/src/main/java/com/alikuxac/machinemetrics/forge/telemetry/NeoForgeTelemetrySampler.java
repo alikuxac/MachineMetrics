@@ -1,15 +1,20 @@
 package com.alikuxac.machinemetrics.forge.telemetry;
 
+import com.alikuxac.machinemetrics.compat.CompatRegistry;
 import com.alikuxac.machinemetrics.compat.ae2.AE2NetworkInspector;
 import com.alikuxac.machinemetrics.compat.ae2.AE2NetworkInspector.AE2StabilityState;
 import com.alikuxac.machinemetrics.compat.storage.DrawerStorageAdapter;
+import com.alikuxac.machinemetrics.compat.storage.SophisticatedStorageAdapter;
 import com.alikuxac.machinemetrics.config.ServerConfig;
+import com.alikuxac.machinemetrics.storage.BlockCapacityReader;
+import com.alikuxac.machinemetrics.storage.BlockCapacityReader.StorageCapacity;
 import com.alikuxac.machinemetrics.telemetry.TelemetryData;
 import it.unimi.dsi.fastutil.ints.IntArrayList;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.multiplayer.ClientLevel;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
+import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.entity.BlockEntity;
 import net.neoforged.neoforge.capabilities.Capabilities;
 import net.neoforged.neoforge.energy.IEnergyStorage;
@@ -30,6 +35,8 @@ public class NeoForgeTelemetrySampler {
     private static final Logger LOGGER = LoggerFactory.getLogger(NeoForgeTelemetrySampler.class);
     private static final Map<BlockPos, SampleHistory> CACHE = new ConcurrentHashMap<>();
     private static final long CLEANUP_EXPIRE_MS = 10000L;
+
+    private static final String WAYSTONE_NAMESPACE = "waystones";
 
     private record Sample(long timestampMs, int[] itemSlots, int[] fluidTanks, int energyAmount, int totalItems, int totalFluid, float[] sideMetrics) {}
 
@@ -77,10 +84,13 @@ public class NeoForgeTelemetrySampler {
             return TelemetryData.empty();
         }
 
-        String beClassName = be.getClass().getName().toLowerCase();
-        boolean isAe2Block = beClassName.contains("appeng");
-        if ((isAe2Block && !AE2NetworkInspector.isAE2Loaded() && (beClassName.contains("cable") || beClassName.contains("multipart") || beClassName.contains("bus")))
-                || beClassName.contains("waystone")) {
+        boolean isAe2Block = CompatRegistry.isAe2Block(level, pos);
+        boolean isAe2ConnectionBlock = isAe2Block
+                && (CompatRegistry.blockPathContains(level, pos, "cable")
+                        || CompatRegistry.blockPathContains(level, pos, "multipart")
+                        || CompatRegistry.blockPathContains(level, pos, "bus"));
+        if ((isAe2ConnectionBlock && !AE2NetworkInspector.isAE2Loaded())
+                || CompatRegistry.blockIsInNamespace(level, pos, WAYSTONE_NAMESPACE)) {
             return TelemetryData.empty();
         }
 
@@ -95,122 +105,116 @@ public class NeoForgeTelemetrySampler {
 
         boolean hasAnyCapability = false;
 
-        Direction[] sidesToQuery = new Direction[] { null, Direction.UP, Direction.DOWN, Direction.NORTH, Direction.SOUTH, Direction.WEST, Direction.EAST };
         float[] sideMetrics = new float[18];
         IntArrayList allSlotCounts = new IntArrayList();
         Set<IItemHandler> processedItemHandlers = Collections.newSetFromMap(new IdentityHashMap<>());
 
-        for (Direction side : sidesToQuery) {
-            IItemHandler itemHandler = level.getCapability(Capabilities.ItemHandler.BLOCK, pos, side);
-            if (itemHandler == null || itemHandler.getSlots() <= 0) {
-                continue;
+        for (Direction side : Direction.values()) {
+            try {
+                IItemHandler itemHandler = level.getCapability(Capabilities.ItemHandler.BLOCK, pos, side);
+                if (itemHandler != null && itemHandler.getSlots() > 0) {
+                    float sideItemCount = 0.0f;
+                    for (int i = 0; i < itemHandler.getSlots(); i++) {
+                        var stack = itemHandler.getStackInSlot(i);
+                        if (!stack.isEmpty()) {
+                            sideItemCount += stack.getCount();
+                        }
+                    }
+                    sideMetrics[side.ordinal()] = sideItemCount;
+                }
+            } catch (Throwable ignored) {
             }
+        }
 
+        IItemHandler itemHandler = resolveItemHandler(level, pos, hitFace);
+
+        if (itemHandler != null && itemHandler.getSlots() > 0) {
             hasAnyCapability = true;
+            processedItemHandlers.add(itemHandler);
+            int slotCount = itemHandler.getSlots();
+            boolean useCachedLimit = existingHistory != null && existingHistory.cachedItemSlotCount == slotCount && existingHistory.cachedMaxItemCapacity > 0;
+            int handlerMaxCap = 0;
 
-            // 1. Calculate side-specific metrics (0..5: Item)
-            if (side != null) {
-                float sideItemCount = 0.0f;
-                for (int i = 0; i < itemHandler.getSlots(); i++) {
+            if (useCachedLimit) {
+                handlerMaxCap = existingHistory.cachedMaxItemCapacity;
+                for (int i = 0; i < slotCount; i++) {
                     var stack = itemHandler.getStackInSlot(i);
                     if (!stack.isEmpty()) {
-                        sideItemCount += stack.getCount();
+                        int count = stack.getCount();
+                        currentItems += count;
+                        allSlotCounts.add(count);
+                    } else {
+                        allSlotCounts.add(0);
                     }
                 }
-                // Assign to side slot: DOWN=0, UP=1, NORTH=2, SOUTH=3, WEST=4, EAST=5
-                sideMetrics[side.ordinal()] = sideItemCount;
-            }
-
-            // 2. Calculate global capacity - deduplicate handlers
-            if (processedItemHandlers.add(itemHandler)) {
-                int slotCount = itemHandler.getSlots();
-                boolean useCachedLimit = existingHistory != null && existingHistory.cachedItemSlotCount == slotCount && existingHistory.cachedMaxItemCapacity > 0;
-                int handlerMaxCap = 0;
-
-                if (useCachedLimit) {
-                    handlerMaxCap = existingHistory.cachedMaxItemCapacity;
-                    for (int i = 0; i < slotCount; i++) {
-                        var stack = itemHandler.getStackInSlot(i);
-                        if (!stack.isEmpty()) {
-                            int count = stack.getCount();
-                            currentItems += count;
-                            allSlotCounts.add(count);
-                        } else {
-                            allSlotCounts.add(0);
-                        }
-                    }
-                } else {
-                    for (int i = 0; i < slotCount; i++) {
-                        handlerMaxCap += itemHandler.getSlotLimit(i);
-                        var stack = itemHandler.getStackInSlot(i);
-                        if (!stack.isEmpty()) {
-                            int count = stack.getCount();
-                            currentItems += count;
-                            allSlotCounts.add(count);
-                        } else {
-                            allSlotCounts.add(0);
-                        }
-                    }
-                    if (existingHistory != null) {
-                        existingHistory.cachedItemSlotCount = slotCount;
-                        existingHistory.cachedMaxItemCapacity = handlerMaxCap;
+            } else {
+                for (int i = 0; i < slotCount; i++) {
+                    handlerMaxCap += itemHandler.getSlotLimit(i);
+                    var stack = itemHandler.getStackInSlot(i);
+                    if (!stack.isEmpty()) {
+                        int count = stack.getCount();
+                        currentItems += count;
+                        allSlotCounts.add(count);
+                    } else {
+                        allSlotCounts.add(0);
                     }
                 }
-                maxItems += handlerMaxCap;
+                if (existingHistory != null) {
+                    existingHistory.cachedItemSlotCount = slotCount;
+                    existingHistory.cachedMaxItemCapacity = handlerMaxCap;
+                }
             }
+            maxItems += handlerMaxCap;
         }
         int[] itemSlots = allSlotCounts.toIntArray();
 
         IntArrayList allTankAmounts = new IntArrayList();
         Set<IFluidHandler> processedFluidHandlers = Collections.newSetFromMap(new IdentityHashMap<>());
+        String fluidName = "";
 
-        for (Direction side : sidesToQuery) {
-            IFluidHandler fluidHandler = level.getCapability(Capabilities.FluidHandler.BLOCK, pos, side);
-            if (fluidHandler == null || fluidHandler.getTanks() <= 0) {
-                continue;
-            }
-
-            hasAnyCapability = true;
-
-            if (side != null) {
-                float sideAmount = 0.0f;
-                for (int i = 0; i < fluidHandler.getTanks(); i++) {
-                    sideAmount += fluidHandler.getFluidInTank(i).getAmount();
-                }
-                // Assign to side fluid slot in 12-element array (offset + 6)
-                sideMetrics[6 + side.ordinal()] = sideAmount;
-            }
-
-            if (processedFluidHandlers.add(fluidHandler)) {
-                for (int i = 0; i < fluidHandler.getTanks(); i++) {
-                    var fluidStack = fluidHandler.getFluidInTank(i);
-                    int tankCap = fluidHandler.getTankCapacity(i);
-                    if (!fluidStack.isEmpty()) {
-                        currentFluid += fluidStack.getAmount();
-                        allTankAmounts.add(fluidStack.getAmount());
-                    } else {
-                        allTankAmounts.add(0);
+        for (Direction side : Direction.values()) {
+            try {
+                IFluidHandler fluidHandler = level.getCapability(Capabilities.FluidHandler.BLOCK, pos, side);
+                if (fluidHandler != null && fluidHandler.getTanks() > 0) {
+                    float sideAmount = 0.0f;
+                    for (int i = 0; i < fluidHandler.getTanks(); i++) {
+                        sideAmount += fluidHandler.getFluidInTank(i).getAmount();
                     }
-                    maxFluid += tankCap;
+                    sideMetrics[6 + side.ordinal()] = sideAmount;
                 }
+            } catch (Throwable ignored) {
+            }
+        }
+
+        IFluidHandler fluidHandler = resolveFluidHandler(level, pos, hitFace);
+
+        if (fluidHandler != null && fluidHandler.getTanks() > 0) {
+            hasAnyCapability = true;
+            processedFluidHandlers.add(fluidHandler);
+            for (int i = 0; i < fluidHandler.getTanks(); i++) {
+                var fluidStack = fluidHandler.getFluidInTank(i);
+                int tankCap = fluidHandler.getTankCapacity(i);
+                if (!fluidStack.isEmpty()) {
+                    currentFluid += fluidStack.getAmount();
+                    allTankAmounts.add(fluidStack.getAmount());
+                    if (fluidName.isEmpty()) {
+                        fluidName = fluidStack.getHoverName().getString();
+                    }
+                } else {
+                    allTankAmounts.add(0);
+                }
+                maxFluid += tankCap;
             }
         }
         int[] fluidTanks = allTankAmounts.toIntArray();
 
-        Set<IEnergyStorage> processedEnergyStorages = Collections.newSetFromMap(new IdentityHashMap<>());
-
-        for (Direction side : sidesToQuery) {
-            try {
-                IEnergyStorage energyStorage = level.getCapability(Capabilities.EnergyStorage.BLOCK, pos, side);
-                if (energyStorage != null && processedEnergyStorages.add(energyStorage)) {
-                    int maxCap = energyStorage.getMaxEnergyStored();
-                    if (maxCap > 0) {
-                        hasAnyCapability = true;
-                        currentEnergy += energyStorage.getEnergyStored();
-                        maxEnergy += maxCap;
-                    }
-                }
-            } catch (Throwable ignored) {
+        IEnergyStorage energyStorage = resolveEnergyStorage(level, pos, hitFace);
+        if (energyStorage != null) {
+            int maxCap = energyStorage.getMaxEnergyStored();
+            if (maxCap > 0) {
+                hasAnyCapability = true;
+                currentEnergy += energyStorage.getEnergyStored();
+                maxEnergy += maxCap;
             }
         }
 
@@ -248,12 +252,14 @@ public class NeoForgeTelemetrySampler {
         }
 
         boolean isAe2Storage = AE2NetworkInspector.isAE2Loaded() && isAe2Block;
-        boolean isDrawerStorage = DrawerStorageAdapter.isFunctionalStorageLoaded() || DrawerStorageAdapter.isStorageDrawersLoaded();
+        boolean hasStorageCapacity = BlockCapacityReader.readCapacity(level, pos, hitFace).hasStorage()
+                || CompatRegistry.isDrawerBlock(level, pos)
+                || CompatRegistry.isSophisticatedStorageBlock(level, pos);
 
-        if (!hasAnyCapability && !hasAe2Network && !isAe2Storage && !isDrawerStorage) {
+        if (!hasAnyCapability && !hasAe2Network && !isAe2Storage && !hasStorageCapacity) {
             return TelemetryData.empty();
         }
-        if ((maxItems == 0 && maxFluid == 0 && maxEnergy == 0 && !hasAe2Network && !isAe2Storage && !isDrawerStorage)) {
+        if ((maxItems == 0 && maxFluid == 0 && maxEnergy == 0 && !hasAe2Network && !isAe2Storage && !hasStorageCapacity)) {
             return TelemetryData.empty();
         }
 
@@ -305,7 +311,6 @@ public class NeoForgeTelemetrySampler {
                 energyDelta = (history.lastSample.energyAmount() - history.previousSample.energyAmount()) / timeDiffTicks;
                 energyNetRate = energyDelta;
 
-                // Compute Side-by-side throughput (delta / time)
                 float[] prevSideMetrics = history.previousSample.sideMetrics();
                 float[] currSideMetrics = history.lastSample.sideMetrics();
                 if (prevSideMetrics != null && currSideMetrics != null) {
@@ -318,7 +323,6 @@ public class NeoForgeTelemetrySampler {
             }
         }
 
-        // Active Burst Detection & Hold Time Window (1.5 seconds)
         boolean hasImmediateActivity = itemThroughput > 0.001f || fluidThroughput > 0.001f || Math.abs(energyDelta) > 0.1f;
         if (hasImmediateActivity) {
             history.lastActiveTimeMs = now;
@@ -352,7 +356,12 @@ public class NeoForgeTelemetrySampler {
             Arrays.fill(sideRates, 0f);
         }
 
-        boolean hasItems = maxItems > 0;
+        boolean isFluidStorage = maxFluid > 0
+                && (CompatRegistry.isFluidTankBlock(level, pos) || maxFluid >= maxItems);
+
+        boolean suppressItems = isFluidStorage && itemThroughput <= 0.001f;
+
+        boolean hasItems = maxItems > 0 && !suppressItems;
         boolean hasFluids = maxFluid > 0;
         boolean hasEnergy = maxEnergy > 0;
 
@@ -391,6 +400,40 @@ public class NeoForgeTelemetrySampler {
         boolean hasStorage = false;
         boolean isInfiniteStorage = false;
 
+        if (CompatRegistry.isDrawerBlock(level, pos)) {
+            try {
+                var drawerOpt = DrawerStorageAdapter.inspectDrawer(level, pos, hitFace);
+                if (drawerOpt.isPresent() && !drawerOpt.get().isEmpty()) {
+                    var drawer = drawerOpt.get();
+                    storageCurrent = drawer.storedItems();
+                    storageMax = drawer.maxCapacity();
+                    primaryNetRate = itemNetRate;
+                    hasStorage = true;
+                    if (drawer.isInfinite()) {
+                        isInfiniteStorage = true;
+                    }
+                }
+            } catch (Throwable ignored) {
+            }
+        }
+
+        if (!hasStorage && CompatRegistry.isSophisticatedStorageBlock(level, pos)) {
+            try {
+                var ssOpt = SophisticatedStorageAdapter.inspectStorage(level, pos, hitFace);
+                if (ssOpt.isPresent() && !ssOpt.get().isEmpty()) {
+                    var ss = ssOpt.get();
+                    storageCurrent = ss.storedItems();
+                    storageMax = ss.maxCapacity();
+                    primaryNetRate = itemNetRate;
+                    hasStorage = true;
+                    if (ss.isInfinite()) {
+                        isInfiniteStorage = true;
+                    }
+                }
+            } catch (Throwable ignored) {
+            }
+        }
+
         try {
             var aeCellOpt = AE2NetworkInspector.inspectCellStorage(level, pos);
             if (aeCellOpt.isPresent() && aeCellOpt.get().isCellStorage()) {
@@ -406,57 +449,34 @@ public class NeoForgeTelemetrySampler {
         } catch (Throwable ignored) {
         }
 
-        if (!hasStorage) {
-            try {
-                var drawerOpt = DrawerStorageAdapter.inspectDrawer(level, pos);
-                if (drawerOpt.isPresent() && drawerOpt.get().isDrawer()) {
-                    var drawer = drawerOpt.get();
-                    storageCurrent = drawer.storedItems();
-                    storageMax = drawer.maxCapacity();
-                    primaryNetRate = itemNetRate;
-                    hasStorage = true;
-                    if (drawer.isInfinite()) {
-                        isInfiniteStorage = true;
-                    }
-                }
-            } catch (Throwable ignored) {
+        if (!hasStorage && isFluidStorage && maxFluid > 0) {
+            storageCurrent = currentFluid;
+            storageMax = maxFluid;
+            primaryNetRate = fluidNetRate;
+            hasStorage = true;
+            if (maxFluid >= Integer.MAX_VALUE) {
+                isInfiniteStorage = true;
             }
         }
 
         if (!hasStorage) {
-            boolean isFluidBlock = beClassName.contains("tank") || beClassName.contains("fluid") || (maxFluid > 0 && maxItems <= 128 && maxFluid > maxItems);
-            boolean isEnergyBlock = beClassName.contains("energy") || beClassName.contains("battery") || beClassName.contains("capacitor") || beClassName.contains("cell") || (maxEnergy > 0 && maxItems == 0 && maxFluid == 0);
-
-            if (isFluidBlock && maxFluid > 0) {
-                storageCurrent = currentFluid;
-                storageMax = maxFluid;
-                primaryNetRate = fluidNetRate;
+            StorageCapacity cap = BlockCapacityReader.readCapacity(level, pos, hitFace);
+            if (cap.hasStorage()) {
+                storageCurrent = cap.current();
+                storageMax = cap.max();
                 hasStorage = true;
-            } else if (isEnergyBlock && maxEnergy > 0) {
-                storageCurrent = currentEnergy;
-                storageMax = maxEnergy;
-                primaryNetRate = energyNetRate;
-                hasStorage = true;
-            } else if (maxItems > 0) {
-                storageCurrent = currentItems;
-                storageMax = maxItems;
-                primaryNetRate = itemNetRate;
-                hasStorage = true;
-            } else if (maxFluid > 0) {
-                storageCurrent = currentFluid;
-                storageMax = maxFluid;
-                primaryNetRate = fluidNetRate;
-                hasStorage = true;
-            } else if (maxEnergy > 0) {
-                storageCurrent = currentEnergy;
-                storageMax = maxEnergy;
-                primaryNetRate = energyNetRate;
-                hasStorage = true;
+                if (cap.isInfinite()) {
+                    isInfiniteStorage = true;
+                }
+                primaryNetRate = switch (cap.type()) {
+                    case FLUID -> fluidNetRate;
+                    case ENERGY -> energyNetRate;
+                    default -> itemNetRate;
+                };
             }
         }
 
         boolean isInfinite = isInfiniteStorage
-                || beClassName.contains("creative")
                 || (storageMax == Integer.MAX_VALUE)
                 || (storageMax >= (Long.MAX_VALUE / 2))
                 || (hasAe2Network && aeIsCreative);
@@ -476,12 +496,12 @@ public class NeoForgeTelemetrySampler {
 
         if (addedNewSample && ServerConfig.DEBUG_LOGGING.get()) {
             LOGGER.info("[TelemetryDebug] Block: {} | Slots: {} | Tanks: {} | itemTp: {}/s | fluidTp: {} mB/s | energyDelta: {} FE/t | state: {}",
-                    be.getClass().getSimpleName(), itemSlots.length, Arrays.toString(fluidTanks), itemThroughput, fluidThroughput, energyDelta, state);
+                    CompatRegistry.friendlyNameOf(level, pos), itemSlots.length, Arrays.toString(fluidTanks), itemThroughput, fluidThroughput, energyDelta, state);
         }
 
         return new TelemetryData(
                 itemThroughput, hasItems,
-                fluidThroughput, hasFluids,
+                fluidThroughput, hasFluids, fluidName, currentFluid, maxFluid,
                 energyDelta, hasEnergy,
                 0f, false, "", 0L, 0L,
                 0f, 0f, 0f, 0f, false, null,
@@ -490,6 +510,72 @@ public class NeoForgeTelemetrySampler {
                 hasAe2Network, aePowerRate, aePowerDrain, aeSubnetDrain, aeSubnetCount, aeStoredPower, aeMaxPower, aeStabilityState, aeIsCreative, aeUsedChannels, aeMaxChannels,
                 storageCurrent, storageMax, primaryNetRate, logisticsFlags
         );
+    }
+
+    private static IItemHandler resolveItemHandler(Level level, BlockPos pos, Direction hitFace) {
+        if (hitFace != null) {
+            IItemHandler h = safeItem(level, pos, hitFace);
+            if (h != null && h.getSlots() > 0) return h;
+        }
+        IItemHandler h = safeItem(level, pos, null);
+        if (h != null && h.getSlots() > 0) return h;
+        for (Direction side : Direction.values()) {
+            h = safeItem(level, pos, side);
+            if (h != null && h.getSlots() > 0) return h;
+        }
+        return null;
+    }
+
+    private static IItemHandler safeItem(Level level, BlockPos pos, Direction side) {
+        try {
+            return level.getCapability(Capabilities.ItemHandler.BLOCK, pos, side);
+        } catch (Throwable ignored) {
+            return null;
+        }
+    }
+
+    private static IFluidHandler resolveFluidHandler(Level level, BlockPos pos, Direction hitFace) {
+        if (hitFace != null) {
+            IFluidHandler h = safeFluid(level, pos, hitFace);
+            if (h != null && h.getTanks() > 0) return h;
+        }
+        IFluidHandler h = safeFluid(level, pos, null);
+        if (h != null && h.getTanks() > 0) return h;
+        for (Direction side : Direction.values()) {
+            h = safeFluid(level, pos, side);
+            if (h != null && h.getTanks() > 0) return h;
+        }
+        return null;
+    }
+
+    private static IFluidHandler safeFluid(Level level, BlockPos pos, Direction side) {
+        try {
+            return level.getCapability(Capabilities.FluidHandler.BLOCK, pos, side);
+        } catch (Throwable ignored) {
+            return null;
+        }
+    }
+
+    private static IEnergyStorage resolveEnergyStorage(Level level, BlockPos pos, Direction hitFace) {
+        if (hitFace != null) {
+            IEnergyStorage s = safeEnergy(level, pos, hitFace);
+            if (s != null && s.getMaxEnergyStored() > 0) return s;
+        }
+        IEnergyStorage s = safeEnergy(level, pos, null);
+        if (s != null && s.getMaxEnergyStored() > 0) return s;
+        for (Direction side : Direction.values()) {
+            s = safeEnergy(level, pos, side);
+            if (s != null && s.getMaxEnergyStored() > 0) return s;
+        }
+        return null;
+    }
+
+    private static IEnergyStorage safeEnergy(Level level, BlockPos pos, Direction side) {
+        try {
+            return level.getCapability(Capabilities.EnergyStorage.BLOCK, pos, side);
+        } catch (Throwable ignored) {
+            return null;
+        }
     }
 
     private static void cleanupStaleEntries(long now) {

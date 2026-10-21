@@ -1,11 +1,11 @@
 package com.alikuxac.machinemetrics.compat.create;
 
+import com.alikuxac.machinemetrics.compat.Reflect;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.entity.BlockEntity;
 
-import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.util.Optional;
 
@@ -62,24 +62,24 @@ public class CreateKineticInspector {
                 kineticBlockEntityClass = Class.forName("com.simibubi.create.content.kinetics.base.KineticBlockEntity");
                 createLoadedCache = true;
 
-                getSpeedMethod = findMethod(kineticBlockEntityClass, "getSpeed");
-                calculateAddedStressCapacityMethod = findMethod(kineticBlockEntityClass, 
+                getSpeedMethod = Reflect.findMethod(kineticBlockEntityClass, "getSpeed");
+                calculateAddedStressCapacityMethod = Reflect.findMethod(kineticBlockEntityClass, 
                         "calculateAddedStressCapacity", "getStressCapacity", "getCapacity");
-                calculateStressAppliedMethod = findMethod(kineticBlockEntityClass, 
+                calculateStressAppliedMethod = Reflect.findMethod(kineticBlockEntityClass, 
                         "calculateStressApplied", "getConsumptiveStress", "getStress");
-                isOverStressedMethod = findMethod(kineticBlockEntityClass, "isOverStressed", "isOverstressed");
-                getOrCreateNetworkMethod = findMethod(kineticBlockEntityClass, "getOrCreateNetwork", "getNetwork");
+                isOverStressedMethod = Reflect.findMethod(kineticBlockEntityClass, "isOverStressed", "isOverstressed");
+                getOrCreateNetworkMethod = Reflect.findMethod(kineticBlockEntityClass, "getOrCreateNetwork", "getNetwork");
 
                 try {
                     Class<?> networkClass = Class.forName("com.simibubi.create.content.kinetics.base.KineticNetwork");
-                    getNetworkCapacityMethod = findMethod(networkClass, "getCapacity", "calculateCapacity", "getActualCapacity");
-                    calculateNetworkStressMethod = findMethod(networkClass, "calculateStress", "getStress", "calculateStressApplied");
+                    getNetworkCapacityMethod = Reflect.findMethod(networkClass, "getCapacity", "calculateCapacity", "getActualCapacity");
+                    calculateNetworkStressMethod = Reflect.findMethod(networkClass, "calculateStress", "getStress", "calculateStressApplied");
                 } catch (Throwable ignored) {}
 
                 try {
                     getRotationSpeedModifierMethod = kineticBlockEntityClass.getMethod("getRotationSpeedModifier", net.minecraft.core.Direction.class);
                 } catch (Throwable ignored) {
-                    getRotationSpeedModifierMethod = findMethod(kineticBlockEntityClass, "getRotationSpeedModifier");
+                    getRotationSpeedModifierMethod = Reflect.findMethod(kineticBlockEntityClass, "getRotationSpeedModifier");
                 }
 
             } catch (Throwable e) {
@@ -90,45 +90,15 @@ public class CreateKineticInspector {
     }
 
     private static Method findMethod(Class<?> clazz, String... names) {
-        if (clazz == null) return null;
-        Class<?> curr = clazz;
-        while (curr != null && curr != Object.class) {
-            for (String name : names) {
-                try {
-                    Method m = curr.getDeclaredMethod(name);
-                    m.setAccessible(true);
-                    return m;
-                } catch (Throwable ignored) {}
-            }
-            curr = curr.getSuperclass();
-        }
-        return null;
+        return Reflect.findMethod(clazz, names);
     }
 
     private static Float invokeFloat(Method method, Object target) {
-        if (method == null || target == null) return null;
-        try {
-            Object res = method.invoke(target);
-            if (res instanceof Number num) return num.floatValue();
-        } catch (Throwable ignored) {}
-        return null;
+        return Reflect.invokeFloat(method, target);
     }
 
     private static Float getFieldValue(Object target, String... names) {
-        if (target == null) return null;
-        Class<?> curr = target.getClass();
-        while (curr != null && curr != Object.class) {
-            for (String name : names) {
-                try {
-                    Field f = curr.getDeclaredField(name);
-                    f.setAccessible(true);
-                    Object res = f.get(target);
-                    if (res instanceof Number num) return num.floatValue();
-                } catch (Throwable ignored) {}
-            }
-            curr = curr.getSuperclass();
-        }
-        return null;
+        return Reflect.getFloatField(target, names);
     }
 
     public static Optional<KineticData> inspectKinetic(Level level, BlockPos pos) {

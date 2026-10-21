@@ -1,15 +1,21 @@
 package com.alikuxac.machinemetrics.compat.storage;
 
+import com.alikuxac.machinemetrics.compat.CompatRegistry;
+import com.alikuxac.machinemetrics.compat.Reflect;
+import com.alikuxac.machinemetrics.storage.BlockCapacityReader;
+import com.alikuxac.machinemetrics.storage.BlockCapacityReader.StorageCapacity;
+import com.alikuxac.machinemetrics.storage.BlockCapacityReader.StorageType;
 import net.minecraft.core.BlockPos;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.entity.BlockEntity;
 
-import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.util.Optional;
 
 public class DrawerStorageAdapter {
+
+    private static final long INFINITE_THRESHOLD = Long.MAX_VALUE / 2;
 
     public record DrawerMetricData(
             boolean isDrawer,
@@ -57,7 +63,23 @@ public class DrawerStorageAdapter {
     }
 
     public static Optional<DrawerMetricData> inspectDrawer(Level level, BlockPos pos) {
+        return inspectDrawer(level, pos, null);
+    }
+
+    public static Optional<DrawerMetricData> inspectDrawer(Level level, BlockPos pos, net.minecraft.core.Direction hitFace) {
         if (level == null || pos == null) {
+            return Optional.empty();
+        }
+
+        String namespace = CompatRegistry.namespaceOf(level, pos);
+        boolean isFunctionalStorage = CompatRegistry.NAMESPACE_FUNCTIONAL_STORAGE.equals(namespace);
+        boolean isStorageDrawers = CompatRegistry.NAMESPACE_STORAGE_DRAWERS.equals(namespace);
+
+        if (!isFunctionalStorage && !isStorageDrawers) {
+            return Optional.empty();
+        }
+
+        if (CompatRegistry.isFluidTankBlock(level, pos)) {
             return Optional.empty();
         }
 
@@ -66,11 +88,9 @@ public class DrawerStorageAdapter {
             return Optional.empty();
         }
 
-        String beClassName = be.getClass().getName();
-
-        if (isFunctionalStorageLoaded() || beClassName.contains("functionalstorage")) {
+        if (isFunctionalStorage || isFunctionalStorageLoaded()) {
             try {
-                var fsData = FunctionalStorageWorker.inspect(be);
+                Optional<DrawerMetricData> fsData = FunctionalStorageWorker.inspect(be);
                 if (fsData.isPresent()) {
                     return fsData;
                 }
@@ -78,9 +98,9 @@ public class DrawerStorageAdapter {
             }
         }
 
-        if (isStorageDrawersLoaded() || beClassName.contains("storagedrawers")) {
+        if (isStorageDrawers || isStorageDrawersLoaded()) {
             try {
-                var sdData = StorageDrawersWorker.inspect(be);
+                Optional<DrawerMetricData> sdData = StorageDrawersWorker.inspect(be);
                 if (sdData.isPresent()) {
                     return sdData;
                 }
@@ -88,258 +108,228 @@ public class DrawerStorageAdapter {
             }
         }
 
+        try {
+            StorageCapacity cap = BlockCapacityReader.readCapacity(level, pos, hitFace);
+            if (cap.hasStorage() && cap.type() == StorageType.ITEM) {
+                return Optional.of(new DrawerMetricData(true, cap.current(), cap.max(), cap.isInfinite()));
+            }
+        } catch (Throwable ignored) {
+        }
+
         return Optional.empty();
     }
 
     private static final class FunctionalStorageWorker {
 
+        private static final String[] STORAGE_METHODS = { "getStorage", "getHandler", "getItemHandler" };
+        private static final String[] SLOT_COUNT_METHODS = { "getSlots", "getSlotCount", "getDrawerCount" };
+
         private static Optional<DrawerMetricData> inspect(BlockEntity be) {
             try {
-                Class<?> clazz = be.getClass();
-                boolean isFsTile = false;
-                Class<?> current = clazz;
-                while (current != null && current != Object.class) {
-                    if (current.getName().contains("ControllableDrawerTile") || current.getName().contains("functionalstorage")) {
-                        isFsTile = true;
-                        break;
-                    }
-                    current = current.getSuperclass();
+                boolean isCreative = Reflect.getBooleanField(be, false, "isCreative", "creative", "unlimited");
+                Integer multObj = Reflect.getIntField(be, "mult", "multiplier");
+                int mult = multObj != null ? multObj : 1;
+
+                Object storageHandler = null;
+                Method storageMethod = Reflect.findMethod(be.getClass(), STORAGE_METHODS);
+                if (storageMethod != null) {
+                    storageHandler = Reflect.invokeSafe(storageMethod, be);
                 }
 
-                if (!isFsTile) {
+                if (storageHandler == null) {
                     return Optional.empty();
                 }
 
-                boolean isCreative = getBooleanField(be, "isCreative");
-                int mult = getIntField(be, "mult", 1);
-                boolean isCompacting = clazz.getSimpleName().contains("Compacting");
+                int slots = slotCount(storageHandler);
+                if (slots <= 0) {
+                    return Optional.empty();
+                }
+
+                boolean isCompacting = determineCompacting(storageHandler, slots);
 
                 long storedItems = 0L;
                 long maxCapacity = 0L;
 
-                Object storageHandler = null;
-                try {
-                    Method getStorageMethod = clazz.getMethod("getStorage");
-                    storageHandler = getStorageMethod.invoke(be);
-                } catch (Throwable ignored) {
-                    try {
-                        Method getHandlerMethod = clazz.getMethod("getHandler");
-                        storageHandler = getHandlerMethod.invoke(be);
-                    } catch (Throwable ignored2) {
+                if (isCompacting) {
+                    storedItems = slotCountStored(storageHandler, 0);
+                    maxCapacity = slotLimit(storageHandler, 0);
+                } else {
+                    for (int i = 0; i < slots; i++) {
+                        storedItems += slotCountStored(storageHandler, i);
+                        maxCapacity += slotLimit(storageHandler, i);
                     }
                 }
 
-                if (storageHandler != null) {
-                    try {
-                        Method getSlotsMethod = storageHandler.getClass().getMethod("getSlots");
-                        int slots = (int) getSlotsMethod.invoke(storageHandler);
-
-                        Method getStackInSlotMethod = storageHandler.getClass().getMethod("getStackInSlot", int.class);
-                        Method getSlotLimitMethod = storageHandler.getClass().getMethod("getSlotLimit", int.class);
-
-                        if (isCompacting) {
-                            if (slots > 0) {
-                                ItemStack stack0 = (ItemStack) getStackInSlotMethod.invoke(storageHandler, 0);
-                                if (stack0 != null && !stack0.isEmpty()) {
-                                    storedItems = stack0.getCount();
-                                }
-                                int limit0 = (int) getSlotLimitMethod.invoke(storageHandler, 0);
-                                maxCapacity = limit0;
-                            }
-                        } else {
-                            for (int i = 0; i < slots; i++) {
-                                ItemStack stack = (ItemStack) getStackInSlotMethod.invoke(storageHandler, i);
-                                if (stack != null && !stack.isEmpty()) {
-                                    storedItems += stack.getCount();
-                                }
-                                int limit = (int) getSlotLimitMethod.invoke(storageHandler, i);
-                                maxCapacity += limit;
-                            }
-                        }
-                    } catch (Throwable ignored) {
-                    }
+                if (mult > 1 && maxCapacity > 0) {
+                    maxCapacity *= mult;
                 }
 
-                if (isCreative || maxCapacity >= (Long.MAX_VALUE / 2) || maxCapacity == Integer.MAX_VALUE) {
-                    isCreative = true;
-                    maxCapacity = Long.MAX_VALUE / 2;
+                boolean isInfinite = isCreative;
+                if (maxCapacity >= INFINITE_THRESHOLD || maxCapacity == Integer.MAX_VALUE) {
+                    isInfinite = true;
+                    maxCapacity = INFINITE_THRESHOLD;
                 }
 
-                return Optional.of(new DrawerMetricData(
-                        true,
-                        storedItems,
-                        maxCapacity,
-                        isCreative
-                ));
+                return Optional.of(new DrawerMetricData(true, storedItems, maxCapacity, isInfinite));
             } catch (Throwable ignored) {
                 return Optional.empty();
             }
         }
 
-        private static boolean getBooleanField(Object obj, String fieldName) {
-            Class<?> c = obj.getClass();
-            while (c != null && c != Object.class) {
-                try {
-                    Field f = c.getDeclaredField(fieldName);
-                    f.setAccessible(true);
-                    return f.getBoolean(obj);
-                } catch (Throwable ignored) {
-                }
-                c = c.getSuperclass();
-            }
-            return false;
+        private static int slotCount(Object handler) {
+            Integer slots = Reflect.invokeInt(Reflect.findMethod(handler.getClass(), SLOT_COUNT_METHODS), handler);
+            return slots != null ? slots : 0;
         }
 
-        private static int getIntField(Object obj, String fieldName, int fallback) {
-            Class<?> c = obj.getClass();
-            while (c != null && c != Object.class) {
-                try {
-                    Field f = c.getDeclaredField(fieldName);
-                    f.setAccessible(true);
-                    return f.getInt(obj);
-                } catch (Throwable ignored) {
-                }
-                c = c.getSuperclass();
+        private static long slotCountStored(Object handler, int slot) {
+            Object stack = Reflect.invokeSafe(Reflect.findMethodTyped(handler.getClass(), new Class<?>[] { int.class }, "getStackInSlot"), handler, slot);
+            if (stack instanceof ItemStack itemStack) {
+                return itemStack.isEmpty() ? 0L : itemStack.getCount();
             }
-            return fallback;
+            return 0L;
+        }
+
+        private static long slotLimit(Object handler, int slot) {
+            Method m = Reflect.findMethodTyped(handler.getClass(), new Class<?>[] { int.class }, "getSlotLimit", "getSlotCapacity");
+            Object res = Reflect.invokeSafe(m, handler, slot);
+            if (res instanceof Number num) {
+                return num.longValue();
+            }
+            return 0L;
+        }
+
+        private static boolean determineCompacting(Object storageHandler, int slots) {
+            try {
+                Object compacting = Reflect.invokeSafe(
+                        Reflect.findMethod(storageHandler.getClass(), "isCompacting", "isCompactingDrawer", "getCompacting"),
+                        storageHandler);
+                if (compacting instanceof Boolean b) {
+                    return b;
+                }
+                Boolean field = null;
+                Object fieldVal = Reflect.getField(storageHandler, "compacting", "isCompacting");
+                if (fieldVal instanceof Boolean b) {
+                    field = b;
+                }
+                if (field != null) {
+                    return field;
+                }
+            } catch (Throwable ignored) {
+            }
+            return slots == 1;
         }
     }
 
     private static final class StorageDrawersWorker {
 
+        private static final String[] GROUP_METHODS = { "getGroup", "getDrawerGroup" };
+        private static final String[] DRAWER_COUNT_METHODS = { "getDrawerCount" };
+
         private static Optional<DrawerMetricData> inspect(BlockEntity be) {
             try {
-                Class<?> clazz = be.getClass();
-                boolean isSdTile = false;
-                Class<?> current = clazz;
-                while (current != null && current != Object.class) {
-                    if (current.getName().contains("BlockEntityDrawers") || current.getName().contains("TileEntityDrawers") || current.getName().contains("storagedrawers")) {
-                        isSdTile = true;
-                        break;
-                    }
-                    current = current.getSuperclass();
-                }
-
-                if (!isSdTile) {
-                    return Optional.empty();
-                }
-
-                Object drawerGroup = null;
-                try {
-                    Method getGroupMethod = clazz.getMethod("getGroup");
-                    drawerGroup = getGroupMethod.invoke(be);
-                } catch (Throwable ignored) {
-                }
-
+                Object drawerGroup = Reflect.invokeSafe(Reflect.findMethod(be.getClass(), GROUP_METHODS), be);
                 if (drawerGroup == null) {
                     return Optional.empty();
                 }
 
-                Method getDrawerCountMethod = drawerGroup.getClass().getMethod("getDrawerCount");
-                int drawerCount = (int) getDrawerCountMethod.invoke(drawerGroup);
+                Integer countObj = Reflect.invokeInt(Reflect.findMethod(drawerGroup.getClass(), DRAWER_COUNT_METHODS), drawerGroup);
+                int drawerCount = countObj != null ? countObj : 0;
                 if (drawerCount <= 0) {
                     return Optional.empty();
                 }
 
-                Method getDrawerMethod = drawerGroup.getClass().getMethod("getDrawer", int.class);
-                boolean isCompacting = drawerGroup.getClass().getSimpleName().contains("Compacting") || clazz.getSimpleName().contains("Compacting");
+                Method getDrawerMethod = Reflect.findMethodTyped(drawerGroup.getClass(), new Class<?>[] { int.class }, "getDrawer");
+                if (getDrawerMethod == null) {
+                    return Optional.empty();
+                }
+
+                boolean isCompacting = determineCompacting(drawerGroup, drawerCount);
 
                 long storedItems = 0L;
                 long maxCapacity = 0L;
                 boolean isInfinite = false;
 
                 if (isCompacting) {
-                    Object drawer0 = getDrawerMethod.invoke(drawerGroup, 0);
+                    Object drawer0 = Reflect.invokeSafe(getDrawerMethod, drawerGroup, 0);
                     if (drawer0 != null) {
-                        storedItems = getDrawerStoredCount(drawer0);
-                        maxCapacity = getDrawerMaxCapacity(drawer0);
-                        if (checkDrawerInfinite(drawer0, maxCapacity)) {
+                        storedItems = drawerStoredCount(drawer0);
+                        maxCapacity = drawerMaxCapacity(drawer0);
+                        if (drawerInfinite(drawer0, maxCapacity)) {
                             isInfinite = true;
                         }
                     }
                 } else {
                     for (int i = 0; i < drawerCount; i++) {
-                        Object drawer = getDrawerMethod.invoke(drawerGroup, i);
-                        if (drawer == null) continue;
-
-                        try {
-                            Method isEnabledMethod = drawer.getClass().getMethod("isEnabled");
-                            if (!((boolean) isEnabledMethod.invoke(drawer))) {
-                                continue;
-                            }
-                        } catch (Throwable ignored) {
+                        Object drawer = Reflect.invokeSafe(getDrawerMethod, drawerGroup, i);
+                        if (drawer == null) {
+                            continue;
                         }
 
-                        storedItems += getDrawerStoredCount(drawer);
-                        long cap = getDrawerMaxCapacity(drawer);
+                        Object enabled = Reflect.invokeSafe(Reflect.findMethod(drawer.getClass(), "isEnabled"), drawer);
+                        if (enabled instanceof Boolean b && !b) {
+                            continue;
+                        }
+
+                        storedItems += drawerStoredCount(drawer);
+                        long cap = drawerMaxCapacity(drawer);
                         maxCapacity += cap;
 
-                        if (checkDrawerInfinite(drawer, cap)) {
+                        if (drawerInfinite(drawer, cap)) {
                             isInfinite = true;
                         }
                     }
                 }
 
-                if (isInfinite || maxCapacity >= (Long.MAX_VALUE / 2) || maxCapacity == Integer.MAX_VALUE) {
+                if (isInfinite || maxCapacity >= INFINITE_THRESHOLD || maxCapacity == Integer.MAX_VALUE) {
                     isInfinite = true;
-                    maxCapacity = Long.MAX_VALUE / 2;
+                    maxCapacity = INFINITE_THRESHOLD;
                 }
 
-                return Optional.of(new DrawerMetricData(
-                        true,
-                        storedItems,
-                        maxCapacity,
-                        isInfinite
-                ));
+                return Optional.of(new DrawerMetricData(true, storedItems, maxCapacity, isInfinite));
             } catch (Throwable ignored) {
                 return Optional.empty();
             }
         }
 
-        private static long getDrawerStoredCount(Object drawer) {
+        private static boolean determineCompacting(Object drawerGroup, int drawerCount) {
             try {
-                Method m = drawer.getClass().getMethod("getStoredItemCount");
-                Object res = m.invoke(drawer);
-                if (res instanceof Number num) {
-                    return num.longValue();
+                Object compacting = Reflect.invokeSafe(
+                        Reflect.findMethod(drawerGroup.getClass(), "isCompacting", "isCompactingDrawer"),
+                        drawerGroup);
+                if (compacting instanceof Boolean b) {
+                    return b;
                 }
             } catch (Throwable ignored) {
+            }
+            return drawerCount == 1;
+        }
+
+        private static long drawerStoredCount(Object drawer) {
+            Long stored = Reflect.invokeLong(
+                    Reflect.findMethod(drawer.getClass(), "getStoredItemCount", "getStoredCount"), drawer);
+            return stored != null ? stored : 0L;
+        }
+
+        private static long drawerMaxCapacity(Object drawer) {
+            Long cap = Reflect.invokeLong(
+                    Reflect.findMethod(drawer.getClass(), "getMaxCapacity", "getMaxItemCount"), drawer);
+            if (cap != null) {
+                return cap;
+            }
+            Method m = Reflect.findMethodTyped(drawer.getClass(), new Class<?>[] { ItemStack.class }, "getMaxCapacity");
+            Object res = Reflect.invokeSafe(m, drawer, ItemStack.EMPTY);
+            if (res instanceof Number num) {
+                return num.longValue();
             }
             return 0L;
         }
 
-        private static long getDrawerMaxCapacity(Object drawer) {
-            try {
-                Method m = drawer.getClass().getMethod("getMaxCapacity");
-                Object res = m.invoke(drawer);
-                if (res instanceof Number num) {
-                    return num.longValue();
-                }
-            } catch (Throwable ignored) {
-                try {
-                    Method m = drawer.getClass().getMethod("getMaxCapacity", ItemStack.class);
-                    Object res = m.invoke(drawer, ItemStack.EMPTY);
-                    if (res instanceof Number num) {
-                        return num.longValue();
-                    }
-                } catch (Throwable ignored2) {
-                }
-            }
-            return 0L;
-        }
-
-        private static boolean checkDrawerInfinite(Object drawer, long cap) {
-            if (cap >= (Long.MAX_VALUE / 2) || cap == Integer.MAX_VALUE) {
+        private static boolean drawerInfinite(Object drawer, long cap) {
+            if (cap >= INFINITE_THRESHOLD || cap == Integer.MAX_VALUE) {
                 return true;
             }
-            try {
-                Method m = drawer.getClass().getMethod("isUnlimited");
-                if ((boolean) m.invoke(drawer)) {
-                    return true;
-                }
-            } catch (Throwable ignored) {
-            }
-            return false;
+            Object unlimited = Reflect.invokeSafe(Reflect.findMethod(drawer.getClass(), "isUnlimited"), drawer);
+            return unlimited instanceof Boolean b && b;
         }
     }
 }

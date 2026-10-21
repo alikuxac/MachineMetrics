@@ -299,10 +299,23 @@ public class TelemetryHudRenderer {
                 Component fluidComp = Component.translatable("machinemetrics.metrics.fluids")
                         .append(Component.literal(": [")).append(disabledServerComp).append(Component.literal("]"));
                 lines.add(new HudLine(fluidComp, disabledColor));
-            } else if (data.fluidThroughput() > 0.001f || (!suppressZeroRates && !data.hasAe2Network())) {
-                String fluidVal = MetricResolver.formatFluidRate(data.fluidThroughput());
-                Component fluidComp = Component.translatable("machinemetrics.metrics.fluids")
-                        .append(Component.literal(": " + fluidVal));
+            } else if (data.fluidThroughput() > 0.001f || (!suppressZeroRates && !data.hasAe2Network())
+                        || data.fluidCapacity() > 0) {
+                Component fluidComp;
+                if (data.fluidCapacity() > 0) {
+                    String vol = MetricResolver.formatVolumeWithCapacity(data.fluidAmount(), data.fluidCapacity());
+                    String rate = data.fluidThroughput() > 0.001f
+                            ? " | " + MetricResolver.formatFluidRate(data.fluidThroughput())
+                            : "";
+                    String namePart = (data.fluidName() != null && !data.fluidName().isEmpty())
+                            ? data.fluidName() + " " : "";
+                    fluidComp = Component.translatable("machinemetrics.metrics.fluids")
+                            .append(Component.literal(": " + namePart + vol + rate));
+                } else {
+                    String fluidVal = MetricResolver.formatFluidRate(data.fluidThroughput());
+                    fluidComp = Component.translatable("machinemetrics.metrics.fluids")
+                            .append(Component.literal(": " + fluidVal));
+                }
                 lines.add(new HudLine(fluidComp, fluidsColor));
             }
         }
@@ -316,10 +329,23 @@ public class TelemetryHudRenderer {
                     Component chemComp = Component.translatable("machinemetrics.metrics.chemicals")
                             .append(Component.literal(": [")).append(disabledServerComp).append(Component.literal("]"));
                     lines.add(new HudLine(chemComp, disabledColor));
-                } else if (data.chemicalThroughput() > 0.001f || (!suppressZeroRates && !data.hasAe2Network())) {
-                    String chemVal = MetricResolver.formatFluidRate(data.chemicalThroughput());
-                    Component chemComp = Component.translatable("machinemetrics.metrics.chemicals")
-                            .append(Component.literal(": " + chemVal));
+                } else if (data.chemicalThroughput() > 0.001f || (!suppressZeroRates && !data.hasAe2Network())
+                            || data.chemicalCapacity() > 0) {
+                    Component chemComp;
+                    if (data.chemicalCapacity() > 0) {
+                        String vol = MetricResolver.formatVolumeWithCapacity(data.chemicalAmount(), data.chemicalCapacity());
+                        String rate = data.chemicalThroughput() > 0.001f
+                                ? " | " + MetricResolver.formatChemicalRate(data.chemicalThroughput())
+                                : "";
+                        String namePart = (data.chemicalName() != null && !data.chemicalName().isEmpty())
+                                ? data.chemicalName() + " " : "";
+                        chemComp = Component.translatable("machinemetrics.metrics.chemicals")
+                                .append(Component.literal(": " + namePart + vol + rate));
+                    } else {
+                        String chemVal = MetricResolver.formatChemicalRate(data.chemicalThroughput());
+                        chemComp = Component.translatable("machinemetrics.metrics.chemicals")
+                                .append(Component.literal(": " + chemVal));
+                    }
                     lines.add(new HudLine(chemComp, chemicalsColor));
                 }
             }
@@ -343,7 +369,6 @@ public class TelemetryHudRenderer {
             }
         }
 
-        // Applied Energistics 2 - Grid Power & Stability
         if (data.hasAe2Network()) {
             int ae2Color = ClientConfig.parseHexColor(ClientConfig.COLOR_AE2_POWER, 0xA259FF);
             int brownoutColor = ClientConfig.parseHexColor(ClientConfig.COLOR_AE2_BROWNOUT, 0xFF3333);
@@ -382,7 +407,7 @@ public class TelemetryHudRenderer {
                             || maxP >= 1.0E12;
 
                     if (isInfiniteOrCreative) {
-                        // Creative source: display ∞ AE (or ∞ FE) cleanly with [CREATIVE] badge
+                    
                         String energyUnit = isFeUnit ? "FE" : "AE";
                         Component powerComp = Component.translatable("machinemetrics.metrics.ae_power")
                                 .append(Component.literal(": ∞ " + energyUnit + " "))
@@ -408,7 +433,6 @@ public class TelemetryHudRenderer {
                             lines.add(new HudLine(drainComp, ae2Color));
                         }
                     } else {
-                        // Standard Grid: Grid Power + Buffer %
                         String bufferStr = "";
                         if (Double.isInfinite(storedP) || Double.isInfinite(maxP)) {
                             bufferStr = String.format(" | %s: ∞ %s", Component.translatable("machinemetrics.ae2.buffer").getString(), isFeUnit ? "FE" : "AE");
@@ -439,7 +463,6 @@ public class TelemetryHudRenderer {
                     }
                 }
 
-                // If showBadge is disabled, render AE2 stability as a standalone line
                 if (showAeStability && !showBadge) {
                     AE2StabilityState stab = AE2StabilityState.fromOrdinal(data.aeStabilityState());
 

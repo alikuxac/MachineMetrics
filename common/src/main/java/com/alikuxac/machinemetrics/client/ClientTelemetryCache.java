@@ -73,7 +73,6 @@ public class ClientTelemetryCache {
     public static void put(BlockPos pos, TelemetryData data) {
         if (pos != null && data != null) {
             Entry existing = CACHE.get(pos);
-            // If we already have fresh server-synced data, do not let local client sampler overwrite it
             if (existing != null && (System.currentTimeMillis() - existing.receivedTimeMs < EXPIRE_MS)) {
                 return;
             }
@@ -156,7 +155,6 @@ public class ClientTelemetryCache {
         Minecraft mc = Minecraft.getInstance();
         Font font = mc.font;
 
-        // Colors
         int itemsColor = ClientConfig.parseHexColor(ClientConfig.COLOR_ITEMS, 0xFFD54F);
         int fluidsColor = ClientConfig.parseHexColor(ClientConfig.COLOR_FLUIDS, 0x4FC3F7);
         int chemicalsColor = ClientConfig.parseHexColor(ClientConfig.COLOR_CHEMICALS, 0xAEEA00);
@@ -169,7 +167,6 @@ public class ClientTelemetryCache {
         int idleColor = ClientConfig.parseHexColor(ClientConfig.COLOR_STATE_IDLE, 0xAAAAAA);
         int headerColor = ClientConfig.parseHexColor(ClientConfig.COLOR_HEADER, 0x00FFCC);
 
-        // --- Compact HUD Calculations ---
         String compactMetricStr;
         int compactMetricColor = 0xFFFFFF;
 
@@ -186,7 +183,13 @@ public class ClientTelemetryCache {
             compactMetricStr = formatFluidRate(data.fluidThroughput());
             compactMetricColor = fluidsColor;
         } else if (data.chemicalThroughput() > 0f || (data.hasChemicals() && !data.hasEnergy())) {
-            compactMetricStr = formatChemicalRate(data.chemicalThroughput());
+            if (data.chemicalThroughput() > 0.001f) {
+                compactMetricStr = formatChemicalRate(data.chemicalThroughput());
+            } else if (data.chemicalCapacity() > 0) {
+                compactMetricStr = "🧪 " + MetricResolver.formatVolumeWithCapacity(data.chemicalAmount(), data.chemicalCapacity());
+            } else {
+                compactMetricStr = formatChemicalRate(data.chemicalThroughput());
+            }
             compactMetricColor = chemicalsColor;
         } else if (data.hasEnergy() || data.energyDelta() != 0f) {
             compactMetricStr = formatEnergyRate(data.energyDelta());
@@ -213,14 +216,12 @@ public class ClientTelemetryCache {
         int compactHeight = 30;
         int compactBadgeColor = getStatusColor(data.bottleneckState());
 
-        // --- Detailed HUD Calculations ---
         Component detailedTitleComp = Component.translatable("machinemetrics.hud.detailed_title");
         Component detailedStateComp = getStateComponent(data.bottleneckState());
         int detailedStateColor = getStatusColor(data.bottleneckState());
 
         List<RenderRow> detailedRows = new ArrayList<>();
 
-        // Kinetic rows always render (they're constant values, not throughput deltas)
         if (data.hasKinetic() || Math.abs(data.kineticSpeed()) > 0f || data.kineticCapacity() > 0f) {
             String dirSuffix = (data.kineticDirection() != null && data.kineticDirection() != CreateKineticInspector.RotationDirection.STATIONARY)
                     ? " " + data.kineticDirection().getLabel()
@@ -282,7 +283,17 @@ public class ClientTelemetryCache {
 
             if (data.hasFluids() || data.fluidThroughput() > 0f) {
                 String labelStr = Component.translatable("machinemetrics.metrics.fluids").getString() + ":";
-                String valStr = formatFluidRate(data.fluidThroughput());
+                String valStr;
+                if (data.fluidCapacity() > 0) {
+                    String vol = MetricResolver.formatVolumeWithCapacity(data.fluidAmount(), data.fluidCapacity());
+                    String namePart = (data.fluidName() != null && !data.fluidName().isEmpty())
+                            ? data.fluidName() + " " : "";
+                    valStr = data.fluidThroughput() > 0.001f
+                            ? namePart + vol + " | " + formatFluidRate(data.fluidThroughput())
+                            : namePart + vol;
+                } else {
+                    valStr = formatFluidRate(data.fluidThroughput());
+                }
                 detailedRows.add(new RenderRow(
                         Component.literal(labelStr),
                         Component.literal(valStr),
@@ -293,7 +304,15 @@ public class ClientTelemetryCache {
 
             if (data.hasChemicals() || data.chemicalThroughput() > 0f) {
                 String labelStr = Component.translatable("machinemetrics.metrics.chemicals").getString() + ":";
-                String valStr = formatChemicalRate(data.chemicalThroughput());
+                String valStr;
+                if (data.chemicalCapacity() > 0) {
+                    String vol = MetricResolver.formatVolumeWithCapacity(data.chemicalAmount(), data.chemicalCapacity());
+                    valStr = data.chemicalThroughput() > 0.001f
+                            ? vol + " | " + formatChemicalRate(data.chemicalThroughput())
+                            : vol;
+                } else {
+                    valStr = formatChemicalRate(data.chemicalThroughput());
+                }
                 detailedRows.add(new RenderRow(
                         Component.literal(labelStr),
                         Component.literal(valStr),

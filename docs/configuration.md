@@ -1,6 +1,6 @@
 # Configuration Guide
 
-Machine Metrics settings are split between client HUD options and server telemetry permissions.
+Machine Metrics splits configuration between client HUD options and server telemetry permissions.
 
 ---
 
@@ -22,13 +22,13 @@ Configure HUD placement and presets directly in-game without editing config file
 
 ### Presets
 
-- **Full Diagnostic**: Displays title, status badges, items, fluids, energy, and all installed mod metrics.
+- **Full Diagnostic**: Shows title, status badges, items, fluids, energy, and all installed mod metrics.
 - **Minimalist Bar**: Enables compact single-line mode.
 - **Create Only**: Shows rotational speed, direction, network stress, and headroom (requires Create).
-- **Chemicals Only**: Shows chemical throughput and container capacities (requires Mekanism).
+- **Chemicals Only**: Shows chemical throughput, chemical name, and container capacities (requires Mekanism).
 - **Energy Only**: Shows Forge Energy throughput (`FE/t`).
 - **Items Only**: Shows item transfer rate (`Items/s`).
-- **Fluids Only**: Shows fluid transfer rate (`mB/s` or `B/s`).
+- **Fluids Only**: Shows fluid transfer rate and, on tanks, fluid name with fill/capacity (`mB/s` or `B/s`).
 
 ---
 
@@ -58,10 +58,11 @@ Configure HUD placement and presets directly in-game without editing config file
 | :--- | :--- | :--- |
 | `show_machine_title` | `true` | Shows targeted block or machine name. |
 | `auto_hide_title_with_info_mods` | `true` | Hides title line when Jade, WAILA, WTHIT, or The One Probe is installed. |
+| `auto_hide_redundant_with_info_mods` | `true` | Hides zero-rate metrics when Jade, WAILA, WTHIT, or The One Probe is installed. |
 | `show_status_badge` | `true` | Shows bottleneck state (`OPTIMAL`, `STARVED`, `CLOGGED`, `IDLE`). |
 | `show_items_throughput` | `true` | Shows item transfer throughput (`Items/s`). |
-| `show_fluids_throughput` | `true` | Shows fluid transfer throughput (`mB/s` or `B/s`). |
-| `show_chemicals_throughput` | `true` | Shows Mekanism chemical throughput. |
+| `show_fluids_throughput` | `true` | Shows fluid transfer throughput (`mB/s` or `B/s`), plus fluid name and fill/capacity on tanks. |
+| `show_chemicals_throughput` | `true` | Shows Mekanism chemical throughput, chemical name, and tank fill/capacity. |
 | `show_speed` | `true` | Shows Create rotational speed (`RPM`). |
 | `show_rotation_direction` | `true` | Shows Create rotation direction (`CW ↻` or `CCW ↺`). |
 | `show_local_impact` | `false` | Shows local block kinetic stress draw. |
@@ -98,21 +99,21 @@ Configure HUD placement and presets directly in-game without editing config file
 - **Progress Bar**: `[████░░░░░░] 41.9% (1,450 / 3,456)` (10 blocks, 1 block = 10%)
   - Standard containers display exact slot or item counts up to 10M, and compact metric units (`10.5M`) above.
   - Infinite or creative containers render as `[██████████] ∞% (∞ / ∞)`.
-  - Color shifts automatically:
+  - Color thresholds:
     - `< storage_warning_threshold` (default 80%): `storageNormalColor` (`#55FF55`)
     - `storage_warning_threshold` to `storage_critical_threshold` (80% to 95%): `storageWarningColor` (`#FFA726`)
     - `≥ storage_critical_threshold` (default 95%): `storageCriticalColor` (`#FF5555`)
 - **ETA Status Line**:
   - `Full in: <time>` when filling, `Empty in: <time>` when draining.
-  - Formats duration in seconds (`45s`), minutes (`2m 40s`), or hours (`1h 15m`).
-  - Color shifts automatically:
+  - Formats duration using up to 3 non-zero units across years, months, days, hours, minutes, and seconds (for example: `45s`, `2m 40s`, `1h 15m 10s`, `3d 4h 12m`, `1y 2mo 5d`).
+  - Color thresholds:
     - `≥ eta_warning_threshold_seconds` (default 60s): `etaNormalColor` (`#55FF55`)
     - `< eta_warning_threshold_seconds`: `etaWarningColor` (`#FFA726`)
     - `< eta_critical_threshold_seconds` (default 15s): flashes between `etaCriticalColor` (`#FF3333`) and `etaWarningColor` at 2.5 Hz.
   - When transfer rate is 0, the HUD omits the ETA line.
 - **Transport Cables**:
   - Item transport cables (such as Mekanism logistical transporters) display active in-flight items against standard stack capacity (64 items).
-  - The sampler holds net rate at 0 for in-transit items to suppress false empty/full ETA alerts while items pass through.
+  - The sampler holds net rate at 0 for in-transit items to suppress false empty or full ETA alerts while items pass through.
 
 ### Colors (`[colors]`)
 
@@ -175,13 +176,23 @@ When targeting a storage container with `compact_mode = true`, the HUD compresse
 | `{load_pct}` | Network stress percentage | `12%`, `100%` |
 | `{state}` | Bottleneck state badge with color code | `§aOPTIMAL`, `§cOVERLOADED`, `§7IDLE` |
 | `{items}` | Item transfer rate | `12.5 /s`, `0.0 /s` |
-| `{fluids}` | Fluid transfer rate | `250.0 mB/s`, `1.20 B/s` |
+| `{fluids}` | Fluid transfer rate, prefixed with fluid name on tanks | `250.0 mB/s`, `Water 250.0 mB/s` |
+| `{fluid_name}` | Fluid display name (empty tank shows `—`) | `Water`, `Lava`, `—` |
+| `{fluid_amount}` | Stored fluid quantity | `250 mB`, `2.50 B` |
+| `{fluid_capacity}` | Fluid tank capacity (`—` when unknown) | `10.00 B`, `∞`, `—` |
+| `{fluid_pct}` | Fluid fill percentage | `25.0`, `100.0` |
+| `{chemicals}` | Mekanism chemical transfer rate, prefixed with chemical name | `0.0 mB/s`, `Hydrogen 50.0 mB/s` |
+| `{chemical_amount}` | Stored chemical quantity | `500 mB`, `1.50 B` |
+| `{chemical_capacity}` | Chemical tank capacity (`—` when unknown) | `1.00 B`, `∞`, `—` |
+| `{chemical_pct}` | Chemical fill percentage | `50.0`, `100.0` |
 | `{storage}` | Compact storage percentage icon | `📦 42%`, `📦 ∞%` |
 | `{eta}` | Compact ETA duration icon | `⏳ 2m 40s`, `—` |
 | `{ae_power}` | AE2 network net power rate | `-3.4k AE/t`, `+1.2k AE/t` |
 | `{ae_drain}` | AE2 grid power drain | `180.0 AE/t` |
 | `{ae_subnets}` | AE2 connected subnet count and drain | `2 (+40.0 AE/t)` |
 | `{ae_state}` | AE2 grid stability state | `STABLE`, `BROWNOUT`, `DISCHARGING` |
+
+> **Fluid and chemical tanks:** On tank blocks, the HUD displays the stored fluid or chemical name with fill and capacity (for example, `Fluids: Water 2.50 B / 10.00 B | 250.0 mB/s`). The storage progress bar tracks tank fill instead of internal bucket slots. Creative or infinite tanks show `∞ / ∞`. The `{fluid_*}` and `{chemical_*}` placeholders display `—` when unavailable and `[Disabled by the server]` when disabled by server settings.
 
 ---
 
@@ -209,11 +220,15 @@ Servers control which telemetry data is sampled and transmitted to connected cli
 [debug]
   # Log telemetry queries and payloads to server console
   enableDebugLogging = false
+
+[sync]
+  # Minimum container fill percentage change required to sync storage
+  storage_sync_deadband_percent = 1.0
 ```
 
 ### Behavior when disabled
 
 When a metric is disabled on the server:
-- The server stops sampling capability deltas for that metric, saving tick time.
+- The server stops sampling capability deltas for that metric to save tick time.
 - The client HUD displays `[Disabled by the server]` in place of values.
 - Mod-specific metrics (Create, Mekanism, AE2) require the corresponding mod installed on both server and client.

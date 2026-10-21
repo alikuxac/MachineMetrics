@@ -15,6 +15,9 @@ public record SyncTelemetryPayload(
         boolean hasItems,
         float fluidThroughput,
         boolean hasFluids,
+        String fluidName,
+        long fluidAmount,
+        long fluidCapacity,
         float energyDelta,
         boolean hasEnergy,
         float chemicalThroughput,
@@ -66,6 +69,9 @@ public record SyncTelemetryPayload(
                 data.hasItems(),
                 data.fluidThroughput(),
                 data.hasFluids(),
+                data.fluidName() != null ? data.fluidName() : "",
+                data.fluidAmount(),
+                data.fluidCapacity(),
                 data.energyDelta(),
                 data.hasEnergy(),
                 data.chemicalThroughput(),
@@ -112,6 +118,9 @@ public record SyncTelemetryPayload(
                 hasItems,
                 fluidThroughput,
                 hasFluids,
+                fluidName,
+                fluidAmount,
+                fluidCapacity,
                 energyDelta,
                 hasEnergy,
                 chemicalThroughput,
@@ -171,7 +180,7 @@ public record SyncTelemetryPayload(
         if (payload.hasItems || payload.itemThroughput > 0.001f) {
             flags |= FLAG_ITEMS;
         }
-        if (payload.hasFluids || payload.fluidThroughput > 0.001f) {
+        if (payload.hasFluids || payload.fluidThroughput > 0.001f || payload.fluidCapacity > 0) {
             flags |= FLAG_FLUIDS;
         }
         if (payload.hasEnergy || Math.abs(payload.energyDelta) > 0.001f) {
@@ -180,7 +189,7 @@ public record SyncTelemetryPayload(
         if (payload.hasKinetic || Math.abs(payload.kineticSpeed) > 0.001f || payload.kineticCapacity > 0.001f) {
             flags |= FLAG_KINETIC;
         }
-        if (payload.hasChemicals || payload.chemicalThroughput > 0.001f) {
+        if (payload.hasChemicals || payload.chemicalThroughput > 0.001f || payload.chemicalCapacity > 0) {
             flags |= FLAG_CHEMICALS;
         }
         if (payload.hasAe2Network) {
@@ -212,6 +221,9 @@ public record SyncTelemetryPayload(
         if ((flags & FLAG_FLUIDS) != 0) {
             buf.writeFloat(payload.fluidThroughput);
             buf.writeBoolean(payload.hasFluids);
+            buf.writeUtf(payload.fluidName != null ? payload.fluidName : "");
+            buf.writeVarLong(payload.fluidAmount);
+            buf.writeVarLong(payload.fluidCapacity);
         }
 
         if ((flags & FLAG_ENERGY) != 0) {
@@ -286,9 +298,15 @@ public record SyncTelemetryPayload(
 
         float fluidThroughput = 0.0f;
         boolean hasFluids = false;
+        String fluidName = "";
+        long fluidAmount = 0L;
+        long fluidCapacity = 0L;
         if ((flags & FLAG_FLUIDS) != 0) {
             fluidThroughput = buf.readFloat();
             hasFluids = buf.readBoolean();
+            fluidName = buf.readUtf();
+            fluidAmount = buf.readVarLong();
+            fluidCapacity = buf.readVarLong();
         }
 
         float energyDelta = 0.0f;
@@ -303,7 +321,7 @@ public record SyncTelemetryPayload(
         float kineticCapacity = 0.0f;
         float kineticBlockStress = 0.0f;
         boolean hasKinetic = (flags & FLAG_KINETIC) != 0;
-        byte kineticDirection = 2; // STATIONARY
+        byte kineticDirection = 2;
         if (hasKinetic) {
             kineticSpeed = buf.readFloat();
             kineticStress = buf.readFloat();
@@ -375,6 +393,9 @@ public record SyncTelemetryPayload(
                 hasItems,
                 fluidThroughput,
                 hasFluids,
+                fluidName,
+                fluidAmount,
+                fluidCapacity,
                 energyDelta,
                 hasEnergy,
                 chemicalThroughput,

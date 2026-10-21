@@ -10,8 +10,11 @@ import appeng.api.networking.energy.IEnergyService;
 import appeng.api.networking.pathing.IPathingService;
 import appeng.api.storage.MEStorage;
 import appeng.api.storage.cells.StorageCell;
+import com.alikuxac.machinemetrics.compat.Reflect;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
+import net.minecraft.core.registries.BuiltInRegistries;
+import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.entity.BlockEntity;
@@ -43,16 +46,16 @@ public class AE2NetworkInspector {
 
     public record AE2MetricData(
             boolean hasNetwork,
-            float powerRate,        // Net power rate in AE/t (negative for net drain, positive for net gain)
-            float powerDrain,       // Active grid power drain in AE/t (avgUsage)
-            float subnetDrain,      // Total energy drain from connected subnets in AE/t
-            int subnetCount,        // Number of connected subnets found
-            double storedPower,     // Stored AE
-            double maxPower,        // Max AE capacity
-            byte stabilityState,    // Ordinal of AE2StabilityState
-            boolean isCreative,     // Infinite/Creative energy source detected
-            int usedChannels,       // Channels used on the inspected node
-            int maxChannels         // Channel capacity (typically 8 for standard cable/device, 32 for dense)
+            float powerRate,
+            float powerDrain,
+            float subnetDrain,
+            int subnetCount,
+            double storedPower,
+            double maxPower,
+            byte stabilityState,
+            boolean isCreative,
+            int usedChannels,
+            int maxChannels
     ) {
         public static final AE2MetricData EMPTY = new AE2MetricData(false, 0f, 0f, 0f, 0, 0.0, 0.0, (byte) 0, false, 0, 0);
 
@@ -223,7 +226,6 @@ public class AE2NetworkInspector {
                         node = host.getGridNode(side);
                     }
                     if (node == null) {
-                        // Center ME cable / internal bus node
                         node = host.getGridNode(null);
                     }
                     if (node == null) {
@@ -275,15 +277,12 @@ public class AE2NetworkInspector {
                 float powerRate = (float) (avgInjection - avgUsage);
                 float powerDrain = (float) avgUsage;
 
-                // Discover and calculate subnet drain
                 SubnetDrainResult subnetResult = calculateSubnetDrain(grid, 3);
 
-                // Determine Stability State
                 AE2StabilityState stabilityState;
                 if (isCreative) {
                     stabilityState = AE2StabilityState.CREATIVE;
                 } else if (!isPowered || (isBooting && storedPower <= Math.max(10.0, avgUsage * 2.0))) {
-                    // Network power is starved or trapped in boot-loop
                     stabilityState = AE2StabilityState.BROWNOUT;
                 } else if (isBooting) {
                     stabilityState = AE2StabilityState.BOOTING;
@@ -318,6 +317,25 @@ public class AE2NetworkInspector {
             } catch (Throwable ignored) {
                 return Optional.empty();
             }
+        }
+
+        private static boolean isCreativeCellItem(Item cellItem) {
+            if (cellItem == null) {
+                return false;
+            }
+            try {
+                ResourceLocation key = BuiltInRegistries.ITEM.getKey(cellItem);
+                return key != null
+                        && "ae2".equals(key.getNamespace())
+                        && key.getPath().contains("creative");
+            } catch (Throwable ignored) {
+                return false;
+            }
+        }
+
+        private static Long firstLong(Object target, String... names) {
+            Method m = Reflect.findMethod(target.getClass(), names);
+            return Reflect.invokeLong(m, target);
         }
 
         private static Optional<AE2CellStorageData> inspectCellStorage(Level level, BlockPos pos) {
@@ -367,68 +385,19 @@ public class AE2NetworkInspector {
                     long cellUsed = 0L;
                     long cellTotal = 0L;
 
-                    if (cellItem != null) {
-                        String itemName = cellItem.toString().toLowerCase();
-                        if (itemName.contains("creative")) {
-                            cellIsCreative = true;
-                        }
+                    if (isCreativeCellItem(cellItem)) {
+                        cellIsCreative = true;
                     }
 
                     Object target = cell != null ? cell : meStorage;
                     if (target != null) {
-                        String className = target.getClass().getName().toLowerCase();
-                        if (className.contains("creative")) {
-                            cellIsCreative = true;
+                        Long used = firstLong(target, "getUsedBytes", "usedBytes", "getStoredItemCount");
+                        if (used != null) {
+                            cellUsed = used;
                         }
-
-                        try {
-                            Method m = target.getClass().getMethod("getUsedBytes");
-                            Object res = m.invoke(target);
-                            if (res instanceof Number num) {
-                                cellUsed = num.longValue();
-                            }
-                        } catch (Throwable ignored) {
-                            try {
-                                Method m = target.getClass().getMethod("usedBytes");
-                                Object res = m.invoke(target);
-                                if (res instanceof Number num) {
-                                    cellUsed = num.longValue();
-                                }
-                            } catch (Throwable ignored2) {
-                                try {
-                                    Method m = target.getClass().getMethod("getStoredItemCount");
-                                    Object res = m.invoke(target);
-                                    if (res instanceof Number num) {
-                                        cellUsed = num.longValue();
-                                    }
-                                } catch (Throwable ignored3) {
-                                }
-                            }
-                        }
-
-                        try {
-                            Method m = target.getClass().getMethod("getTotalBytes");
-                            Object res = m.invoke(target);
-                            if (res instanceof Number num) {
-                                cellTotal = num.longValue();
-                            }
-                        } catch (Throwable ignored) {
-                            try {
-                                Method m = target.getClass().getMethod("totalBytes");
-                                Object res = m.invoke(target);
-                                if (res instanceof Number num) {
-                                    cellTotal = num.longValue();
-                                }
-                            } catch (Throwable ignored2) {
-                                try {
-                                    Method m = target.getClass().getMethod("getBytes");
-                                    Object res = m.invoke(target);
-                                    if (res instanceof Number num) {
-                                        cellTotal = num.longValue();
-                                    }
-                                } catch (Throwable ignored3) {
-                                }
-                            }
+                        Long total = firstLong(target, "getTotalBytes", "totalBytes", "getBytes");
+                        if (total != null) {
+                            cellTotal = total;
                         }
                     }
 

@@ -64,12 +64,10 @@ public class HudPositionScreen extends Screen {
         availablePresets.add(PresetType.FULL_DIAGNOSTIC);
         availablePresets.add(PresetType.MINIMALIST_BAR);
 
-        // Only offer 'Create Only' preset if Create mod is present
         if (CreateKineticInspector.isCreateLoaded()) {
             availablePresets.add(PresetType.CREATE_ONLY);
         }
 
-        // Only offer 'Chemicals Only' preset if Mekanism mod is present
         if (MekanismChemicalInspector.isMekanismLoaded()) {
             availablePresets.add(PresetType.CHEMICALS_ONLY);
         }
@@ -87,7 +85,7 @@ public class HudPositionScreen extends Screen {
                 return i;
             }
         }
-        return -1; // Custom configuration
+        return -1;
     }
 
     private boolean matchesPreset(PresetType preset) {
@@ -160,32 +158,27 @@ public class HudPositionScreen extends Screen {
         int buttonWidth = 140;
         int buttonHeight = 20;
 
-        // Button: Anchor Switcher
         ClientConfig.HudAnchor currentAnchor = ClientConfig.HUD_ANCHOR != null ? ClientConfig.HUD_ANCHOR.get() : ClientConfig.HudAnchor.TOP_LEFT;
         anchorButton = Button.builder(getAnchorButtonText(currentAnchor), b -> {
             cycleAnchor();
         }).bounds((this.width / 2) - buttonWidth - 5, this.height - 30, buttonWidth, buttonHeight).build();
         addRenderableWidget(anchorButton);
 
-        // Button: Quick Preset Cycler
         presetButton = Button.builder(getPresetButtonText(), b -> {
             cyclePreset();
         }).bounds((this.width / 2) + 5, this.height - 30, buttonWidth, buttonHeight).build();
         addRenderableWidget(presetButton);
 
-        // Button: Toggle Block Name Display
         boolean showTitle = ClientConfig.SHOW_MACHINE_TITLE == null || ClientConfig.SHOW_MACHINE_TITLE.get();
         titleToggleButton = Button.builder(getTitleButtonText(showTitle), b -> {
             toggleMachineTitle();
         }).bounds(10, 8, 130, 20).build();
         addRenderableWidget(titleToggleButton);
 
-        // Button: Reset Offset to Default (10, 10 or 0, 0 for crosshair)
         addRenderableWidget(Button.builder(Component.translatable("machinemetrics.hud.reset_button"), b -> {
             resetPosition();
         }).bounds(145, 8, 120, 20).build());
 
-        // Button: Done / Close
         addRenderableWidget(Button.builder(Component.translatable("gui.done"), b -> {
             onClose();
         }).bounds(this.width - 70, 8, 60, 20).build());
@@ -233,7 +226,6 @@ public class HudPositionScreen extends Screen {
         if (ClientConfig.HUD_ANCHOR != null) {
             ClientConfig.HUD_ANCHOR.set(next);
         }
-        // When changing anchor to/from CROSSHAIR or corner, reset offsets to clean defaults
         int defaultOffset = (next == ClientConfig.HudAnchor.CROSSHAIR) ? 0 : 10;
         if (ClientConfig.HUD_X_OFFSET != null) {
             ClientConfig.HUD_X_OFFSET.set(defaultOffset);
@@ -386,7 +378,7 @@ public class HudPositionScreen extends Screen {
 
         return new TelemetryData(
                 12.5f, true,
-                250.0f, true,
+                250.0f, true, "Water", 2500L, 10000L,
                 1500.0f, true,
                 hasMek ? 50.0f : 0.0f, hasMek, hasMek ? "Hydrogen" : "", hasMek ? 500L : 0L, hasMek ? 1000L : 0L,
                 hasCreate ? 128.0f : 0.0f, hasCreate ? 8192.0f : 0.0f, hasCreate ? 65536.0f : 0.0f, hasCreate ? 256.0f : 0.0f, hasCreate,
@@ -420,7 +412,6 @@ public class HudPositionScreen extends Screen {
         graphics.drawCenteredString(this.font, this.title, this.width / 2, 8, 0xFFFFFF);
         graphics.drawCenteredString(this.font, Component.translatable("machinemetrics.hud.drag_hint"), this.width / 2, 20, 0xAAAAAA);
 
-        // Build sample preview lines based on user config toggles
         TelemetryData sampleData = createSampleTelemetryData();
         List<TelemetryHudRenderer.HudLine> lines = TelemetryHudRenderer.buildHudLines("Sample Generator", sampleData);
         if (lines.isEmpty()) {
@@ -447,18 +438,15 @@ public class HudPositionScreen extends Screen {
         int bgColor = ClientConfig.parseHexColor(ClientConfig.BACKGROUND_COLOR, 0x90000000);
         int borderColor = isDragging ? 0xFFFFFFFF : ClientConfig.parseHexColor(ClientConfig.BORDER_COLOR, 0xFF00FFCC);
 
-        // Draw preview box
         graphics.fill(renderX, renderY, renderX + boxWidth, renderY + boxHeight, bgColor);
         graphics.renderOutline(renderX, renderY, boxWidth, boxHeight, borderColor);
 
-        // Render preview lines
         int currentY = renderY + paddingY;
         for (TelemetryHudRenderer.HudLine line : lines) {
             graphics.drawString(font, line.text(), renderX + paddingX, currentY, line.color());
             currentY += lineHeight;
         }
 
-        // Hint under box if hovered
         if (isMouseOverBox(mouseX, mouseY, renderX, renderY, boxWidth, boxHeight)) {
             graphics.drawString(font, Component.translatable("machinemetrics.hud.drag_action"), renderX, renderY - 10, 0xFFFF55);
         }
@@ -471,7 +459,6 @@ public class HudPositionScreen extends Screen {
     @Override
     public boolean mouseClicked(double mouseX, double mouseY, int button) {
         if (button == 0) {
-            // Check if clicking inside HUD box
             TelemetryData sampleData = createSampleTelemetryData();
             List<TelemetryHudRenderer.HudLine> lines = TelemetryHudRenderer.buildHudLines("Sample Generator", sampleData);
             if (lines.isEmpty()) {

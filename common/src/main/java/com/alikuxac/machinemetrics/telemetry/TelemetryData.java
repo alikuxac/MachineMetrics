@@ -10,6 +10,9 @@ public record TelemetryData(
         boolean hasItems,
         float fluidThroughput,
         boolean hasFluids,
+        String fluidName,
+        long fluidAmount,
+        long fluidCapacity,
         float energyDelta,
         boolean hasEnergy,
         float chemicalThroughput,
@@ -105,7 +108,7 @@ public record TelemetryData(
     ) {
         this(
                 itemThroughput, hasItems,
-                fluidThroughput, hasFluids,
+                fluidThroughput, hasFluids, "", 0L, 0L,
                 energyDelta, hasEnergy,
                 chemicalThroughput, hasChemicals, chemicalName, chemicalAmount, chemicalCapacity,
                 kineticSpeed, kineticStress, kineticCapacity, kineticBlockStress, hasKinetic,
@@ -154,7 +157,7 @@ public record TelemetryData(
     ) {
         this(
                 itemThroughput, hasItems,
-                fluidThroughput, hasFluids,
+                fluidThroughput, hasFluids, "", 0L, 0L,
                 energyDelta, hasEnergy,
                 chemicalThroughput, hasChemicals, chemicalName, chemicalAmount, chemicalCapacity,
                 kineticSpeed, kineticStress, kineticCapacity, kineticBlockStress, hasKinetic,
@@ -168,7 +171,7 @@ public record TelemetryData(
 
     public static final TelemetryData EMPTY = new TelemetryData(
             0.0f, false,
-            0.0f, false,
+            0.0f, false, "", 0L, 0L,
             0.0f, false,
             0.0f, false, "", 0L, 0L,
             0.0f, 0.0f, 0.0f, 0.0f, false,
@@ -263,6 +266,9 @@ public record TelemetryData(
         }
         if (Math.abs(this.itemThroughput - other.itemThroughput) > 0.1f) return true;
         if (Math.abs(this.fluidThroughput - other.fluidThroughput) > 1.0f) return true;
+        if (this.fluidAmount != other.fluidAmount) return true;
+        if (this.fluidCapacity != other.fluidCapacity) return true;
+        if (this.fluidName != null ? !this.fluidName.equals(other.fluidName) : other.fluidName != null) return true;
         if (Math.abs(this.chemicalThroughput - other.chemicalThroughput) > 1.0f) return true;
         if (Math.abs(this.energyDelta - other.energyDelta) > 1.0f) return true;
         if (Math.abs(this.kineticSpeed - other.kineticSpeed) > 0.1f) return true;
@@ -270,6 +276,7 @@ public record TelemetryData(
         if (Math.abs(this.kineticCapacity - other.kineticCapacity) > 0.5f) return true;
         if (Math.abs(this.kineticBlockStress - other.kineticBlockStress) > 0.5f) return true;
         if (this.chemicalAmount != other.chemicalAmount) return true;
+        if (this.chemicalCapacity != other.chemicalCapacity) return true;
 
         if (this.logisticsFlags != other.logisticsFlags) return true;
         if (Math.abs(this.netRate - other.netRate) > 0.05f) return true;

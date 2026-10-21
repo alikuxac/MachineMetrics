@@ -3,6 +3,7 @@ package com.alikuxac.machinemetrics.client;
 import com.alikuxac.machinemetrics.config.ClientConfig;
 import com.alikuxac.machinemetrics.compat.ae2.AE2NetworkInspector;
 import com.alikuxac.machinemetrics.compat.create.CreateKineticInspector;
+import com.alikuxac.machinemetrics.compat.storage.SophisticatedStorageAdapter;
 import com.alikuxac.machinemetrics.telemetry.TelemetryData;
 import net.minecraft.ChatFormatting;
 import net.minecraft.core.BlockPos;
@@ -12,6 +13,7 @@ import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.state.BlockState;
 
 import java.util.Locale;
+import java.util.Optional;
 
 public class MetricResolver {
 
@@ -132,7 +134,6 @@ public class MetricResolver {
         int criticalSeconds = ClientConfig.ETA_CRITICAL_THRESHOLD_SECONDS != null ? ClientConfig.ETA_CRITICAL_THRESHOLD_SECONDS.get() : 15;
 
         if (seconds < criticalSeconds) {
-            // Flashing red alert at 2.5 Hz (400ms period)
             boolean flash = (System.currentTimeMillis() / 400L) % 2L == 0;
             return flash ? criticalColor : warningColor;
         } else if (seconds < warningSeconds) {
@@ -228,14 +229,35 @@ public class MetricResolver {
         if (seconds < 60) {
             return String.format(Locale.ROOT, "%ds", seconds);
         }
-        long minutes = seconds / 60;
-        long remainingSec = seconds % 60;
-        if (minutes < 60) {
-            return String.format(Locale.ROOT, "%dm %02ds", minutes, remainingSec);
+
+        final long MINUTE = 60L;
+        final long HOUR = 60L * MINUTE;
+        final long DAY = 24L * HOUR;
+        final long MONTH = Math.round(30.44 * DAY);
+        final long YEAR = Math.round(365.25 * DAY);
+
+        long[] units = { YEAR, MONTH, DAY, HOUR, MINUTE, 1L };
+        String[] labels = { "y", "mo", "d", "h", "m", "s" };
+
+        long remaining = seconds;
+        StringBuilder sb = new StringBuilder();
+        int shown = 0;
+        for (int i = 0; i < units.length && shown < 3; i++) {
+            long value = remaining / units[i];
+            remaining -= value * units[i];
+            if (value <= 0 && shown == 0) {
+                continue;
+            }
+            if (value <= 0) {
+                continue;
+            }
+            if (sb.length() > 0) {
+                sb.append(' ');
+            }
+            sb.append(value).append(labels[i]);
+            shown++;
         }
-        long hours = minutes / 60;
-        long remainingMin = minutes % 60;
-        return String.format(Locale.ROOT, "%dh %02dm", hours, remainingMin);
+        return sb.length() > 0 ? sb.toString() : "0s";
     }
 
     public static String formatEta(long seconds) {
@@ -281,6 +303,37 @@ public class MetricResolver {
         return formatFluidRate(rate);
     }
 
+    public static String formatVolume(long millibuckets) {
+        if (millibuckets < 0) {
+            return "0 mB";
+        }
+        if (millibuckets >= 1_000L) {
+            return String.format(Locale.ROOT, "%.2f B", millibuckets / 1_000.0);
+        }
+        return String.format(Locale.ROOT, "%,d mB", millibuckets);
+    }
+
+    public static String formatChemicalVolume(long amount, long capacity) {
+        if (capacity <= 0) {
+            return formatVolume(amount);
+        }
+        return formatVolume(amount) + " / " + formatVolume(capacity);
+    }
+
+    public static String formatVolumeWithCapacity(long amount, long capacity) {
+        if (isInfiniteVolume(capacity)) {
+            return "∞ / ∞";
+        }
+        if (capacity <= 0) {
+            return formatVolume(amount);
+        }
+        return formatVolume(amount) + " / " + formatVolume(capacity);
+    }
+
+    public static boolean isInfiniteVolume(long capacity) {
+        return capacity >= Integer.MAX_VALUE || capacity >= (Long.MAX_VALUE / 2);
+    }
+
     public static String resolveRotationDirection(CreateKineticInspector.RotationDirection dir, float speed) {
         if (dir != null) {
             return dir.getLabel();
@@ -322,8 +375,45 @@ public class MetricResolver {
         if (state.isAir()) {
             return Component.translatable("machinemetrics.hud.title").getString();
         }
-        return state.getBlock().getName().getString();
+        String name = state.getBlock().getName().getString();
+        if (containsFormatPlaceholder(name)) {
+            String resolved = resolveStorageDisplayName(level, pos);
+            if (resolved != null && !resolved.isEmpty()) {
+                return resolved;
+            }
+            return DEFAULT_BLOCK_NAME;
+        }
+        return name;
     }
+
+    private static String resolveStorageDisplayName(Level level, BlockPos pos) {
+        try {
+            Optional<String> ss = SophisticatedStorageAdapter.resolveDisplayName(level, pos);
+            if (ss.isPresent() && !ss.get().isEmpty()) {
+                return ss.get();
+            }
+        } catch (Throwable ignored) {
+        }
+        return null;
+    }
+
+    private static boolean containsFormatPlaceholder(String name) {
+        if (name == null) {
+            return false;
+        }
+        for (int i = 0; i + 1 < name.length(); i++) {
+            if (name.charAt(i) == '%') {
+                char next = name.charAt(i + 1);
+                if (next == 's' || next == 'd' || next == 'f' || next == 'b' || next == 'n'
+                        || (next >= '0' && next <= '9') || next == '$') {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
+    public static final String DEFAULT_BLOCK_NAME = "Oak netherite chest";
 
     public static String resolveTemplate(
             String template,
@@ -366,6 +456,59 @@ public class MetricResolver {
 
         String itemsStr = itemsDisabled ? disabledLabel : formatItemRate(data != null ? data.itemThroughput() : 0f);
         String fluidsStr = fluidsDisabled ? disabledLabel : formatFluidRate(data != null ? data.fluidThroughput() : 0f);
+
+        String fluidAmountStr = "—";
+        String fluidCapacityStr = "—";
+        String fluidPctStr = "—";
+        String fluidNameStr = "—";
+        if (data != null && data.hasFluids()) {
+            long fluidAmount = data.fluidAmount();
+            long fluidCapacity = data.fluidCapacity();
+            if (fluidsDisabled) {
+                fluidAmountStr = disabledLabel;
+                fluidCapacityStr = disabledLabel;
+                fluidPctStr = disabledLabel;
+                fluidNameStr = disabledLabel;
+            } else {
+                fluidAmountStr = formatVolume(fluidAmount);
+                fluidCapacityStr = fluidCapacity > 0 ? formatVolume(fluidCapacity) : "—";
+                fluidPctStr = fluidCapacity > 0
+                        ? String.format(Locale.ROOT, "%.1f", (fluidAmount / (double) fluidCapacity) * 100.0)
+                        : "—";
+                if (data.fluidName() != null && !data.fluidName().isEmpty()) {
+                    fluidNameStr = data.fluidName();
+                    fluidsStr = data.fluidName() + " " + fluidsStr;
+                }
+            }
+        }
+
+        boolean chemicalsDisabled = data != null && data.isChemicalsDisabledByServer();
+        String chemicalsStr = "—";
+        String chemicalAmountStr = "—";
+        String chemicalCapacityStr = "—";
+        String chemicalPctStr = "—";
+        if (data != null && data.hasChemicals()) {
+            long chemAmount = data.chemicalAmount();
+            long chemCapacity = data.chemicalCapacity();
+            if (chemicalsDisabled) {
+                chemicalsStr = disabledLabel;
+                chemicalAmountStr = disabledLabel;
+                chemicalCapacityStr = disabledLabel;
+                chemicalPctStr = disabledLabel;
+            } else {
+                chemicalsStr = data.chemicalThroughput() > 0.001f
+                        ? formatChemicalRate(data.chemicalThroughput())
+                        : "0.0 mB/s";
+                chemicalAmountStr = formatVolume(chemAmount);
+                chemicalCapacityStr = chemCapacity > 0 ? formatVolume(chemCapacity) : "—";
+                chemicalPctStr = chemCapacity > 0
+                        ? String.format(Locale.ROOT, "%.1f", (chemAmount / (double) chemCapacity) * 100.0)
+                        : "—";
+                if (data.chemicalName() != null && !data.chemicalName().isEmpty()) {
+                    chemicalsStr = data.chemicalName() + " " + chemicalsStr;
+                }
+            }
+        }
 
         String aePowerStr = "—";
         String aeStateStr = "—";
@@ -437,6 +580,14 @@ public class MetricResolver {
                 .replace("{state}", stateStr)
                 .replace("{items}", itemsStr)
                 .replace("{fluids}", fluidsStr)
+                .replace("{fluid_amount}", fluidAmountStr)
+                .replace("{fluid_capacity}", fluidCapacityStr)
+                .replace("{fluid_pct}", fluidPctStr)
+                .replace("{fluid_name}", fluidNameStr)
+                .replace("{chemicals}", chemicalsStr)
+                .replace("{chemical_amount}", chemicalAmountStr)
+                .replace("{chemical_capacity}", chemicalCapacityStr)
+                .replace("{chemical_pct}", chemicalPctStr)
                 .replace("{storage}", storageStr)
                 .replace("{eta}", etaStr)
                 .replace("{ae_power}", aePowerStr)

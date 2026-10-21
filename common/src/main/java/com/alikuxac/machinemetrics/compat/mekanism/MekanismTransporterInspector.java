@@ -1,5 +1,6 @@
 package com.alikuxac.machinemetrics.compat.mekanism;
 
+import com.alikuxac.machinemetrics.compat.Reflect;
 import it.unimi.dsi.fastutil.ints.IntArrayList;
 import net.minecraft.core.Direction;
 import net.minecraft.world.item.ItemStack;
@@ -41,23 +42,20 @@ public class MekanismTransporterInspector {
         try {
             ClassLoader cl = MekanismTransporterInspector.class.getClassLoader();
             transporterBaseClass = Class.forName("mekanism.common.tile.transmitter.TileEntityLogisticalTransporterBase", false, cl);
-            getTransmitterMethod = transporterBaseClass.getMethod("getTransmitter");
+            getTransmitterMethod = Reflect.findMethod(transporterBaseClass, "getTransmitter");
 
             Class<?> logisticalTransporterClass = Class.forName("mekanism.common.content.network.transmitter.LogisticalTransporterBase", false, cl);
-            getTransitMethod = logisticalTransporterClass.getMethod("getTransit");
-            tierField = logisticalTransporterClass.getField("tier");
+            getTransitMethod = Reflect.findMethod(logisticalTransporterClass, "getTransit");
+            tierField = Reflect.findField(logisticalTransporterClass, "tier");
 
             Class<?> tierClass = Class.forName("mekanism.common.tier.TransporterTier", false, cl);
-            getSpeedMethod = tierClass.getMethod("getSpeed");
-            getPullAmountMethod = tierClass.getMethod("getPullAmount");
+            getSpeedMethod = Reflect.findMethod(tierClass, "getSpeed");
+            getPullAmountMethod = Reflect.findMethod(tierClass, "getPullAmount");
 
             Class<?> stackClass = Class.forName("mekanism.common.content.transporter.TransporterStack", false, cl);
-            itemStackField = stackClass.getField("itemStack");
+            itemStackField = Reflect.findField(stackClass, "itemStack", "stack");
 
-            try {
-                getSideMethod = stackClass.getMethod("getSide", logisticalTransporterClass);
-            } catch (Throwable ignored) {
-            }
+            getSideMethod = Reflect.findMethodTyped(stackClass, new Class<?>[] { logisticalTransporterClass }, "getSide");
 
             isMekanismLoaded = true;
         } catch (Throwable t) {
