@@ -28,7 +28,7 @@ Machine Metrics is a client-side and server-synced telemetry HUD for Minecraft. 
 
 ### Compatibility
 
-- **Standard Capabilities:** Works with any block using standard NeoForge or Forge capabilities (Item Handler, Fluid Handler, Energy Storage).
+- **Standard Capabilities:** Works with any block exposing standard NeoForge capabilities (Item, Fluid, and Energy resource handlers).
 - **Create:** Kinetic speed (RPM), rotation direction, network stress, capacity (SU), overstress warning, and headroom.
 - **Mekanism:** Chemical throughput and tank capacities (Gases, Infuse Types, Pigments, Slurries).
 - **Tooltip Mods:** Automatically hides the block title line when Jade, Waila, WTHIT, or The One Probe is installed.
@@ -63,7 +63,7 @@ Machine Metrics is a client-side and server-synced telemetry HUD for Minecraft. 
 
 - This is a personal side project. Updates come as time allows.
 - No backports to older Minecraft versions or loaders are planned.
-- Built for NeoForge and Forge on 1.21.1.
+- Built for NeoForge on Minecraft 26.1.2 (Java 25).
 
 ---
 

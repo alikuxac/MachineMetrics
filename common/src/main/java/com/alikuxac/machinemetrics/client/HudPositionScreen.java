@@ -9,9 +9,10 @@ import com.alikuxac.machinemetrics.config.ClientConfig;
 import com.alikuxac.machinemetrics.telemetry.TelemetryData;
 import it.unimi.dsi.fastutil.ints.IntArrayList;
 import net.minecraft.client.gui.Font;
-import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.screens.Screen;
+import net.minecraft.client.input.MouseButtonEvent;
 import net.minecraft.network.chat.Component;
 import net.neoforged.neoforge.common.ModConfigSpec;
 
@@ -406,11 +407,11 @@ public class HudPositionScreen extends Screen {
     }
 
     @Override
-    public void render(GuiGraphics graphics, int mouseX, int mouseY, float partialTick) {
-        super.render(graphics, mouseX, mouseY, partialTick);
+    public void extractRenderState(GuiGraphicsExtractor graphics, int mouseX, int mouseY, float partialTick) {
+        super.extractRenderState(graphics, mouseX, mouseY, partialTick);
 
-        graphics.drawCenteredString(this.font, this.title, this.width / 2, 8, 0xFFFFFF);
-        graphics.drawCenteredString(this.font, Component.translatable("machinemetrics.hud.drag_hint"), this.width / 2, 20, 0xAAAAAA);
+        graphics.centeredText(this.font, this.title, this.width / 2, 8, 0xFFFFFF);
+        graphics.centeredText(this.font, Component.translatable("machinemetrics.hud.drag_hint"), this.width / 2, 20, 0xAAAAAA);
 
         TelemetryData sampleData = createSampleTelemetryData();
         List<TelemetryHudRenderer.HudLine> lines = TelemetryHudRenderer.buildHudLines("Sample Generator", sampleData);
@@ -439,16 +440,16 @@ public class HudPositionScreen extends Screen {
         int borderColor = isDragging ? 0xFFFFFFFF : ClientConfig.parseHexColor(ClientConfig.BORDER_COLOR, 0xFF00FFCC);
 
         graphics.fill(renderX, renderY, renderX + boxWidth, renderY + boxHeight, bgColor);
-        graphics.renderOutline(renderX, renderY, boxWidth, boxHeight, borderColor);
+        graphics.outline(renderX, renderY, boxWidth, boxHeight, borderColor);
 
         int currentY = renderY + paddingY;
         for (TelemetryHudRenderer.HudLine line : lines) {
-            graphics.drawString(font, line.text(), renderX + paddingX, currentY, line.color());
+            graphics.text(font, line.text(), renderX + paddingX, currentY, line.color());
             currentY += lineHeight;
         }
 
         if (isMouseOverBox(mouseX, mouseY, renderX, renderY, boxWidth, boxHeight)) {
-            graphics.drawString(font, Component.translatable("machinemetrics.hud.drag_action"), renderX, renderY - 10, 0xFFFF55);
+            graphics.text(font, Component.translatable("machinemetrics.hud.drag_action"), renderX, renderY - 10, 0xFFFF55);
         }
     }
 
@@ -457,7 +458,10 @@ public class HudPositionScreen extends Screen {
     }
 
     @Override
-    public boolean mouseClicked(double mouseX, double mouseY, int button) {
+    public boolean mouseClicked(MouseButtonEvent event, boolean doubleClick) {
+        double mouseX = event.x();
+        double mouseY = event.y();
+        int button = event.button();
         if (button == 0) {
             TelemetryData sampleData = createSampleTelemetryData();
             List<TelemetryHudRenderer.HudLine> lines = TelemetryHudRenderer.buildHudLines("Sample Generator", sampleData);
@@ -488,19 +492,21 @@ public class HudPositionScreen extends Screen {
                 return true;
             }
         }
-        return super.mouseClicked(mouseX, mouseY, button);
+        return super.mouseClicked(event, doubleClick);
     }
 
     @Override
-    public boolean mouseReleased(double mouseX, double mouseY, int button) {
-        if (button == 0) {
+    public boolean mouseReleased(MouseButtonEvent event) {
+        if (event.button() == 0) {
             isDragging = false;
         }
-        return super.mouseReleased(mouseX, mouseY, button);
+        return super.mouseReleased(event);
     }
 
     @Override
-    public boolean mouseDragged(double mouseX, double mouseY, int button, double dragX, double dragY) {
+    public boolean mouseDragged(MouseButtonEvent event, double dragX, double dragY) {
+        double mouseX = event.x();
+        double mouseY = event.y();
         if (isDragging) {
             int deltaX = (int) mouseX - dragMouseStartX;
             int deltaY = (int) mouseY - dragMouseStartY;
@@ -541,7 +547,7 @@ public class HudPositionScreen extends Screen {
             }
             return true;
         }
-        return super.mouseDragged(mouseX, mouseY, button, dragX, dragY);
+        return super.mouseDragged(event, dragX, dragY);
     }
 
     @Override
@@ -560,12 +566,8 @@ public class HudPositionScreen extends Screen {
     }
 
     @Override
-    public void renderBackground(GuiGraphics graphics, int mouseX, int mouseY, float partialTick) {
-        if (this.minecraft != null && this.minecraft.level == null) {
-            this.renderMenuBackground(graphics);
-        } else {
-            super.renderBackground(graphics, mouseX, mouseY, partialTick);
-        }
+    public void extractBackground(GuiGraphicsExtractor graphics, int mouseX, int mouseY, float partialTick) {
+        super.extractBackground(graphics, mouseX, mouseY, partialTick);
     }
 
     @Override

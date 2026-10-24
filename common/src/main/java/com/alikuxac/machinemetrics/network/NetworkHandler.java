@@ -38,7 +38,7 @@ public class NetworkHandler {
     private static void handleRequestPayload(RequestTelemetryPayload payload, IPayloadContext context) {
         context.enqueueWork(() -> {
             if (context.player() instanceof ServerPlayer serverPlayer) {
-                ServerLevel serverLevel = serverPlayer.serverLevel();
+                ServerLevel serverLevel = serverPlayer.level();
                 BlockPos targetPos = payload.targetPos();
                 Direction hitFace = payload.hitFace();
                 TelemetryData data = Services.SERVER_SAMPLER.sample(serverLevel, targetPos, hitFace);

@@ -20,7 +20,7 @@ sequenceDiagram
     alt Server has Machine Metrics installed
         ClientHUD->>Net: RequestTelemetryPayload(pos, hitFace) [Max 5 Hz]
         Net->>Sampler: sample(serverLevel, pos, hitFace)
-        Sampler->>Block: Query Forge/NeoForge Capabilities & Mod APIs
+        Sampler->>Block: Query NeoForge Capabilities & Mod APIs
         Block-->>Sampler: Raw slot counts, tank levels, stored energy
         Sampler->>Sampler: Compute delta rates & bottleneck state
         Sampler-->>Net: TelemetryData + serverDisabledMask
@@ -67,7 +67,7 @@ flowchart TD
 ### Capability Sampling
 
 The sampler queries supported capabilities on all 6 faces plus the center block:
-- **NeoForge/Forge Capabilities**:
+- **NeoForge Capabilities**:
   - `Capabilities.ItemHandler.BLOCK`: Item inventory and slot counts.
   - `Capabilities.FluidHandler.BLOCK`: Tank capacities and fluid amounts.
   - `Capabilities.EnergyStorage.BLOCK`: Stored FE amounts.

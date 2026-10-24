@@ -1,6 +1,6 @@
 plugins {
     id 'java-library'
-    id 'net.neoforged.moddev' version '1.0.21'
+    id 'net.neoforged.moddev' version '2.0.148'
 }
 
 group = rootProject.mod_group_id
@@ -16,9 +16,10 @@ java {
 neoForge {
     version = rootProject.neo_version
 
-    parchment {
-        minecraftVersion = rootProject.parchment_minecraft_version
-        mappingsVersion = rootProject.parchment_mappings_version
+    mods {
+        "${rootProject.mod_id}" {
+            sourceSet sourceSets.main
+        }
     }
 }
 
@@ -27,6 +28,19 @@ tasks.withType(JavaCompile).configureEach {
 }
 
 dependencies {
-    compileOnly "mekanism:Mekanism:${rootProject.mekanism_version}:api"
+    compileOnly project(':mekanism-api-stub')
     compileOnly "org.appliedenergistics:appliedenergistics2:${rootProject.ae2_version}:api"
+}
+
+tasks.withType(ProcessResources).configureEach {
+    var replaceProperties = [
+            loader_version_range: rootProject.loader_version_range,
+            mod_version         : rootProject.mod_version,
+            version             : rootProject.mod_version,
+    ]
+    inputs.properties replaceProperties
+
+    filesMatching(['META-INF/neoforge.mods.toml']) {
+        expand replaceProperties
+    }
 }

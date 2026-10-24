@@ -20,9 +20,10 @@ import net.minecraft.core.Direction;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.entity.BlockEntity;
 import net.neoforged.neoforge.capabilities.Capabilities;
-import net.neoforged.neoforge.energy.IEnergyStorage;
-import net.neoforged.neoforge.fluids.capability.IFluidHandler;
-import net.neoforged.neoforge.items.IItemHandler;
+import net.neoforged.neoforge.transfer.energy.EnergyHandler;
+import net.neoforged.neoforge.transfer.ResourceHandler;
+import net.neoforged.neoforge.transfer.fluid.FluidResource;
+import net.neoforged.neoforge.transfer.item.ItemResource;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -41,7 +42,8 @@ public class NeoForgeTelemetrySampler {
 
     private static final String WAYSTONE_NAMESPACE = "waystones";
 
-    private record Sample(long timestampMs, int[] itemSlots, int[] fluidTanks, int energyAmount, int totalItems, int totalFluid, float[] sideMetrics) {}
+    private record Sample(long timestampMs, int[] itemSlots, int[] fluidTanks, long energyAmount, int totalItems, long totalFluid,
+    float[] sideMetrics) {}
 
     private static class SampleHistory {
         private Sample previousSample;
@@ -102,16 +104,16 @@ public class NeoForgeTelemetrySampler {
 
         int currentItems = 0;
         int maxItems = 0;
-        int currentFluid = 0;
-        int maxFluid = 0;
-        int currentEnergy = 0;
-        int maxEnergy = 0;
+        long currentFluid = 0L;
+        long maxFluid = 0L;
+        long currentEnergy = 0L;
+        long maxEnergy = 0L;
 
         boolean hasAnyCapability = false;
 
         float[] sideMetrics = new float[18];
         IntArrayList allSlotCounts = new IntArrayList();
-        Set<IItemHandler> processedItemHandlers = Collections.newSetFromMap(new IdentityHashMap<>());
+        Set<ResourceHandler<ItemResource>> processedItemHandlers = Collections.newSetFromMap(new IdentityHashMap<>());
 
         var transporterOpt = MekanismTransporterInspector.inspect(be);
         boolean isTransporter = transporterOpt.isPresent() && transporterOpt.get().isTransporter();
@@ -131,11 +133,11 @@ public class NeoForgeTelemetrySampler {
         } else {
             for (Direction side : Direction.values()) {
                     try {
-                        IItemHandler itemHandler = level.getCapability(Capabilities.ItemHandler.BLOCK, pos, side);
-                        if (itemHandler != null && itemHandler.getSlots() > 0) {
+                        ResourceHandler<ItemResource> itemHandler = level.getCapability(Capabilities.Item.BLOCK, pos, side);
+                        if (itemHandler != null && itemHandler.size() > 0) {
                             int sideCount = 0;
-                            for (int i = 0; i < itemHandler.getSlots(); i++) {
-                                var stack = itemHandler.getStackInSlot(i);
+                            for (int i = 0; i < itemHandler.size(); i++) {
+                                var stack = itemHandler.getResource(i).toStack();
                                 if (!stack.isEmpty()) {
                                     sideCount += stack.getCount();
                                 }
@@ -146,19 +148,19 @@ public class NeoForgeTelemetrySampler {
                     }
                 }
 
-                IItemHandler itemHandler = resolveItemHandler(level, pos, hitFace);
+                ResourceHandler<ItemResource> itemHandler = resolveItemHandler(level, pos, hitFace);
 
-                if (itemHandler != null && itemHandler.getSlots() > 0) {
+                if (itemHandler != null && itemHandler.size() > 0) {
                     hasAnyCapability = true;
                     processedItemHandlers.add(itemHandler);
-                    int slotCount = itemHandler.getSlots();
+                    int slotCount = itemHandler.size();
                     boolean useCachedLimit = existingHistory != null && existingHistory.cachedItemSlotCount == slotCount && existingHistory.cachedMaxItemCapacity > 0;
                     int handlerMaxCap = 0;
 
                     if (useCachedLimit) {
                         handlerMaxCap = existingHistory.cachedMaxItemCapacity;
                         for (int i = 0; i < slotCount; i++) {
-                            var stack = itemHandler.getStackInSlot(i);
+                            var stack = itemHandler.getResource(i).toStack();
                             if (!stack.isEmpty()) {
                                 int count = stack.getCount();
                                 currentItems += count;
@@ -169,8 +171,8 @@ public class NeoForgeTelemetrySampler {
                         }
                     } else {
                         for (int i = 0; i < slotCount; i++) {
-                            handlerMaxCap += itemHandler.getSlotLimit(i);
-                            var stack = itemHandler.getStackInSlot(i);
+                            handlerMaxCap += itemHandler.getCapacityAsLong(i, itemHandler.getResource(i));
+                            var stack = itemHandler.getResource(i).toStack();
                             if (!stack.isEmpty()) {
                                 int count = stack.getCount();
                                 currentItems += count;
@@ -190,16 +192,16 @@ public class NeoForgeTelemetrySampler {
         int[] itemSlots = allSlotCounts.toIntArray();
 
         IntArrayList allTankAmounts = new IntArrayList();
-        Set<IFluidHandler> processedFluidHandlers = Collections.newSetFromMap(new IdentityHashMap<>());
+        Set<ResourceHandler<FluidResource>> processedFluidHandlers = Collections.newSetFromMap(new IdentityHashMap<>());
         String fluidName = "";
 
         for (Direction side : Direction.values()) {
             try {
-                IFluidHandler fluidHandler = level.getCapability(Capabilities.FluidHandler.BLOCK, pos, side);
-                if (fluidHandler != null && fluidHandler.getTanks() > 0) {
+                ResourceHandler<FluidResource> fluidHandler = level.getCapability(Capabilities.Fluid.BLOCK, pos, side);
+                if (fluidHandler != null && fluidHandler.size() > 0) {
                     float sideAmount = 0.0f;
-                    for (int i = 0; i < fluidHandler.getTanks(); i++) {
-                        sideAmount += fluidHandler.getFluidInTank(i).getAmount();
+                    for (int i = 0; i < fluidHandler.size(); i++) {
+                        sideAmount += fluidHandler.getAmountAsLong(i);
                     }
                     sideMetrics[6 + side.ordinal()] = sideAmount;
                 }
@@ -207,19 +209,20 @@ public class NeoForgeTelemetrySampler {
             }
         }
 
-        IFluidHandler fluidHandler = resolveFluidHandler(level, pos, hitFace);
+        ResourceHandler<FluidResource> fluidHandler = resolveFluidHandler(level, pos, hitFace);
 
-        if (fluidHandler != null && fluidHandler.getTanks() > 0) {
+        if (fluidHandler != null && fluidHandler.size() > 0) {
             hasAnyCapability = true;
             processedFluidHandlers.add(fluidHandler);
-            for (int i = 0; i < fluidHandler.getTanks(); i++) {
-                var fluidStack = fluidHandler.getFluidInTank(i);
-                int tankCap = fluidHandler.getTankCapacity(i);
-                if (!fluidStack.isEmpty()) {
-                    currentFluid += fluidStack.getAmount();
-                    allTankAmounts.add(fluidStack.getAmount());
+            for (int i = 0; i < fluidHandler.size(); i++) {
+                var fluidResource = fluidHandler.getResource(i);
+                long tankCap = fluidHandler.getCapacityAsLong(i, fluidResource);
+                if (!fluidResource.isEmpty()) {
+                    long amount = fluidHandler.getAmountAsLong(i);
+                    currentFluid += amount;
+                    allTankAmounts.add((int) Math.min(amount, Integer.MAX_VALUE));
                     if (fluidName.isEmpty()) {
-                        fluidName = fluidStack.getHoverName().getString();
+                        fluidName = fluidResource.toStack(1).getHoverName().getString();
                     }
                 } else {
                     allTankAmounts.add(0);
@@ -229,12 +232,12 @@ public class NeoForgeTelemetrySampler {
         }
         int[] fluidTanks = allTankAmounts.toIntArray();
 
-        IEnergyStorage energyStorage = resolveEnergyStorage(level, pos, hitFace);
+        EnergyHandler energyStorage = resolveEnergyStorage(level, pos, hitFace);
         if (energyStorage != null) {
-            int maxCap = energyStorage.getMaxEnergyStored();
+            long maxCap = energyStorage.getCapacityAsLong();
             if (maxCap > 0) {
                 hasAnyCapability = true;
-                currentEnergy += energyStorage.getEnergyStored();
+                currentEnergy += energyStorage.getAmountAsLong();
                 maxEnergy += maxCap;
             }
         }
@@ -613,67 +616,67 @@ public class NeoForgeTelemetrySampler {
 
 
 
-    private static IItemHandler resolveItemHandler(Level level, BlockPos pos, Direction hitFace) {
+    private static ResourceHandler<ItemResource> resolveItemHandler(Level level, BlockPos pos, Direction hitFace) {
         if (hitFace != null) {
-            IItemHandler h = safeItem(level, pos, hitFace);
-            if (h != null && h.getSlots() > 0) return h;
+            ResourceHandler<ItemResource> h = safeItem(level, pos, hitFace);
+            if (h != null && h.size() > 0) return h;
         }
-        IItemHandler h = safeItem(level, pos, null);
-        if (h != null && h.getSlots() > 0) return h;
+        ResourceHandler<ItemResource> h = safeItem(level, pos, null);
+        if (h != null && h.size() > 0) return h;
         for (Direction side : Direction.values()) {
             h = safeItem(level, pos, side);
-            if (h != null && h.getSlots() > 0) return h;
+            if (h != null && h.size() > 0) return h;
         }
         return null;
     }
 
-    private static IItemHandler safeItem(Level level, BlockPos pos, Direction side) {
+    private static ResourceHandler<ItemResource> safeItem(Level level, BlockPos pos, Direction side) {
         try {
-            return level.getCapability(Capabilities.ItemHandler.BLOCK, pos, side);
+            return level.getCapability(Capabilities.Item.BLOCK, pos, side);
         } catch (Throwable ignored) {
             return null;
         }
     }
 
-    private static IFluidHandler resolveFluidHandler(Level level, BlockPos pos, Direction hitFace) {
+    private static ResourceHandler<FluidResource> resolveFluidHandler(Level level, BlockPos pos, Direction hitFace) {
         if (hitFace != null) {
-            IFluidHandler h = safeFluid(level, pos, hitFace);
-            if (h != null && h.getTanks() > 0) return h;
+            ResourceHandler<FluidResource> h = safeFluid(level, pos, hitFace);
+            if (h != null && h.size() > 0) return h;
         }
-        IFluidHandler h = safeFluid(level, pos, null);
-        if (h != null && h.getTanks() > 0) return h;
+        ResourceHandler<FluidResource> h = safeFluid(level, pos, null);
+        if (h != null && h.size() > 0) return h;
         for (Direction side : Direction.values()) {
             h = safeFluid(level, pos, side);
-            if (h != null && h.getTanks() > 0) return h;
+            if (h != null && h.size() > 0) return h;
         }
         return null;
     }
 
-    private static IFluidHandler safeFluid(Level level, BlockPos pos, Direction side) {
+    private static ResourceHandler<FluidResource> safeFluid(Level level, BlockPos pos, Direction side) {
         try {
-            return level.getCapability(Capabilities.FluidHandler.BLOCK, pos, side);
+            return level.getCapability(Capabilities.Fluid.BLOCK, pos, side);
         } catch (Throwable ignored) {
             return null;
         }
     }
 
-    private static IEnergyStorage resolveEnergyStorage(Level level, BlockPos pos, Direction hitFace) {
+    private static EnergyHandler resolveEnergyStorage(Level level, BlockPos pos, Direction hitFace) {
         if (hitFace != null) {
-            IEnergyStorage s = safeEnergy(level, pos, hitFace);
-            if (s != null && s.getMaxEnergyStored() > 0) return s;
+            EnergyHandler s = safeEnergy(level, pos, hitFace);
+            if (s != null && s.getCapacityAsLong() > 0) return s;
         }
-        IEnergyStorage s = safeEnergy(level, pos, null);
-        if (s != null && s.getMaxEnergyStored() > 0) return s;
+        EnergyHandler s = safeEnergy(level, pos, null);
+        if (s != null && s.getCapacityAsLong() > 0) return s;
         for (Direction side : Direction.values()) {
             s = safeEnergy(level, pos, side);
-            if (s != null && s.getMaxEnergyStored() > 0) return s;
+            if (s != null && s.getCapacityAsLong() > 0) return s;
         }
         return null;
     }
 
-    private static IEnergyStorage safeEnergy(Level level, BlockPos pos, Direction side) {
+    private static EnergyHandler safeEnergy(Level level, BlockPos pos, Direction side) {
         try {
-            return level.getCapability(Capabilities.EnergyStorage.BLOCK, pos, side);
+            return level.getCapability(Capabilities.Energy.BLOCK, pos, side);
         } catch (Throwable ignored) {
             return null;
         }

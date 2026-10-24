@@ -8,10 +8,10 @@ import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.entity.BlockEntity;
 import net.neoforged.neoforge.capabilities.Capabilities;
-import net.neoforged.neoforge.energy.IEnergyStorage;
-import net.neoforged.neoforge.fluids.FluidStack;
-import net.neoforged.neoforge.fluids.capability.IFluidHandler;
-import net.neoforged.neoforge.items.IItemHandler;
+import net.neoforged.neoforge.transfer.ResourceHandler;
+import net.neoforged.neoforge.transfer.energy.EnergyHandler;
+import net.neoforged.neoforge.transfer.fluid.FluidResource;
+import net.neoforged.neoforge.transfer.item.ItemResource;
 
 public class BlockCapacityReader {
 
@@ -57,22 +57,22 @@ public class BlockCapacityReader {
         boolean hitFaceHasEnergy = false;
         if (hitFace != null) {
             try {
-                IItemHandler faceItem = level.getCapability(Capabilities.ItemHandler.BLOCK, pos, hitFace);
-                if (faceItem != null && faceItem.getSlots() > 0) {
+                ResourceHandler<ItemResource> faceItem = safeItem(level, pos, hitFace);
+                if (faceItem != null && faceItem.size() > 0) {
                     hitFaceHasItems = true;
                 }
             } catch (Throwable ignored) {
             }
             try {
-                IFluidHandler faceFluid = level.getCapability(Capabilities.FluidHandler.BLOCK, pos, hitFace);
-                if (faceFluid != null && faceFluid.getTanks() > 0) {
+                ResourceHandler<FluidResource> faceFluid = safeFluid(level, pos, hitFace);
+                if (faceFluid != null && faceFluid.size() > 0) {
                     hitFaceHasFluids = true;
                 }
             } catch (Throwable ignored) {
             }
             try {
-                IEnergyStorage faceEnergy = level.getCapability(Capabilities.EnergyStorage.BLOCK, pos, hitFace);
-                if (faceEnergy != null && faceEnergy.getMaxEnergyStored() > 0) {
+                EnergyHandler faceEnergy = safeEnergy(level, pos, hitFace);
+                if (faceEnergy != null && faceEnergy.getCapacityAsLong() > 0) {
                     hitFaceHasEnergy = true;
                 }
             } catch (Throwable ignored) {
@@ -84,17 +84,14 @@ public class BlockCapacityReader {
         boolean isItemInfinite = false;
         boolean hasItemCapability = false;
 
-        IItemHandler itemHandler = resolveItemHandler(level, pos, hitFace);
+        ResourceHandler<ItemResource> itemHandler = resolveItemHandler(level, pos, hitFace);
 
-        if (itemHandler != null && itemHandler.getSlots() > 0) {
+        if (itemHandler != null && itemHandler.size() > 0) {
             hasItemCapability = true;
-            int slots = itemHandler.getSlots();
+            int slots = itemHandler.size();
             for (int i = 0; i < slots; i++) {
-                ItemStack stack = itemHandler.getStackInSlot(i);
-                if (!stack.isEmpty()) {
-                    totalItemCurrent += stack.getCount();
-                }
-                long limit = itemHandler.getSlotLimit(i);
+                totalItemCurrent += itemHandler.getAmountAsLong(i);
+                long limit = itemHandler.getCapacityAsLong(i, itemHandler.getResource(i));
                 if (limit >= Integer.MAX_VALUE || limit >= INFINITE_THRESHOLD) {
                     isItemInfinite = true;
                     limit = INFINITE_THRESHOLD;
@@ -126,22 +123,19 @@ public class BlockCapacityReader {
         boolean isFluidInfinite = false;
         boolean hasFluidCapability = false;
 
-        IFluidHandler fluidHandler = resolveFluidHandler(level, pos, hitFace);
+        ResourceHandler<FluidResource> fluidHandler = resolveFluidHandler(level, pos, hitFace);
 
-        if (fluidHandler != null && fluidHandler.getTanks() > 0) {
+        if (fluidHandler != null && fluidHandler.size() > 0) {
             hasFluidCapability = true;
-            int tanks = fluidHandler.getTanks();
+            int tanks = fluidHandler.size();
             for (int i = 0; i < tanks; i++) {
-                long cap = fluidHandler.getTankCapacity(i);
+                long cap = fluidHandler.getCapacityAsLong(i, fluidHandler.getResource(i));
                 if (cap >= Integer.MAX_VALUE || cap >= INFINITE_THRESHOLD) {
                     isFluidInfinite = true;
                     cap = INFINITE_THRESHOLD;
                 }
                 totalFluidMax += cap;
-                FluidStack stack = fluidHandler.getFluidInTank(i);
-                if (!stack.isEmpty()) {
-                    totalFluidCurrent += stack.getAmount();
-                }
+                totalFluidCurrent += fluidHandler.getAmountAsLong(i);
             }
         }
 
@@ -150,17 +144,17 @@ public class BlockCapacityReader {
         boolean isEnergyInfinite = false;
         boolean hasEnergyCapability = false;
 
-        IEnergyStorage energyStorage = resolveEnergyStorage(level, pos, hitFace);
+        EnergyHandler energyStorage = resolveEnergyStorage(level, pos, hitFace);
 
-        if (energyStorage != null && energyStorage.getMaxEnergyStored() > 0) {
+        if (energyStorage != null && energyStorage.getCapacityAsLong() > 0) {
             hasEnergyCapability = true;
-            long maxEnergy = energyStorage.getMaxEnergyStored();
+            long maxEnergy = energyStorage.getCapacityAsLong();
             if (maxEnergy >= Integer.MAX_VALUE || maxEnergy >= INFINITE_THRESHOLD) {
                 isEnergyInfinite = true;
                 maxEnergy = INFINITE_THRESHOLD;
             }
             totalEnergyMax += maxEnergy;
-            totalEnergyCurrent += energyStorage.getEnergyStored();
+            totalEnergyCurrent += energyStorage.getAmountAsLong();
         }
 
         StorageType selectedType = StorageType.NONE;
@@ -237,67 +231,67 @@ public class BlockCapacityReader {
         return new StorageCapacity(selectedType, selectedCurrent, selectedMax, selectedInfinite, true);
     }
 
-    private static IItemHandler resolveItemHandler(Level level, BlockPos pos, Direction hitFace) {
+    private static ResourceHandler<ItemResource> resolveItemHandler(Level level, BlockPos pos, Direction hitFace) {
         if (hitFace != null) {
-            IItemHandler h = safeItem(level, pos, hitFace);
-            if (h != null && h.getSlots() > 0) return h;
+            ResourceHandler<ItemResource> h = safeItem(level, pos, hitFace);
+            if (h != null && h.size() > 0) return h;
         }
-        IItemHandler h = safeItem(level, pos, null);
-        if (h != null && h.getSlots() > 0) return h;
+        ResourceHandler<ItemResource> h = safeItem(level, pos, null);
+        if (h != null && h.size() > 0) return h;
         for (Direction side : Direction.values()) {
             h = safeItem(level, pos, side);
-            if (h != null && h.getSlots() > 0) return h;
+            if (h != null && h.size() > 0) return h;
         }
         return null;
     }
 
-    private static IItemHandler safeItem(Level level, BlockPos pos, Direction side) {
+    private static ResourceHandler<ItemResource> safeItem(Level level, BlockPos pos, Direction side) {
         try {
-            return level.getCapability(Capabilities.ItemHandler.BLOCK, pos, side);
+            return level.getCapability(Capabilities.Item.BLOCK, pos, side);
         } catch (Throwable ignored) {
             return null;
         }
     }
 
-    private static IFluidHandler resolveFluidHandler(Level level, BlockPos pos, Direction hitFace) {
+    private static ResourceHandler<FluidResource> resolveFluidHandler(Level level, BlockPos pos, Direction hitFace) {
         if (hitFace != null) {
-            IFluidHandler h = safeFluid(level, pos, hitFace);
-            if (h != null && h.getTanks() > 0) return h;
+            ResourceHandler<FluidResource> h = safeFluid(level, pos, hitFace);
+            if (h != null && h.size() > 0) return h;
         }
-        IFluidHandler h = safeFluid(level, pos, null);
-        if (h != null && h.getTanks() > 0) return h;
+        ResourceHandler<FluidResource> h = safeFluid(level, pos, null);
+        if (h != null && h.size() > 0) return h;
         for (Direction side : Direction.values()) {
             h = safeFluid(level, pos, side);
-            if (h != null && h.getTanks() > 0) return h;
+            if (h != null && h.size() > 0) return h;
         }
         return null;
     }
 
-    private static IFluidHandler safeFluid(Level level, BlockPos pos, Direction side) {
+    private static ResourceHandler<FluidResource> safeFluid(Level level, BlockPos pos, Direction side) {
         try {
-            return level.getCapability(Capabilities.FluidHandler.BLOCK, pos, side);
+            return level.getCapability(Capabilities.Fluid.BLOCK, pos, side);
         } catch (Throwable ignored) {
             return null;
         }
     }
 
-    private static IEnergyStorage resolveEnergyStorage(Level level, BlockPos pos, Direction hitFace) {
+    private static EnergyHandler resolveEnergyStorage(Level level, BlockPos pos, Direction hitFace) {
         if (hitFace != null) {
-            IEnergyStorage s = safeEnergy(level, pos, hitFace);
-            if (s != null && s.getMaxEnergyStored() > 0) return s;
+            EnergyHandler s = safeEnergy(level, pos, hitFace);
+            if (s != null && s.getCapacityAsLong() > 0) return s;
         }
-        IEnergyStorage s = safeEnergy(level, pos, null);
-        if (s != null && s.getMaxEnergyStored() > 0) return s;
+        EnergyHandler s = safeEnergy(level, pos, null);
+        if (s != null && s.getCapacityAsLong() > 0) return s;
         for (Direction side : Direction.values()) {
             s = safeEnergy(level, pos, side);
-            if (s != null && s.getMaxEnergyStored() > 0) return s;
+            if (s != null && s.getCapacityAsLong() > 0) return s;
         }
         return null;
     }
 
-    private static IEnergyStorage safeEnergy(Level level, BlockPos pos, Direction side) {
+    private static EnergyHandler safeEnergy(Level level, BlockPos pos, Direction side) {
         try {
-            return level.getCapability(Capabilities.EnergyStorage.BLOCK, pos, side);
+            return level.getCapability(Capabilities.Energy.BLOCK, pos, side);
         } catch (Throwable ignored) {
             return null;
         }

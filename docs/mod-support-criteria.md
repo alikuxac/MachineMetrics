@@ -39,7 +39,7 @@ A mod requires a dedicated adapter only when it meets all five criteria:
 2. **Maps to supported HUD metrics.** Telemetry must fit items, fluids, energy, chemicals, kinetics, networks, or container capacity.
 3. **Provides stable reflection targets.** Class and method names must remain consistent across releases. Official API methods take precedence over internal fields.
 4. **Maintains high player adoption.** The mod appears in major modpacks or shows high download volume to justify maintenance.
-5. **Functions on NeoForge and Forge.** Shared adapters live in `common/` and must pass verification on both loaders.
+5. **Functions on NeoForge.** Shared adapters live in `common/` and must pass verification on the current NeoForge target.
 
 ---
 

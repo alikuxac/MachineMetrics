@@ -25,7 +25,7 @@ public class NeoForgeClientEventHandler {
                 Component msg = KeyBindings.hudEnabled
                         ? Component.translatable("machinemetrics.hud.enabled").withStyle(ChatFormatting.GREEN)
                         : Component.translatable("machinemetrics.hud.disabled").withStyle(ChatFormatting.RED);
-                mc.player.displayClientMessage(msg, true);
+                mc.player.sendOverlayMessage(msg);
             }
         }
     }

@@ -6,19 +6,18 @@ import com.alikuxac.machinemetrics.compat.create.CreateKineticInspector;
 import com.alikuxac.machinemetrics.compat.infohud.InfoHudDetector;
 import com.alikuxac.machinemetrics.compat.mekanism.MekanismChemicalInspector;
 import com.alikuxac.machinemetrics.config.ClientConfig;
-import com.alikuxac.machinemetrics.network.RequestTelemetryPayload;
+import com.alikuxac.machinemetrics.platform.Services;
 import com.alikuxac.machinemetrics.platform.Services.ClientSampler;
 import com.alikuxac.machinemetrics.telemetry.TelemetryData;
 import net.minecraft.ChatFormatting;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.Font;
-import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.network.chat.Component;
 import net.minecraft.world.phys.BlockHitResult;
 import net.minecraft.world.phys.HitResult;
-import net.neoforged.neoforge.network.PacketDistributor;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -34,7 +33,7 @@ public class TelemetryHudRenderer {
     private static Direction lastSentFace = null;
     private static long lastRequestTimeMs = 0L;
 
-    public static void renderHud(GuiGraphics graphics, ClientSampler sampler) {
+    public static void renderHud(GuiGraphicsExtractor graphics, ClientSampler sampler) {
         if (!KeyBindings.hudEnabled) {
             return;
         }
@@ -81,7 +80,7 @@ public class TelemetryHudRenderer {
                 lastSentFace = hitFace;
                 try {
                     if (mc.getConnection() != null) {
-                        PacketDistributor.sendToServer(new RequestTelemetryPayload(targetPos, hitFace));
+                        Services.NETWORK_SENDER.sendRequest(targetPos, hitFace);
                     }
                 } catch (Exception ignored) {
                 }
@@ -674,7 +673,7 @@ public class TelemetryHudRenderer {
         return new int[]{x, y};
     }
 
-    private static void renderAdaptiveHud(GuiGraphics graphics, Minecraft mc, List<HudLine> lines) {
+    private static void renderAdaptiveHud(GuiGraphicsExtractor graphics, Minecraft mc, List<HudLine> lines) {
         Font font = mc.font;
         int maxLineWidth = 0;
         for (HudLine line : lines) {
@@ -700,11 +699,11 @@ public class TelemetryHudRenderer {
 
         float scale = ClientConfig.HUD_SCALE != null ? ClientConfig.HUD_SCALE.get().floatValue() : 1.0f;
 
-        graphics.pose().pushPose();
+        graphics.pose().pushMatrix();
         if (scale != 1.0f) {
-            graphics.pose().translate(renderX, renderY, 0);
-            graphics.pose().scale(scale, scale, 1.0f);
-            graphics.pose().translate(-renderX, -renderY, 0);
+            graphics.pose().translate(renderX, renderY);
+            graphics.pose().scale(scale, scale);
+            graphics.pose().translate(-renderX, -renderY);
         }
 
         int bgColor = ClientConfig.parseHexColor(ClientConfig.BACKGROUND_COLOR, 0x90000000);
@@ -712,15 +711,15 @@ public class TelemetryHudRenderer {
 
         // Backdrop & Outline
         graphics.fill(renderX, renderY, renderX + boxWidth, renderY + boxHeight, bgColor);
-        graphics.renderOutline(renderX, renderY, boxWidth, boxHeight, borderColor);
+        graphics.outline(renderX, renderY, boxWidth, boxHeight, borderColor);
 
         // Render sequential lines
         int currentY = renderY + paddingY;
         for (HudLine line : lines) {
-            graphics.drawString(font, line.text(), renderX + paddingX, currentY, line.color());
+            graphics.text(font, line.text(), renderX + paddingX, currentY, line.color());
             currentY += lineHeight;
         }
 
-        graphics.pose().popPose();
+        graphics.pose().popMatrix();
     }
 }

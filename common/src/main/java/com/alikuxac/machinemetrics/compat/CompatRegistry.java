@@ -2,7 +2,7 @@ package com.alikuxac.machinemetrics.compat;
 
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.registries.BuiltInRegistries;
-import net.minecraft.resources.ResourceLocation;
+import net.minecraft.resources.Identifier;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.state.BlockState;
@@ -42,7 +42,7 @@ public final class CompatRegistry {
         }
         return NAMESPACE_CACHE.computeIfAbsent(block, b -> {
             try {
-                ResourceLocation key = BuiltInRegistries.BLOCK.getKey(b);
+                Identifier key = BuiltInRegistries.BLOCK.getKey(b);
                 return key != null ? key.getNamespace() : UNKNOWN;
             } catch (Throwable ignored) {
                 return UNKNOWN;
@@ -64,7 +64,7 @@ public final class CompatRegistry {
         }
         return PATH_CACHE.computeIfAbsent(block, b -> {
             try {
-                ResourceLocation key = BuiltInRegistries.BLOCK.getKey(b);
+                Identifier key = BuiltInRegistries.BLOCK.getKey(b);
                 return key != null ? key.getPath() : UNKNOWN;
             } catch (Throwable ignored) {
                 return UNKNOWN;
@@ -78,7 +78,7 @@ public final class CompatRegistry {
             return "unknown";
         }
         try {
-            ResourceLocation key = BuiltInRegistries.BLOCK.getKey(state.getBlock());
+            Identifier key = BuiltInRegistries.BLOCK.getKey(state.getBlock());
             return key != null ? key.toString() : "unknown";
         } catch (Throwable ignored) {
             return "unknown";

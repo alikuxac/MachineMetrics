@@ -14,7 +14,7 @@ import com.alikuxac.machinemetrics.compat.Reflect;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.core.registries.BuiltInRegistries;
-import net.minecraft.resources.ResourceLocation;
+import net.minecraft.resources.Identifier;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.entity.BlockEntity;
@@ -324,7 +324,7 @@ public class AE2NetworkInspector {
                 return false;
             }
             try {
-                ResourceLocation key = BuiltInRegistries.ITEM.getKey(cellItem);
+                Identifier key = BuiltInRegistries.ITEM.getKey(cellItem);
                 return key != null
                         && "ae2".equals(key.getNamespace())
                         && key.getPath().contains("creative");

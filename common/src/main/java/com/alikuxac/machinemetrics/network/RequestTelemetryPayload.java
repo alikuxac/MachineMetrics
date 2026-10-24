@@ -5,10 +5,10 @@ import net.minecraft.core.Direction;
 import net.minecraft.network.FriendlyByteBuf;
 import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
-import net.minecraft.resources.ResourceLocation;
+import net.minecraft.resources.Identifier;
 
 public record RequestTelemetryPayload(BlockPos targetPos, Direction hitFace) implements CustomPacketPayload {
-    public static final Type<RequestTelemetryPayload> TYPE = new Type<>(ResourceLocation.fromNamespaceAndPath("machinemetrics", "request_telemetry"));
+    public static final Type<RequestTelemetryPayload> TYPE = new Type<>(Identifier.fromNamespaceAndPath("machinemetrics", "request_telemetry"));
 
     public static final StreamCodec<FriendlyByteBuf, RequestTelemetryPayload> STREAM_CODEC = StreamCodec.of(
             (buf, payload) -> {

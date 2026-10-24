@@ -1,5 +1,5 @@
 {
-  "key.categories.machinemetrics": "Machine Metrics",
+  "key.category.machinemetrics.main": "Machine Metrics",
   "key.machinemetrics.toggle_hud": "Toggle Telemetry HUD",
   "machinemetrics.hud.title": "Telemetry",
   "machinemetrics.hud.detailed_title": "Telemetry HUD",

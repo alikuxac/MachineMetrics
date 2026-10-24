@@ -11,7 +11,8 @@ import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.block.state.BlockState;
 import net.neoforged.neoforge.capabilities.Capabilities;
-import net.neoforged.neoforge.items.IItemHandler;
+import net.neoforged.neoforge.transfer.ResourceHandler;
+import net.neoforged.neoforge.transfer.item.ItemResource;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -175,19 +176,19 @@ public class SophisticatedStorageAdapter {
             return Optional.empty();
         }
 
-        IItemHandler handler = null;
+        ResourceHandler<ItemResource> handler = null;
         try {
-            handler = level.getCapability(Capabilities.ItemHandler.BLOCK, pos, hitFace);
+            handler = level.getCapability(Capabilities.Item.BLOCK, pos, hitFace);
             if (handler == null) {
                 for (Direction side : Direction.values()) {
-                    handler = level.getCapability(Capabilities.ItemHandler.BLOCK, pos, side);
+                    handler = level.getCapability(Capabilities.Item.BLOCK, pos, side);
                     if (handler != null) {
                         break;
                     }
                 }
             }
             if (handler == null) {
-                handler = level.getCapability(Capabilities.ItemHandler.BLOCK, pos, null);
+                handler = level.getCapability(Capabilities.Item.BLOCK, pos, null);
             }
         } catch (Throwable ignored) {
         }
@@ -197,7 +198,7 @@ public class SophisticatedStorageAdapter {
         }
 
         try {
-            int slots = handler.getSlots();
+            int slots = handler.size();
             if (slots <= 0) {
                 return Optional.empty();
             }
@@ -212,15 +213,16 @@ public class SophisticatedStorageAdapter {
             }
 
             for (int i = 0; i < slots; i++) {
-                ItemStack stack = handler.getStackInSlot(i);
-                boolean hasItem = stack != null && !stack.isEmpty();
+                ItemResource resource = handler.getResource(i);
+                ItemStack stack = resource.toStack();
+                boolean hasItem = !stack.isEmpty();
                 if (hasItem) {
-                    storedItems += stack.getCount();
+                    storedItems += handler.getAmountAsLong(i);
                 }
 
                 long slotLimit = 0L;
                 try {
-                    slotLimit = handler.getSlotLimit(i);
+                    slotLimit = handler.getCapacityAsLong(i, resource);
                 } catch (Throwable ignored) {
                 }
 

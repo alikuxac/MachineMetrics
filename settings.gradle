@@ -2,4 +2,4 @@ rootProject.name = 'machinemetrics'
 
 include 'common'
 include 'neoforge'
-include 'forge'
+include 'mekanism-api-stub'

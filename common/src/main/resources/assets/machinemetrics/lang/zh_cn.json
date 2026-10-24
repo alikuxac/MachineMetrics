@@ -1,5 +1,5 @@
 {
-  "key.categories.machinemetrics": "Machine Metrics",
+  "key.category.machinemetrics.main": "Machine Metrics",
   "key.machinemetrics.toggle_hud": "切换遥测 HUD 显示",
   "machinemetrics.hud.title": "Telemetry",
   "machinemetrics.hud.detailed_title": "Telemetry HUD",

@@ -7,7 +7,7 @@ import net.minecraft.core.BlockPos;
 import net.minecraft.network.FriendlyByteBuf;
 import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
-import net.minecraft.resources.ResourceLocation;
+import net.minecraft.resources.Identifier;
 
 public record SyncTelemetryPayload(
         BlockPos targetPos,
@@ -52,7 +52,7 @@ public record SyncTelemetryPayload(
         float netRate,
         byte logisticsFlags
 ) implements CustomPacketPayload {
-    public static final Type<SyncTelemetryPayload> TYPE = new Type<>(ResourceLocation.fromNamespaceAndPath("machinemetrics", "sync_telemetry"));
+    public static final Type<SyncTelemetryPayload> TYPE = new Type<>(Identifier.fromNamespaceAndPath("machinemetrics", "sync_telemetry"));
 
     public static final StreamCodec<FriendlyByteBuf, SyncTelemetryPayload> STREAM_CODEC = 
             StreamCodec.of(SyncTelemetryPayload::encode, SyncTelemetryPayload::decode);
