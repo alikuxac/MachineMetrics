@@ -14,7 +14,7 @@ A high-tech standalone client-side HUD mod displaying real-time machine telemetr
 [[dependencies.machinemetrics]]
     modId="forge"
     mandatory=true
-    versionRange="[${forge_version},)"
+    versionRange="[52,)"
     ordering="NONE"
     side="BOTH"
 

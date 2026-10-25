@@ -4,6 +4,8 @@ Machine Metrics is a client-side and server-synced telemetry HUD for Minecraft. 
 
 > **Note:** This mod is currently in beta. Features and network protocols may change between updates. Back up your worlds before updating.
 
+**Documentation:** [https://docs.alikuxac.xyz/mods/machine-metrics](https://docs.alikuxac.xyz/mods/machine-metrics/)
+
 ---
 
 ### Features

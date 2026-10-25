@@ -12,7 +12,7 @@ Machine Metrics provides dedicated adapters for selected high-traffic mods and r
 | **Tier 2: Generic** | Standard capabilities | `BlockCapacityReader` fallback | None |
 | **Tier 3: Community** | Contributed niche mods | Reflection heuristics | Review and merge |
 
-Tier 2 applies automatically to any block exposing `IItemHandler`, `IFluidHandler`, or `IEnergyStorage` capabilities. Blocks without dedicated adapters run on this fallback.
+Tier 2 applies automatically to any block exposing item, fluid, or energy capabilities. Blocks without dedicated adapters run on this fallback. Loader-agnostic capability access goes through the `platform.storage` abstraction (`StorageAccess` + `ItemStorage`/`FluidStorage`/`EnergyStorage`), implemented per loader (`NeoForgeStorageLookup`, `ForgeStorageLookup`), so adapters and readers compiled in `common/` never reference `net.neoforged.*` or `net.minecraftforge.*` directly.
 
 ---
 

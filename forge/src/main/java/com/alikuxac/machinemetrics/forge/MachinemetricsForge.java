@@ -12,8 +12,6 @@ import com.alikuxac.machinemetrics.platform.network.NetworkPlatform;
 import com.mojang.logging.LogUtils;
 import net.minecraftforge.api.distmarker.Dist;
 import net.minecraftforge.common.ForgeConfigSpec;
-import net.minecraftforge.fml.ModContainer;
-import net.minecraftforge.fml.ModLoadingContext;
 import net.minecraftforge.fml.common.Mod;
 import net.minecraftforge.fml.config.ModConfig;
 import net.minecraftforge.fml.javafmlmod.FMLJavaModLoadingContext;
@@ -28,12 +26,12 @@ public class MachinemetricsForge {
     public MachinemetricsForge(FMLJavaModLoadingContext context) {
         ForgeConfigFactory.install();
         ForgeStorageLookup.install();
+        ForgeNetworkPlatform.install();
         NetworkPlatform.setRegistrationHook(NetworkHandler::register);
 
         Services.SERVER_SAMPLER = ForgeServerTelemetrySampler::sampleTargetBlock;
-        ForgeNetworkPlatform.install();
 
-        ModLoadingContext.get().registerConfig(ModConfig.Type.SERVER, (ForgeConfigSpec) ServerConfig.SPEC.nativeSpec());
+        context.registerConfig(ModConfig.Type.SERVER, (ForgeConfigSpec) ServerConfig.SPEC.nativeSpec());
 
         if (FMLEnvironment.dist == Dist.CLIENT) {
             ForgeClientInit.init(context, context.getContainer());

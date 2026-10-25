@@ -10,7 +10,6 @@ import net.minecraftforge.common.ForgeConfigSpec;
 import net.minecraftforge.common.MinecraftForge;
 import net.minecraftforge.eventbus.api.IEventBus;
 import net.minecraftforge.fml.ModContainer;
-import net.minecraftforge.fml.ModLoadingContext;
 import net.minecraftforge.fml.config.ModConfig;
 import net.minecraftforge.fml.javafmlmod.FMLJavaModLoadingContext;
 
@@ -19,7 +18,7 @@ public class ForgeClientInit {
     public static void init(FMLJavaModLoadingContext context, ModContainer modContainer) {
         ForgeConfigFactory.install();
 
-        ModLoadingContext.get().registerConfig(ModConfig.Type.CLIENT, (ForgeConfigSpec) ClientConfig.SPEC.nativeSpec());
+        context.registerConfig(ModConfig.Type.CLIENT, (ForgeConfigSpec) ClientConfig.SPEC.nativeSpec());
         modContainer.registerExtensionPoint(
                 ConfigScreenHandler.ConfigScreenFactory.class,
                 () -> new ConfigScreenHandler.ConfigScreenFactory(

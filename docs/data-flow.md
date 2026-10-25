@@ -91,18 +91,21 @@ Rates use differential time sampling against `SampleHistory`:
 
 ## 3. Network Payload Compression
 
-`SyncTelemetryPayload` uses bitmask serialization. A 1-byte presence mask indicates which data fields follow in the packet:
+`SyncTelemetryPayload` uses bitmask serialization. A varint presence mask (`PRESENT_*`, distinct from `TelemetryData.MASK_*`) indicates which data fields follow in the packet:
 
 | Bit Flag | Mask Name | Payload Written if Bit Set |
 | :--- | :--- | :--- |
 | `0x01` | Items | `float itemThroughput`, `boolean hasItems` |
-| `0x02` | Fluids | `float fluidThroughput`, `boolean hasFluids` |
+| `0x02` | Fluids | `float fluidThroughput`, `boolean hasFluids`, `String fluidName`, `long fluidAmount`, `long fluidCapacity` |
 | `0x04` | Energy | `float energyDelta`, `boolean hasEnergy` |
 | `0x08` | Kinetic | `float speed`, `stress`, `capacity`, `byte direction` |
-| `0x10` | Chemicals | `float chemicalThroughput`, `boolean hasChemicals` |
+| `0x10` | Chemicals | `float chemicalThroughput`, `String chemicalName`, `long chemicalAmount`, `long chemicalCapacity` |
 | `0x20` | AE2 | `float powerRate`, `powerDrain`, `subnetDrain`, `short subnets`, `double stored`, `double max`, `byte stability`, `int usedChannels`, `int maxChannels` |
 | `0x40` | Directional Sides | Variable length array of per-face active rates |
 | `0x80` | Server Disabled Mask | `short serverDisabledMask` (Flags restricted features) |
+| `0x100` | Storage | `logisticsFlags`, `storageCurrent`, `storageMax`, `netRate` |
+
+> The presence mask is a **varint**, not a single byte: the storage bit (`0x100`) exceeds 8 bits, so packets carrying storage data use a 2-byte varint header.
 
 ### Storage Sync Payload
 
