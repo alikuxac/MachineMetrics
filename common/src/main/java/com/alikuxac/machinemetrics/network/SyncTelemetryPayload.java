@@ -33,8 +33,6 @@ public record SyncTelemetryPayload(
         byte kineticDirection,
         byte machineState,
         float[] sideMetrics,
-        IntArrayList allSlotCounts,
-        IntArrayList allTankAmounts,
         short serverDisabledMask,
         boolean hasAe2Network,
         float aePowerRate,
@@ -87,8 +85,6 @@ public record SyncTelemetryPayload(
                 dirByte,
                 (byte) data.bottleneckState().ordinal(),
                 data.sideMetrics(),
-                data.allSlotCounts(),
-                data.allTankAmounts(),
                 serverDisabledMask,
                 data.hasAe2Network(),
                 data.aePowerRate(),
@@ -135,8 +131,8 @@ public record SyncTelemetryPayload(
                 hasKinetic,
                 dir,
                 state,
-                allSlotCounts != null ? allSlotCounts : new IntArrayList(),
-                allTankAmounts != null ? allTankAmounts : new IntArrayList(),
+                new IntArrayList(),
+                new IntArrayList(),
                 sideMetrics != null ? sideMetrics : new float[18],
                 serverDisabledMask,
                 hasAe2Network,
@@ -157,15 +153,17 @@ public record SyncTelemetryPayload(
         );
     }
 
-    public static final int FLAG_ITEMS     = 1 << 0;
-    public static final int FLAG_FLUIDS    = 1 << 1;
-    public static final int FLAG_ENERGY    = 1 << 2;
-    public static final int FLAG_KINETIC   = 1 << 3;
-    public static final int FLAG_CHEMICALS = 1 << 4;
-    public static final int FLAG_AE2       = 1 << 5;
-    public static final int FLAG_SIDES     = 1 << 6;
-    public static final int FLAG_DISABLED  = 1 << 7;
-    public static final int FLAG_STORAGE   = 1 << 8;
+    // Wire presence flags (which fields are present in the packet). Distinct from TelemetryData.MASK_*
+    // (which fields are config-disabled); do not conflate the two bit sets.
+    public static final int PRESENT_ITEMS     = 1 << 0;
+    public static final int PRESENT_FLUIDS    = 1 << 1;
+    public static final int PRESENT_ENERGY    = 1 << 2;
+    public static final int PRESENT_KINETIC   = 1 << 3;
+    public static final int PRESENT_CHEMICALS = 1 << 4;
+    public static final int PRESENT_AE2       = 1 << 5;
+    public static final int PRESENT_SIDES     = 1 << 6;
+    public static final int PRESENT_DISABLED  = 1 << 7;
+    public static final int PRESENT_STORAGE   = 1 << 8;
 
     private static boolean hasActiveSides(float[] sides) {
         if (sides == null) return false;
@@ -178,47 +176,47 @@ public record SyncTelemetryPayload(
     private static void encode(FriendlyByteBuf buf, SyncTelemetryPayload payload) {
         int flags = 0;
         if (payload.hasItems || payload.itemThroughput > 0.001f) {
-            flags |= FLAG_ITEMS;
+            flags |= PRESENT_ITEMS;
         }
         if (payload.hasFluids || payload.fluidThroughput > 0.001f || payload.fluidCapacity > 0) {
-            flags |= FLAG_FLUIDS;
+            flags |= PRESENT_FLUIDS;
         }
         if (payload.hasEnergy || Math.abs(payload.energyDelta) > 0.001f) {
-            flags |= FLAG_ENERGY;
+            flags |= PRESENT_ENERGY;
         }
         if (payload.hasKinetic || Math.abs(payload.kineticSpeed) > 0.001f || payload.kineticCapacity > 0.001f) {
-            flags |= FLAG_KINETIC;
+            flags |= PRESENT_KINETIC;
         }
         if (payload.hasChemicals || payload.chemicalThroughput > 0.001f || payload.chemicalCapacity > 0) {
-            flags |= FLAG_CHEMICALS;
+            flags |= PRESENT_CHEMICALS;
         }
         if (payload.hasAe2Network) {
-            flags |= FLAG_AE2;
+            flags |= PRESENT_AE2;
         }
         if (hasActiveSides(payload.sideMetrics)) {
-            flags |= FLAG_SIDES;
+            flags |= PRESENT_SIDES;
         }
         if (payload.serverDisabledMask != 0) {
-            flags |= FLAG_DISABLED;
+            flags |= PRESENT_DISABLED;
         }
         if (payload.storageMax > 0 || payload.storageCurrent > 0 || (payload.logisticsFlags & TelemetryData.FLAG_LOGISTICS_HAS_STORAGE) != 0 || Math.abs(payload.netRate) > 0.001f) {
-            flags |= FLAG_STORAGE;
+            flags |= PRESENT_STORAGE;
         }
 
         buf.writeBlockPos(payload.targetPos);
         buf.writeByte(payload.machineState);
         buf.writeVarInt(flags);
 
-        if ((flags & FLAG_DISABLED) != 0) {
+        if ((flags & PRESENT_DISABLED) != 0) {
             buf.writeShort(payload.serverDisabledMask);
         }
 
-        if ((flags & FLAG_ITEMS) != 0) {
+        if ((flags & PRESENT_ITEMS) != 0) {
             buf.writeFloat(payload.itemThroughput);
             buf.writeBoolean(payload.hasItems);
         }
 
-        if ((flags & FLAG_FLUIDS) != 0) {
+        if ((flags & PRESENT_FLUIDS) != 0) {
             buf.writeFloat(payload.fluidThroughput);
             buf.writeBoolean(payload.hasFluids);
             buf.writeUtf(payload.fluidName != null ? payload.fluidName : "");
@@ -226,12 +224,12 @@ public record SyncTelemetryPayload(
             buf.writeVarLong(payload.fluidCapacity);
         }
 
-        if ((flags & FLAG_ENERGY) != 0) {
+        if ((flags & PRESENT_ENERGY) != 0) {
             buf.writeFloat(payload.energyDelta);
             buf.writeBoolean(payload.hasEnergy);
         }
 
-        if ((flags & FLAG_KINETIC) != 0) {
+        if ((flags & PRESENT_KINETIC) != 0) {
             buf.writeFloat(payload.kineticSpeed);
             buf.writeFloat(payload.kineticStress);
             buf.writeFloat(payload.kineticCapacity);
@@ -239,14 +237,14 @@ public record SyncTelemetryPayload(
             buf.writeByte(payload.kineticDirection);
         }
 
-        if ((flags & FLAG_CHEMICALS) != 0) {
+        if ((flags & PRESENT_CHEMICALS) != 0) {
             buf.writeFloat(payload.chemicalThroughput);
             buf.writeUtf(payload.chemicalName != null ? payload.chemicalName : "");
             buf.writeVarLong(payload.chemicalAmount);
             buf.writeVarLong(payload.chemicalCapacity);
         }
 
-        if ((flags & FLAG_AE2) != 0) {
+        if ((flags & PRESENT_AE2) != 0) {
             buf.writeFloat(payload.aePowerRate);
             buf.writeFloat(payload.aePowerDrain);
             buf.writeFloat(payload.aeSubnetDrain);
@@ -259,7 +257,7 @@ public record SyncTelemetryPayload(
             buf.writeVarInt(payload.aeMaxChannels);
         }
 
-        if ((flags & FLAG_SIDES) != 0) {
+        if ((flags & PRESENT_SIDES) != 0) {
             int nonZeroMask = 0;
             for (int i = 0; i < 18; i++) {
                 if (payload.sideMetrics != null && i < payload.sideMetrics.length && payload.sideMetrics[i] > 0.01f) {
@@ -274,7 +272,7 @@ public record SyncTelemetryPayload(
             }
         }
 
-        if ((flags & FLAG_STORAGE) != 0) {
+        if ((flags & PRESENT_STORAGE) != 0) {
             buf.writeVarLong(payload.storageCurrent);
             buf.writeVarLong(payload.storageMax);
             buf.writeFloat(payload.netRate);
@@ -287,11 +285,11 @@ public record SyncTelemetryPayload(
         byte machineState = buf.readByte();
         int flags = buf.readVarInt();
 
-        short serverDisabledMask = (flags & FLAG_DISABLED) != 0 ? buf.readShort() : (short) 0;
+        short serverDisabledMask = (flags & PRESENT_DISABLED) != 0 ? buf.readShort() : (short) 0;
 
         float itemThroughput = 0.0f;
         boolean hasItems = false;
-        if ((flags & FLAG_ITEMS) != 0) {
+        if ((flags & PRESENT_ITEMS) != 0) {
             itemThroughput = buf.readFloat();
             hasItems = buf.readBoolean();
         }
@@ -301,7 +299,7 @@ public record SyncTelemetryPayload(
         String fluidName = "";
         long fluidAmount = 0L;
         long fluidCapacity = 0L;
-        if ((flags & FLAG_FLUIDS) != 0) {
+        if ((flags & PRESENT_FLUIDS) != 0) {
             fluidThroughput = buf.readFloat();
             hasFluids = buf.readBoolean();
             fluidName = buf.readUtf();
@@ -311,7 +309,7 @@ public record SyncTelemetryPayload(
 
         float energyDelta = 0.0f;
         boolean hasEnergy = false;
-        if ((flags & FLAG_ENERGY) != 0) {
+        if ((flags & PRESENT_ENERGY) != 0) {
             energyDelta = buf.readFloat();
             hasEnergy = buf.readBoolean();
         }
@@ -320,7 +318,7 @@ public record SyncTelemetryPayload(
         float kineticStress = 0.0f;
         float kineticCapacity = 0.0f;
         float kineticBlockStress = 0.0f;
-        boolean hasKinetic = (flags & FLAG_KINETIC) != 0;
+        boolean hasKinetic = (flags & PRESENT_KINETIC) != 0;
         byte kineticDirection = 2;
         if (hasKinetic) {
             kineticSpeed = buf.readFloat();
@@ -331,7 +329,7 @@ public record SyncTelemetryPayload(
         }
 
         float chemicalThroughput = 0.0f;
-        boolean hasChemicals = (flags & FLAG_CHEMICALS) != 0;
+        boolean hasChemicals = (flags & PRESENT_CHEMICALS) != 0;
         String chemicalName = "";
         long chemicalAmount = 0L;
         long chemicalCapacity = 0L;
@@ -342,7 +340,7 @@ public record SyncTelemetryPayload(
             chemicalCapacity = buf.readVarLong();
         }
 
-        boolean hasAe2Network = (flags & FLAG_AE2) != 0;
+        boolean hasAe2Network = (flags & PRESENT_AE2) != 0;
         float aePowerRate = 0.0f;
         float aePowerDrain = 0.0f;
         float aeSubnetDrain = 0.0f;
@@ -367,7 +365,7 @@ public record SyncTelemetryPayload(
         }
 
         float[] sideMetrics = new float[18];
-        if ((flags & FLAG_SIDES) != 0) {
+        if ((flags & PRESENT_SIDES) != 0) {
             int nonZeroMask = buf.readVarInt();
             for (int i = 0; i < 18; i++) {
                 if ((nonZeroMask & (1 << i)) != 0) {
@@ -380,7 +378,7 @@ public record SyncTelemetryPayload(
         long storageMax = 0L;
         float netRate = 0.0f;
         byte logisticsFlags = (byte) 0;
-        if ((flags & FLAG_STORAGE) != 0) {
+        if ((flags & PRESENT_STORAGE) != 0) {
             storageCurrent = buf.readVarLong();
             storageMax = buf.readVarLong();
             netRate = buf.readFloat();
@@ -411,8 +409,6 @@ public record SyncTelemetryPayload(
                 kineticDirection,
                 machineState,
                 sideMetrics,
-                new IntArrayList(),
-                new IntArrayList(),
                 serverDisabledMask,
                 hasAe2Network,
                 aePowerRate,

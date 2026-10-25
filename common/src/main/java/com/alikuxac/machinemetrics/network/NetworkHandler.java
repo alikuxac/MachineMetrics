@@ -1,13 +1,13 @@
 package com.alikuxac.machinemetrics.network;
 
 import com.alikuxac.machinemetrics.client.ClientTelemetryCache;
+import com.alikuxac.machinemetrics.config.ServerConfig;
 import com.alikuxac.machinemetrics.platform.Services;
+import com.alikuxac.machinemetrics.platform.network.NetworkPlatform;
 import com.alikuxac.machinemetrics.telemetry.TelemetryData;
 import net.minecraft.core.Direction;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
-import net.neoforged.neoforge.network.event.RegisterPayloadHandlersEvent;
-import net.neoforged.neoforge.network.handling.IPayloadContext;
 
 import net.minecraft.core.BlockPos;
 
@@ -18,52 +18,67 @@ public class NetworkHandler {
 
     private record SentEntry(TelemetryData data, long timestampMs) {}
     private static final Map<BlockPos, SentEntry> LAST_SENT_TO_CLIENT = new ConcurrentHashMap<>();
+    // ponytail: entries only need to live long enough for the next request; evict anything idle.
+    private static final long SENT_ENTRY_EXPIRE_MS = 10000L;
+    private static volatile long lastCleanupMs = 0L;
 
-    public static void register(RegisterPayloadHandlersEvent event) {
-        var registrar = event.registrar("1.0.0").optional();
+    private static void cleanupStaleEntries(long now) {
+        if (now - lastCleanupMs < SENT_ENTRY_EXPIRE_MS) {
+            return;
+        }
+        lastCleanupMs = now;
+        LAST_SENT_TO_CLIENT.entrySet().removeIf(entry -> now - entry.getValue().timestampMs() > SENT_ENTRY_EXPIRE_MS);
+    }
+
+    public static void register(NetworkPlatform.RegisterEvent event) {
+        NetworkPlatform.Registrar registrar = event.registrar("1.0.0");
 
         registrar.playToServer(
+                RequestTelemetryPayload.class,
                 RequestTelemetryPayload.TYPE,
                 RequestTelemetryPayload.STREAM_CODEC,
                 NetworkHandler::handleRequestPayload
         );
 
         registrar.playToClient(
+                SyncTelemetryPayload.class,
                 SyncTelemetryPayload.TYPE,
                 SyncTelemetryPayload.STREAM_CODEC,
                 NetworkHandler::handleSyncPayload
         );
     }
 
-    private static void handleRequestPayload(RequestTelemetryPayload payload, IPayloadContext context) {
+    private static void handleRequestPayload(RequestTelemetryPayload payload, NetworkPlatform.Context context) {
         context.enqueueWork(() -> {
-            if (context.player() instanceof ServerPlayer serverPlayer) {
+            ServerPlayer serverPlayer = context.player();
+            if (serverPlayer != null) {
                 ServerLevel serverLevel = serverPlayer.serverLevel();
                 BlockPos targetPos = payload.targetPos();
                 Direction hitFace = payload.hitFace();
                 TelemetryData data = Services.SERVER_SAMPLER.sample(serverLevel, targetPos, hitFace);
-                
+
                 short disabledMask = 0;
-                if (com.alikuxac.machinemetrics.config.ServerConfig.ALLOW_ITEMS != null && !com.alikuxac.machinemetrics.config.ServerConfig.ALLOW_ITEMS.get()) {
+                if (ServerConfig.ALLOW_ITEMS != null && !ServerConfig.ALLOW_ITEMS.get()) {
                     disabledMask |= TelemetryData.MASK_ITEMS;
                 }
-                if (com.alikuxac.machinemetrics.config.ServerConfig.ALLOW_FLUIDS != null && !com.alikuxac.machinemetrics.config.ServerConfig.ALLOW_FLUIDS.get()) {
+                if (ServerConfig.ALLOW_FLUIDS != null && !ServerConfig.ALLOW_FLUIDS.get()) {
                     disabledMask |= TelemetryData.MASK_FLUIDS;
                 }
-                if (com.alikuxac.machinemetrics.config.ServerConfig.ALLOW_ENERGY != null && !com.alikuxac.machinemetrics.config.ServerConfig.ALLOW_ENERGY.get()) {
+                if (ServerConfig.ALLOW_ENERGY != null && !ServerConfig.ALLOW_ENERGY.get()) {
                     disabledMask |= TelemetryData.MASK_ENERGY;
                 }
-                if (com.alikuxac.machinemetrics.config.ServerConfig.ALLOW_KINETIC != null && !com.alikuxac.machinemetrics.config.ServerConfig.ALLOW_KINETIC.get()) {
+                if (ServerConfig.ALLOW_KINETIC != null && !ServerConfig.ALLOW_KINETIC.get()) {
                     disabledMask |= TelemetryData.MASK_KINETIC;
                 }
-                if (com.alikuxac.machinemetrics.config.ServerConfig.ALLOW_CHEMICALS != null && !com.alikuxac.machinemetrics.config.ServerConfig.ALLOW_CHEMICALS.get()) {
+                if (ServerConfig.ALLOW_CHEMICALS != null && !ServerConfig.ALLOW_CHEMICALS.get()) {
                     disabledMask |= TelemetryData.MASK_CHEMICALS;
                 }
-                if (com.alikuxac.machinemetrics.config.ServerConfig.ALLOW_SIDE_METRICS != null && !com.alikuxac.machinemetrics.config.ServerConfig.ALLOW_SIDE_METRICS.get()) {
+                if (ServerConfig.ALLOW_SIDE_METRICS != null && !ServerConfig.ALLOW_SIDE_METRICS.get()) {
                     disabledMask |= TelemetryData.MASK_SIDES;
                 }
 
                 long now = System.currentTimeMillis();
+                cleanupStaleEntries(now);
                 SentEntry lastSent = LAST_SENT_TO_CLIENT.get(targetPos);
                 if (lastSent == null || data.hasSignificantDelta(lastSent.data) || (now - lastSent.timestampMs >= 1500L)) {
                     LAST_SENT_TO_CLIENT.put(targetPos, new SentEntry(data, now));
@@ -74,7 +89,7 @@ public class NetworkHandler {
         });
     }
 
-    private static void handleSyncPayload(SyncTelemetryPayload payload, IPayloadContext context) {
+    private static void handleSyncPayload(SyncTelemetryPayload payload, NetworkPlatform.Context context) {
         context.enqueueWork(() -> {
             ClientTelemetryCache.putSynced(payload.targetPos(), payload.toTelemetryData());
         });

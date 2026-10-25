@@ -1,6 +1,6 @@
 plugins {
     id 'java-library'
-    id 'net.neoforged.moddev' version '1.0.21'
+    id 'net.minecraftforge.gradle' version '[6.0.24,6.2)'
 }
 
 version = rootProject.mod_version
@@ -16,39 +16,29 @@ java {
     }
 }
 
-neoForge {
-    version = rootProject.neo_version
-
-    parchment {
-        minecraftVersion = rootProject.parchment_minecraft_version
-        mappingsVersion = rootProject.parchment_mappings_version
-    }
+minecraft {
+    mappings channel: 'official', version: rootProject.minecraft_version
 
     runs {
-        configureEach {
-            systemProperty 'forge.logging.markers', 'REGISTRIES'
-            systemProperty 'forge.logging.console.level', 'debug'
-        }
-
         client {
-            client()
+            workingDirectory project.file('run')
+            ideaModule "${rootProject.name}.${project.name}.main"
         }
 
         server {
-            server()
-            programArgument '--nogui'
-        }
-    }
-
-    mods {
-        "${rootProject.mod_id}" {
-            sourceSet sourceSets.main
+            workingDirectory project.file('run')
+            args '--nogui'
+            ideaModule "${rootProject.name}.${project.name}.main"
         }
     }
 }
 
 dependencies {
-    implementation project(':common')
+    minecraft "net.minecraftforge:forge:${rootProject.minecraft_version}-${rootProject.forge_version}"
+
+    compileOnly project(':common')
+    compileOnly "mekanism:Mekanism:${rootProject.mekanism_version}:api"
+    compileOnly "org.appliedenergistics:appliedenergistics2:${rootProject.ae2_version}:api"
 }
 
 tasks.named('jar', Jar) {
@@ -76,4 +66,9 @@ tasks.withType(ProcessResources).configureEach {
 
 tasks.withType(JavaCompile).configureEach {
     options.encoding = 'UTF-8'
+}
+
+// ponytail: common has no Forge-mapped MC jars of its own; compile its sources against the Forge MC jar
+tasks.named('compileJava').configure {
+    dependsOn project(':common').tasks.named('classes')
 }

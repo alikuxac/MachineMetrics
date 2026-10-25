@@ -1,6 +1,6 @@
 package com.alikuxac.machinemetrics.config;
 
-import net.neoforged.neoforge.common.ModConfigSpec;
+import com.alikuxac.machinemetrics.platform.config.Config;
 
 public class ClientConfig {
 
@@ -12,77 +12,77 @@ public class ClientConfig {
         CROSSHAIR
     }
 
-    public static final ModConfigSpec SPEC;
+    public static final Config.Spec SPEC;
 
     // HUD General
-    public static final ModConfigSpec.BooleanValue HUD_ENABLED;
-    public static final ModConfigSpec.EnumValue<HudAnchor> HUD_ANCHOR;
-    public static final ModConfigSpec.IntValue HUD_X_OFFSET;
-    public static final ModConfigSpec.IntValue HUD_Y_OFFSET;
-    public static final ModConfigSpec.DoubleValue HUD_SCALE;
+    public static final Config.Value<Boolean> HUD_ENABLED;
+    public static final Config.Value<HudAnchor> HUD_ANCHOR;
+    public static final Config.Value<Integer> HUD_X_OFFSET;
+    public static final Config.Value<Integer> HUD_Y_OFFSET;
+    public static final Config.Value<Double> HUD_SCALE;
 
     // HUD Colors
-    public static final ModConfigSpec.ConfigValue<String> BACKGROUND_COLOR;
-    public static final ModConfigSpec.ConfigValue<String> BORDER_COLOR;
+    public static final Config.Value<String> BACKGROUND_COLOR;
+    public static final Config.Value<String> BORDER_COLOR;
 
     // Granular Element Switches
-    public static final ModConfigSpec.BooleanValue SHOW_MACHINE_TITLE;
-    public static final ModConfigSpec.BooleanValue AUTO_HIDE_TITLE_WITH_INFO_MODS;
-    public static final ModConfigSpec.BooleanValue AUTO_HIDE_REDUNDANT_WITH_INFOHUD;
-    public static final ModConfigSpec.BooleanValue SHOW_STATUS_BADGE;
-    public static final ModConfigSpec.BooleanValue SHOW_ITEMS_THROUGHPUT;
-    public static final ModConfigSpec.BooleanValue SHOW_FLUIDS_THROUGHPUT;
-    public static final ModConfigSpec.BooleanValue SHOW_CHEMICALS_THROUGHPUT;
-    public static final ModConfigSpec.BooleanValue SHOW_SPEED;
-    public static final ModConfigSpec.BooleanValue SHOW_ROTATION_DIRECTION;
-    public static final ModConfigSpec.BooleanValue SHOW_LOCAL_IMPACT;
-    public static final ModConfigSpec.BooleanValue SHOW_NETWORK_STRESS;
-    public static final ModConfigSpec.BooleanValue SHOW_HEADROOM;
-    public static final ModConfigSpec.BooleanValue SHOW_ENERGY_FE;
-    public static final ModConfigSpec.BooleanValue SHOW_SIDES;
-    public static final ModConfigSpec.BooleanValue SHOW_AE2_POWER;
-    public static final ModConfigSpec.BooleanValue SHOW_AE2_STABILITY;
-    public static final ModConfigSpec.BooleanValue AUTO_HIDE_AE2_CHANNELS_WITH_INFOHUD;
-    public static final ModConfigSpec.BooleanValue SHOW_AE2_CHANNELS;
-    public static final ModConfigSpec.ConfigValue<String> AE2_POWER_UNIT;
-    public static final ModConfigSpec.BooleanValue SHOW_STORAGE_CAPACITY;
-    public static final ModConfigSpec.BooleanValue SHOW_TIME_TO_FULL;
+    public static final Config.Value<Boolean> SHOW_MACHINE_TITLE;
+    public static final Config.Value<Boolean> AUTO_HIDE_TITLE_WITH_INFO_MODS;
+    public static final Config.Value<Boolean> AUTO_HIDE_REDUNDANT_WITH_INFOHUD;
+    public static final Config.Value<Boolean> SHOW_STATUS_BADGE;
+    public static final Config.Value<Boolean> SHOW_ITEMS_THROUGHPUT;
+    public static final Config.Value<Boolean> SHOW_FLUIDS_THROUGHPUT;
+    public static final Config.Value<Boolean> SHOW_CHEMICALS_THROUGHPUT;
+    public static final Config.Value<Boolean> SHOW_SPEED;
+    public static final Config.Value<Boolean> SHOW_ROTATION_DIRECTION;
+    public static final Config.Value<Boolean> SHOW_LOCAL_IMPACT;
+    public static final Config.Value<Boolean> SHOW_NETWORK_STRESS;
+    public static final Config.Value<Boolean> SHOW_HEADROOM;
+    public static final Config.Value<Boolean> SHOW_ENERGY_FE;
+    public static final Config.Value<Boolean> SHOW_SIDES;
+    public static final Config.Value<Boolean> SHOW_AE2_POWER;
+    public static final Config.Value<Boolean> SHOW_AE2_STABILITY;
+    public static final Config.Value<Boolean> AUTO_HIDE_AE2_CHANNELS_WITH_INFOHUD;
+    public static final Config.Value<Boolean> SHOW_AE2_CHANNELS;
+    public static final Config.Value<String> AE2_POWER_UNIT;
+    public static final Config.Value<Boolean> SHOW_STORAGE_CAPACITY;
+    public static final Config.Value<Boolean> SHOW_TIME_TO_FULL;
 
     // Compact Formatting & Thresholds
-    public static final ModConfigSpec.BooleanValue COMPACT_MODE;
-    public static final ModConfigSpec.ConfigValue<String> COMPACT_TEMPLATE;
-    public static final ModConfigSpec.DoubleValue STORAGE_WARNING_THRESHOLD;
-    public static final ModConfigSpec.DoubleValue STORAGE_CRITICAL_THRESHOLD;
-    public static final ModConfigSpec.IntValue ETA_WARNING_THRESHOLD_SECONDS;
-    public static final ModConfigSpec.IntValue ETA_CRITICAL_THRESHOLD_SECONDS;
+    public static final Config.Value<Boolean> COMPACT_MODE;
+    public static final Config.Value<String> COMPACT_TEMPLATE;
+    public static final Config.Value<Double> STORAGE_WARNING_THRESHOLD;
+    public static final Config.Value<Double> STORAGE_CRITICAL_THRESHOLD;
+    public static final Config.Value<Integer> ETA_WARNING_THRESHOLD_SECONDS;
+    public static final Config.Value<Integer> ETA_CRITICAL_THRESHOLD_SECONDS;
 
     // Metric Colors
-    public static final ModConfigSpec.ConfigValue<String> COLOR_HEADER;
-    public static final ModConfigSpec.ConfigValue<String> COLOR_ITEMS;
-    public static final ModConfigSpec.ConfigValue<String> COLOR_FLUIDS;
-    public static final ModConfigSpec.ConfigValue<String> COLOR_CHEMICALS;
-    public static final ModConfigSpec.ConfigValue<String> COLOR_KINETIC;
-    public static final ModConfigSpec.ConfigValue<String> COLOR_ENERGY_POSITIVE;
-    public static final ModConfigSpec.ConfigValue<String> COLOR_ENERGY_NEGATIVE;
-    public static final ModConfigSpec.ConfigValue<String> COLOR_ENERGY_NEUTRAL;
-    public static final ModConfigSpec.ConfigValue<String> COLOR_SIDES;
-    public static final ModConfigSpec.ConfigValue<String> COLOR_AE2_POWER;
-    public static final ModConfigSpec.ConfigValue<String> COLOR_AE2_BROWNOUT;
-    public static final ModConfigSpec.ConfigValue<String> COLOR_STORAGE_NORMAL;
-    public static final ModConfigSpec.ConfigValue<String> COLOR_STORAGE_WARNING;
-    public static final ModConfigSpec.ConfigValue<String> COLOR_STORAGE_CRITICAL;
-    public static final ModConfigSpec.ConfigValue<String> COLOR_ETA_NORMAL;
-    public static final ModConfigSpec.ConfigValue<String> COLOR_ETA_WARNING;
-    public static final ModConfigSpec.ConfigValue<String> COLOR_ETA_CRITICAL;
+    public static final Config.Value<String> COLOR_HEADER;
+    public static final Config.Value<String> COLOR_ITEMS;
+    public static final Config.Value<String> COLOR_FLUIDS;
+    public static final Config.Value<String> COLOR_CHEMICALS;
+    public static final Config.Value<String> COLOR_KINETIC;
+    public static final Config.Value<String> COLOR_ENERGY_POSITIVE;
+    public static final Config.Value<String> COLOR_ENERGY_NEGATIVE;
+    public static final Config.Value<String> COLOR_ENERGY_NEUTRAL;
+    public static final Config.Value<String> COLOR_SIDES;
+    public static final Config.Value<String> COLOR_AE2_POWER;
+    public static final Config.Value<String> COLOR_AE2_BROWNOUT;
+    public static final Config.Value<String> COLOR_STORAGE_NORMAL;
+    public static final Config.Value<String> COLOR_STORAGE_WARNING;
+    public static final Config.Value<String> COLOR_STORAGE_CRITICAL;
+    public static final Config.Value<String> COLOR_ETA_NORMAL;
+    public static final Config.Value<String> COLOR_ETA_WARNING;
+    public static final Config.Value<String> COLOR_ETA_CRITICAL;
 
-    public static final ModConfigSpec.ConfigValue<String> COLOR_STATE_OPTIMAL;
-    public static final ModConfigSpec.ConfigValue<String> COLOR_STATE_STARVED;
-    public static final ModConfigSpec.ConfigValue<String> COLOR_STATE_CLOGGED;
-    public static final ModConfigSpec.ConfigValue<String> COLOR_STATE_OVERLOADED;
-    public static final ModConfigSpec.ConfigValue<String> COLOR_STATE_IDLE;
+    public static final Config.Value<String> COLOR_STATE_OPTIMAL;
+    public static final Config.Value<String> COLOR_STATE_STARVED;
+    public static final Config.Value<String> COLOR_STATE_CLOGGED;
+    public static final Config.Value<String> COLOR_STATE_OVERLOADED;
+    public static final Config.Value<String> COLOR_STATE_IDLE;
 
     static {
-        ModConfigSpec.Builder builder = new ModConfigSpec.Builder();
+        Config.Builder builder = Config.builder();
 
         builder.comment("HUD Position & Appearance").push("hud");
 
@@ -326,7 +326,7 @@ public class ClientConfig {
         SPEC = builder.build();
     }
 
-    public static int parseHexColor(ModConfigSpec.ConfigValue<String> configValue, int fallbackColor) {
+    public static int parseHexColor(Config.Value<String> configValue, int fallbackColor) {
         if (configValue == null || configValue.get() == null) return fallbackColor;
         return parseHexColor(configValue.get(), fallbackColor);
     }

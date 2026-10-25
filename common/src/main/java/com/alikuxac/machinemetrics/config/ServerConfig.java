@@ -1,28 +1,28 @@
 package com.alikuxac.machinemetrics.config;
 
-import net.neoforged.neoforge.common.ModConfigSpec;
+import com.alikuxac.machinemetrics.platform.config.Config;
 
 public class ServerConfig {
 
-    public static final ModConfigSpec SPEC;
+    public static final Config.Spec SPEC;
 
     // Feature Toggles (default: true)
-    public static final ModConfigSpec.BooleanValue ALLOW_ITEMS;
-    public static final ModConfigSpec.BooleanValue ALLOW_FLUIDS;
-    public static final ModConfigSpec.BooleanValue ALLOW_ENERGY;
-    public static final ModConfigSpec.BooleanValue ALLOW_KINETIC;
-    public static final ModConfigSpec.BooleanValue ALLOW_CHEMICALS;
-    public static final ModConfigSpec.BooleanValue ALLOW_SIDE_METRICS;
-    public static final ModConfigSpec.BooleanValue ALLOW_AE2;
+    public static final Config.Value<Boolean> ALLOW_ITEMS;
+    public static final Config.Value<Boolean> ALLOW_FLUIDS;
+    public static final Config.Value<Boolean> ALLOW_ENERGY;
+    public static final Config.Value<Boolean> ALLOW_KINETIC;
+    public static final Config.Value<Boolean> ALLOW_CHEMICALS;
+    public static final Config.Value<Boolean> ALLOW_SIDE_METRICS;
+    public static final Config.Value<Boolean> ALLOW_AE2;
 
     // Debug
-    public static final ModConfigSpec.BooleanValue DEBUG_LOGGING;
+    public static final Config.Value<Boolean> DEBUG_LOGGING;
 
     // Synchronization & Throttling
-    public static final ModConfigSpec.DoubleValue STORAGE_SYNC_DEADBAND_PERCENT;
+    public static final Config.Value<Double> STORAGE_SYNC_DEADBAND_PERCENT;
 
     static {
-        ModConfigSpec.Builder builder = new ModConfigSpec.Builder();
+        Config.Builder builder = Config.builder();
 
         builder.comment("Server Telemetry Metric Permissions (What data the server samples and sends to clients)")
                 .push("features");

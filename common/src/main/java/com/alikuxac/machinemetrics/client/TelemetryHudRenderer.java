@@ -18,7 +18,7 @@ import net.minecraft.core.Direction;
 import net.minecraft.network.chat.Component;
 import net.minecraft.world.phys.BlockHitResult;
 import net.minecraft.world.phys.HitResult;
-import net.neoforged.neoforge.network.PacketDistributor;
+import com.alikuxac.machinemetrics.platform.network.NetworkPlatform;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -81,7 +81,7 @@ public class TelemetryHudRenderer {
                 lastSentFace = hitFace;
                 try {
                     if (mc.getConnection() != null) {
-                        PacketDistributor.sendToServer(new RequestTelemetryPayload(targetPos, hitFace));
+                        NetworkPlatform.sendToServer(new RequestTelemetryPayload(targetPos, hitFace));
                     }
                 } catch (Exception ignored) {
                 }

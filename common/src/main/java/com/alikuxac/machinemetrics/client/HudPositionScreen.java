@@ -13,7 +13,7 @@ import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.network.chat.Component;
-import net.neoforged.neoforge.common.ModConfigSpec;
+import com.alikuxac.machinemetrics.platform.config.Config;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -362,7 +362,7 @@ public class HudPositionScreen extends Screen {
         }
     }
 
-    private static void setSafe(ModConfigSpec.BooleanValue config, boolean val) {
+    private static void setSafe(Config.Value<Boolean> config, boolean val) {
         if (config != null) config.set(val);
     }
 

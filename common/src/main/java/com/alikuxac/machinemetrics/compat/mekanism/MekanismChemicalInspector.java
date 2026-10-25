@@ -62,7 +62,9 @@ public class MekanismChemicalInspector {
         if (holder == null) {
             return null;
         }
-        if (holder.getClass().getName().equals("net.neoforged.neoforge.capabilities.BlockCapability")) {
+        // ponytail: NeoForge BlockCapability is already the capability; Forge's Capability too.
+        String cn = holder.getClass().getName();
+        if (cn.endsWith(".capabilities.BlockCapability") || cn.endsWith("common.capabilities.Capability")) {
             return holder;
         }
         try {

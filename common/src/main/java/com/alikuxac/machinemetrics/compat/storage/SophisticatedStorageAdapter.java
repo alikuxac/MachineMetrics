@@ -2,6 +2,8 @@ package com.alikuxac.machinemetrics.compat.storage;
 
 import com.alikuxac.machinemetrics.compat.CompatRegistry;
 import com.alikuxac.machinemetrics.config.ServerConfig;
+import com.alikuxac.machinemetrics.platform.storage.ItemStorage;
+import com.alikuxac.machinemetrics.platform.storage.StorageAccess;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.network.chat.Component;
@@ -10,8 +12,6 @@ import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.block.state.BlockState;
-import net.neoforged.neoforge.capabilities.Capabilities;
-import net.neoforged.neoforge.items.IItemHandler;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -175,19 +175,19 @@ public class SophisticatedStorageAdapter {
             return Optional.empty();
         }
 
-        IItemHandler handler = null;
+        ItemStorage handler = null;
         try {
-            handler = level.getCapability(Capabilities.ItemHandler.BLOCK, pos, hitFace);
+            handler = StorageAccess.item(level, pos, hitFace);
             if (handler == null) {
                 for (Direction side : Direction.values()) {
-                    handler = level.getCapability(Capabilities.ItemHandler.BLOCK, pos, side);
+                    handler = StorageAccess.item(level, pos, side);
                     if (handler != null) {
                         break;
                     }
                 }
             }
             if (handler == null) {
-                handler = level.getCapability(Capabilities.ItemHandler.BLOCK, pos, null);
+                handler = StorageAccess.item(level, pos, null);
             }
         } catch (Throwable ignored) {
         }

@@ -2,16 +2,22 @@ package com.alikuxac.machinemetrics.forge;
 
 import com.alikuxac.machinemetrics.config.ServerConfig;
 import com.alikuxac.machinemetrics.forge.client.ForgeClientInit;
-import com.alikuxac.machinemetrics.forge.telemetry.ServerTelemetrySampler;
+import com.alikuxac.machinemetrics.forge.platform.ForgeConfigFactory;
+import com.alikuxac.machinemetrics.forge.platform.ForgeNetworkPlatform;
+import com.alikuxac.machinemetrics.forge.platform.ForgeStorageLookup;
+import com.alikuxac.machinemetrics.forge.telemetry.ForgeServerTelemetrySampler;
 import com.alikuxac.machinemetrics.network.NetworkHandler;
 import com.alikuxac.machinemetrics.platform.Services;
+import com.alikuxac.machinemetrics.platform.network.NetworkPlatform;
 import com.mojang.logging.LogUtils;
-import net.neoforged.api.distmarker.Dist;
-import net.neoforged.bus.api.IEventBus;
-import net.neoforged.fml.ModContainer;
-import net.neoforged.fml.common.Mod;
-import net.neoforged.fml.config.ModConfig;
-import net.neoforged.fml.loading.FMLEnvironment;
+import net.minecraftforge.api.distmarker.Dist;
+import net.minecraftforge.common.ForgeConfigSpec;
+import net.minecraftforge.fml.ModContainer;
+import net.minecraftforge.fml.ModLoadingContext;
+import net.minecraftforge.fml.common.Mod;
+import net.minecraftforge.fml.config.ModConfig;
+import net.minecraftforge.fml.javafmlmod.FMLJavaModLoadingContext;
+import net.minecraftforge.fml.loading.FMLEnvironment;
 import org.slf4j.Logger;
 
 @Mod("machinemetrics")
@@ -19,13 +25,18 @@ public class MachinemetricsForge {
 
     public static final Logger LOGGER = LogUtils.getLogger();
 
-    public MachinemetricsForge(IEventBus modEventBus, ModContainer modContainer) {
-        Services.SERVER_SAMPLER = ServerTelemetrySampler::sampleTargetBlock;
-        modContainer.registerConfig(ModConfig.Type.SERVER, ServerConfig.SPEC);
-        modEventBus.addListener(NetworkHandler::register);
+    public MachinemetricsForge(FMLJavaModLoadingContext context) {
+        ForgeConfigFactory.install();
+        ForgeStorageLookup.install();
+        NetworkPlatform.setRegistrationHook(NetworkHandler::register);
+
+        Services.SERVER_SAMPLER = ForgeServerTelemetrySampler::sampleTargetBlock;
+        ForgeNetworkPlatform.install();
+
+        ModLoadingContext.get().registerConfig(ModConfig.Type.SERVER, (ForgeConfigSpec) ServerConfig.SPEC.nativeSpec());
 
         if (FMLEnvironment.dist == Dist.CLIENT) {
-            ForgeClientInit.init(modEventBus, modContainer);
+            ForgeClientInit.init(context, context.getContainer());
         }
 
         LOGGER.info("Machinemetrics Forge telemetry mod initialized.");

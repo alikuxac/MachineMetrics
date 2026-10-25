@@ -9,11 +9,12 @@ import net.neoforged.fml.config.ModConfig;
 import net.neoforged.neoforge.client.event.RegisterKeyMappingsEvent;
 import net.neoforged.neoforge.client.gui.IConfigScreenFactory;
 import net.neoforged.neoforge.common.NeoForge;
+import net.neoforged.neoforge.common.ModConfigSpec;
 
 public class NeoForgeClientInit {
 
     public static void init(IEventBus modEventBus, ModContainer modContainer) {
-        modContainer.registerConfig(ModConfig.Type.CLIENT, ClientConfig.SPEC);
+        modContainer.registerConfig(ModConfig.Type.CLIENT, (ModConfigSpec) ClientConfig.SPEC.nativeSpec());
         modContainer.registerExtensionPoint(
                 IConfigScreenFactory.class,
                 (container, screen) -> new HudPositionScreen(screen)

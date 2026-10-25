@@ -159,7 +159,7 @@ public class ClientTelemetryCache {
         int fluidsColor = ClientConfig.parseHexColor(ClientConfig.COLOR_FLUIDS, 0x4FC3F7);
         int chemicalsColor = ClientConfig.parseHexColor(ClientConfig.COLOR_CHEMICALS, 0xAEEA00);
         int kineticColor = ClientConfig.parseHexColor(ClientConfig.COLOR_KINETIC, 0xFF9E59);
-        int positiveEnergyColor = ClientConfig.parseHexColor(ClientConfig.COLOR_ENERGY_POSITIVE, 0x55FF55);
+        int positiveEnergyColor = ClientConfig.parseHexColor(ClientConfig.COLOR_ENERGY_POSITIVE, 0x69F0AE);
         int negativeEnergyColor = ClientConfig.parseHexColor(ClientConfig.COLOR_ENERGY_NEGATIVE, 0xFF5252);
         int neutralEnergyColor = ClientConfig.parseHexColor(ClientConfig.COLOR_ENERGY_NEUTRAL, 0xE040FB);
         int detailedPositiveEnergyColor = ClientConfig.parseHexColor(ClientConfig.COLOR_ENERGY_POSITIVE, 0x69F0AE);

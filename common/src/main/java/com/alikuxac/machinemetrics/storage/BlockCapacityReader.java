@@ -1,17 +1,16 @@
 package com.alikuxac.machinemetrics.storage;
 
 import com.alikuxac.machinemetrics.compat.CompatRegistry;
+import com.alikuxac.machinemetrics.platform.storage.EnergyStorage;
+import com.alikuxac.machinemetrics.platform.storage.FluidStorage;
+import com.alikuxac.machinemetrics.platform.storage.ItemStorage;
+import com.alikuxac.machinemetrics.platform.storage.StorageAccess;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.world.Container;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.entity.BlockEntity;
-import net.neoforged.neoforge.capabilities.Capabilities;
-import net.neoforged.neoforge.energy.IEnergyStorage;
-import net.neoforged.neoforge.fluids.FluidStack;
-import net.neoforged.neoforge.fluids.capability.IFluidHandler;
-import net.neoforged.neoforge.items.IItemHandler;
 
 public class BlockCapacityReader {
 
@@ -57,21 +56,21 @@ public class BlockCapacityReader {
         boolean hitFaceHasEnergy = false;
         if (hitFace != null) {
             try {
-                IItemHandler faceItem = level.getCapability(Capabilities.ItemHandler.BLOCK, pos, hitFace);
+                ItemStorage faceItem = StorageAccess.item(level, pos, hitFace);
                 if (faceItem != null && faceItem.getSlots() > 0) {
                     hitFaceHasItems = true;
                 }
             } catch (Throwable ignored) {
             }
             try {
-                IFluidHandler faceFluid = level.getCapability(Capabilities.FluidHandler.BLOCK, pos, hitFace);
+                FluidStorage faceFluid = StorageAccess.fluid(level, pos, hitFace);
                 if (faceFluid != null && faceFluid.getTanks() > 0) {
                     hitFaceHasFluids = true;
                 }
             } catch (Throwable ignored) {
             }
             try {
-                IEnergyStorage faceEnergy = level.getCapability(Capabilities.EnergyStorage.BLOCK, pos, hitFace);
+                EnergyStorage faceEnergy = StorageAccess.energy(level, pos, hitFace);
                 if (faceEnergy != null && faceEnergy.getMaxEnergyStored() > 0) {
                     hitFaceHasEnergy = true;
                 }
@@ -84,7 +83,7 @@ public class BlockCapacityReader {
         boolean isItemInfinite = false;
         boolean hasItemCapability = false;
 
-        IItemHandler itemHandler = resolveItemHandler(level, pos, hitFace);
+        ItemStorage itemHandler = resolveItemHandler(level, pos, hitFace);
 
         if (itemHandler != null && itemHandler.getSlots() > 0) {
             hasItemCapability = true;
@@ -126,7 +125,7 @@ public class BlockCapacityReader {
         boolean isFluidInfinite = false;
         boolean hasFluidCapability = false;
 
-        IFluidHandler fluidHandler = resolveFluidHandler(level, pos, hitFace);
+        FluidStorage fluidHandler = resolveFluidHandler(level, pos, hitFace);
 
         if (fluidHandler != null && fluidHandler.getTanks() > 0) {
             hasFluidCapability = true;
@@ -138,9 +137,8 @@ public class BlockCapacityReader {
                     cap = INFINITE_THRESHOLD;
                 }
                 totalFluidMax += cap;
-                FluidStack stack = fluidHandler.getFluidInTank(i);
-                if (!stack.isEmpty()) {
-                    totalFluidCurrent += stack.getAmount();
+                if (!fluidHandler.isTankEmpty(i)) {
+                    totalFluidCurrent += fluidHandler.getTankAmount(i);
                 }
             }
         }
@@ -150,7 +148,7 @@ public class BlockCapacityReader {
         boolean isEnergyInfinite = false;
         boolean hasEnergyCapability = false;
 
-        IEnergyStorage energyStorage = resolveEnergyStorage(level, pos, hitFace);
+        EnergyStorage energyStorage = resolveEnergyStorage(level, pos, hitFace);
 
         if (energyStorage != null && energyStorage.getMaxEnergyStored() > 0) {
             hasEnergyCapability = true;
@@ -237,69 +235,45 @@ public class BlockCapacityReader {
         return new StorageCapacity(selectedType, selectedCurrent, selectedMax, selectedInfinite, true);
     }
 
-    private static IItemHandler resolveItemHandler(Level level, BlockPos pos, Direction hitFace) {
+    private static ItemStorage resolveItemHandler(Level level, BlockPos pos, Direction hitFace) {
         if (hitFace != null) {
-            IItemHandler h = safeItem(level, pos, hitFace);
+            ItemStorage h = StorageAccess.item(level, pos, hitFace);
             if (h != null && h.getSlots() > 0) return h;
         }
-        IItemHandler h = safeItem(level, pos, null);
+        ItemStorage h = StorageAccess.item(level, pos, null);
         if (h != null && h.getSlots() > 0) return h;
         for (Direction side : Direction.values()) {
-            h = safeItem(level, pos, side);
+            h = StorageAccess.item(level, pos, side);
             if (h != null && h.getSlots() > 0) return h;
         }
         return null;
     }
 
-    private static IItemHandler safeItem(Level level, BlockPos pos, Direction side) {
-        try {
-            return level.getCapability(Capabilities.ItemHandler.BLOCK, pos, side);
-        } catch (Throwable ignored) {
-            return null;
-        }
-    }
-
-    private static IFluidHandler resolveFluidHandler(Level level, BlockPos pos, Direction hitFace) {
+    private static FluidStorage resolveFluidHandler(Level level, BlockPos pos, Direction hitFace) {
         if (hitFace != null) {
-            IFluidHandler h = safeFluid(level, pos, hitFace);
+            FluidStorage h = StorageAccess.fluid(level, pos, hitFace);
             if (h != null && h.getTanks() > 0) return h;
         }
-        IFluidHandler h = safeFluid(level, pos, null);
+        FluidStorage h = StorageAccess.fluid(level, pos, null);
         if (h != null && h.getTanks() > 0) return h;
         for (Direction side : Direction.values()) {
-            h = safeFluid(level, pos, side);
+            h = StorageAccess.fluid(level, pos, side);
             if (h != null && h.getTanks() > 0) return h;
         }
         return null;
     }
 
-    private static IFluidHandler safeFluid(Level level, BlockPos pos, Direction side) {
-        try {
-            return level.getCapability(Capabilities.FluidHandler.BLOCK, pos, side);
-        } catch (Throwable ignored) {
-            return null;
-        }
-    }
-
-    private static IEnergyStorage resolveEnergyStorage(Level level, BlockPos pos, Direction hitFace) {
+    private static EnergyStorage resolveEnergyStorage(Level level, BlockPos pos, Direction hitFace) {
         if (hitFace != null) {
-            IEnergyStorage s = safeEnergy(level, pos, hitFace);
+            EnergyStorage s = StorageAccess.energy(level, pos, hitFace);
             if (s != null && s.getMaxEnergyStored() > 0) return s;
         }
-        IEnergyStorage s = safeEnergy(level, pos, null);
+        EnergyStorage s = StorageAccess.energy(level, pos, null);
         if (s != null && s.getMaxEnergyStored() > 0) return s;
         for (Direction side : Direction.values()) {
-            s = safeEnergy(level, pos, side);
+            s = StorageAccess.energy(level, pos, side);
             if (s != null && s.getMaxEnergyStored() > 0) return s;
         }
         return null;
-    }
-
-    private static IEnergyStorage safeEnergy(Level level, BlockPos pos, Direction side) {
-        try {
-            return level.getCapability(Capabilities.EnergyStorage.BLOCK, pos, side);
-        } catch (Throwable ignored) {
-            return null;
-        }
     }
 }
