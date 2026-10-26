@@ -4,6 +4,8 @@ loaderVersion="${loader_version_range}"
 
 license="MIT"
 
+issueTrackerURL="https://github.com/alikuxac/MachineMetrics/issues"
+
 [[mods]]
 
 modId="machinemetrics"
@@ -23,7 +25,7 @@ A high-tech standalone client-side HUD mod displaying real-time machine telemetr
 [[dependencies.machinemetrics]]
     modId="neoforge"
     type="required"
-    versionRange="[${neo_version},)"
+    versionRange="[26.1,)"
     ordering="NONE"
     side="BOTH"
 

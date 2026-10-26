@@ -18,6 +18,16 @@ public class NetworkHandler {
 
     private record SentEntry(TelemetryData data, long timestampMs) {}
     private static final Map<BlockPos, SentEntry> LAST_SENT_TO_CLIENT = new ConcurrentHashMap<>();
+    private static final long SENT_ENTRY_EXPIRE_MS = 10000L;
+    private static volatile long lastCleanupMs = 0L;
+
+    private static void cleanupStaleEntries(long now) {
+        if (now - lastCleanupMs < SENT_ENTRY_EXPIRE_MS) {
+            return;
+        }
+        lastCleanupMs = now;
+        LAST_SENT_TO_CLIENT.entrySet().removeIf(entry -> now - entry.getValue().timestampMs() > SENT_ENTRY_EXPIRE_MS);
+    }
 
     public static void register(RegisterPayloadHandlersEvent event) {
         var registrar = event.registrar("1.0.0").optional();
@@ -64,6 +74,7 @@ public class NetworkHandler {
                 }
 
                 long now = System.currentTimeMillis();
+                cleanupStaleEntries(now);
                 SentEntry lastSent = LAST_SENT_TO_CLIENT.get(targetPos);
                 if (lastSent == null || data.hasSignificantDelta(lastSent.data) || (now - lastSent.timestampMs >= 1500L)) {
                     LAST_SENT_TO_CLIENT.put(targetPos, new SentEntry(data, now));
