@@ -8,7 +8,6 @@ import net.neoforged.fml.ModContainer;
 import net.neoforged.fml.config.ModConfig;
 import net.neoforged.neoforge.client.event.RegisterKeyMappingsEvent;
 import net.neoforged.neoforge.client.gui.IConfigScreenFactory;
-import net.neoforged.neoforge.common.NeoForge;
 
 public class NeoForgeClientInit {
 
@@ -19,8 +18,6 @@ public class NeoForgeClientInit {
                 (container, screen) -> new HudPositionScreen(screen)
         );
         modEventBus.addListener(NeoForgeClientInit::registerKeyMappings);
-        NeoForge.EVENT_BUS.register(NeoForgeClientEventHandler.class);
-        NeoForge.EVENT_BUS.register(NeoForgeHudRenderer.class);
     }
 
     private static void registerKeyMappings(RegisterKeyMappingsEvent event) {

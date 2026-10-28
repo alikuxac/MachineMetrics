@@ -30,10 +30,14 @@ Machine Metrics is a client-side and server-synced telemetry HUD for Minecraft. 
 
 ### Compatibility
 
-- **Standard Capabilities:** Works with any block exposing standard NeoForge capabilities (Item, Fluid, and Energy resource handlers).
-- **Create:** Kinetic speed (RPM), rotation direction, network stress, capacity (SU), overstress warning, and headroom.
-- **Mekanism:** Chemical throughput and tank capacities (Gases, Infuse Types, Pigments, Slurries).
+Machine Metrics targets **NeoForge on Minecraft 26.1.2 (Java 25)**.
+
+- **Standard Capabilities:** Works with any block exposing standard NeoForge transfer capabilities (`Capabilities.Item.BLOCK`, `Capabilities.Fluid.BLOCK`, `Capabilities.Energy.BLOCK`).
+- **Create:** Kinetic speed (RPM), rotation direction, network stress, capacity (SU), overstress warning, and headroom. No official 26.1.2 build exists; the inspector is reflective and inert when Create is absent.
+- **Mekanism:** Chemical throughput and tank capacities (Gases, Infuse Types, Pigments, Slurries). No official 26.1.2 build exists; the adapter is compile-decoupled and falls back to generic capability reads when absent.
 - **Tooltip Mods:** Automatically hides the block title line when Jade, Waila, WTHIT, or The One Probe is installed.
+
+> Migrating from the 1.21.1 line? See [Migrating to Minecraft 26.1.2](docs/26.1.2-migration.md) for the loader, capability, and identifier deltas.
 
 ---
 

@@ -2,6 +2,8 @@
 
 Machine Metrics provides dedicated adapters for selected high-traffic mods and relies on standard capability inspection for everything else. This document outlines active mod support and the requirements for adding new adapters.
 
+> **Target:** NeoForge 26.1.2 on Java 25. Forge support was dropped in this line. Capability fallback uses the NeoForge transfer API (`ResourceHandler`/`EnergyHandler`, `Capabilities.Item/Fluid/Energy.BLOCK`), not the legacy `IItemHandler`/`IFluidHandler`/`IEnergyStorage` interfaces. See [Migrating to Minecraft 26.1.2](26.1.2-migration.md) for details.
+
 ---
 
 ## Support Tiers
@@ -12,20 +14,20 @@ Machine Metrics provides dedicated adapters for selected high-traffic mods and r
 | **Tier 2: Generic** | Standard capabilities | `BlockCapacityReader` fallback | None |
 | **Tier 3: Community** | Contributed niche mods | Reflection heuristics | Review and merge |
 
-Tier 2 applies automatically to any block exposing `IItemHandler`, `IFluidHandler`, or `IEnergyStorage` capabilities. Blocks without dedicated adapters run on this fallback.
+Tier 2 applies automatically to any block exposing NeoForge item, fluid, or energy block capabilities (`Capabilities.Item.BLOCK`, `Capabilities.Fluid.BLOCK`, `Capabilities.Energy.BLOCK`). Blocks without dedicated adapters run on this fallback.
 
 ---
 
 ## Supported Mods (Tier 1)
 
-| Mod | Namespace | Adapter | Detection Gate |
-| :--- | :--- | :--- | :--- |
-| **Applied Energistics 2** | `appeng` | `AE2NetworkInspector` | `appeng.api.networking.IGridNode` |
-| **Mekanism** | `mekanism` | `MekanismChemicalInspector`, `MekanismTransporterInspector` | `mekanism.api.chemical.IChemicalHandler` |
-| **Create** | `create` | `CreateKineticInspector` | `com.simibubi.create.content.kinetics.base.KineticBlockEntity` |
-| **Functional Storage** | `functionalstorage` | `DrawerStorageAdapter` | `com.buuz135.functionalstorage.block.tile.ControllableDrawerTile` |
-| **Storage Drawers** | `storagedrawers` | `DrawerStorageAdapter` | `com.jaquadro.minecraft.storagedrawers.api.storage.IDrawerGroup` |
-| **Sophisticated Storage** | `sophisticatedstorage` | `SophisticatedStorageAdapter` | Namespace match |
+| Mod | Namespace | Adapter | Detection Gate | 26.1.2 Status |
+| :--- | :--- | :--- | :--- | :--- |
+| **Applied Energistics 2** | `appeng` | `AE2NetworkInspector` | `appeng.api.networking.IGridNode` | Official, supported |
+| **Mekanism** | `mekanism` | `MekanismChemicalInspector`, `MekanismTransporterInspector` | `mekanism.api.chemical.IChemicalHandler` | No official build; reflective fallback |
+| **Create** | `create` | `CreateKineticInspector` | `com.simibubi.create.content.kinetics.base.KineticBlockEntity` | No official build; reflective fallback |
+| **Functional Storage** | `functionalstorage` | `DrawerStorageAdapter` | `com.buuz135.functionalstorage.block.tile.ControllableDrawerTile` | Supported |
+| **Storage Drawers** | `storagedrawers` | `DrawerStorageAdapter` | `com.jaquadro.minecraft.storagedrawers.api.storage.IDrawerGroup` | Supported |
+| **Sophisticated Storage** | `sophisticatedstorage` | `SophisticatedStorageAdapter` | Namespace match | Supported |
 
 Tier 1 detection combines `CompatRegistry` namespace checks with reflective class checks. Adapters stay inert when their target mod is absent and introduce no compile-time dependencies.
 
@@ -39,7 +41,7 @@ A mod requires a dedicated adapter only when it meets all five criteria:
 2. **Maps to supported HUD metrics.** Telemetry must fit items, fluids, energy, chemicals, kinetics, networks, or container capacity.
 3. **Provides stable reflection targets.** Class and method names must remain consistent across releases. Official API methods take precedence over internal fields.
 4. **Maintains high player adoption.** The mod appears in major modpacks or shows high download volume to justify maintenance.
-5. **Functions on NeoForge.** Shared adapters live in `common/` and must pass verification on the current NeoForge target.
+5. **Functions on NeoForge 26.1.2.** Shared adapters live in `common/` and must pass verification against NeoForge 26.1.2 on Java 25. Only NeoForge is targeted in this line.
 
 ---
 

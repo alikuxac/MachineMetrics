@@ -38,8 +38,3 @@ run/
 **/src/generated/**/.cache/
 repo/
 **/repo/
-
-# Local agent scratch files
-.agents/
-minecraft_26_1_2_migration_plan.md
-prompt.md

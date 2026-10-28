@@ -26,8 +26,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.Arrays;
-import java.util.Collections;
-import java.util.IdentityHashMap;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
@@ -35,12 +33,50 @@ import java.util.concurrent.ConcurrentHashMap;
 public class ServerTelemetrySampler {
 
     private static final Logger LOGGER = LoggerFactory.getLogger(ServerTelemetrySampler.class);
-    private static final Map<BlockPos, SampleHistory> CACHE = new ConcurrentHashMap<>();
+    private static final Map<SampleKey, SampleHistory> CACHE = new ConcurrentHashMap<>();
     private static final Map<BlockPos, Long> INERT_BLOCK_CACHE = new ConcurrentHashMap<>();
     private static final long CLEANUP_EXPIRE_MS = 10000L;
+    private static final long CLEANUP_INTERVAL_MS = 1000L;
     private static final long INERT_EXPIRE_MS = 5000L;
+    private static volatile long lastCleanupMs = 0L;
 
     private static final String WAYSTONE_NAMESPACE = "waystones";
+
+    private record SampleKey(BlockPos pos, Direction face) {}
+
+    private static final class CapabilityCache {
+        private final Level level;
+        private final BlockPos pos;
+        private final Map<Direction, ResourceHandler<ItemResource>> item = new ConcurrentHashMap<>();
+        private final Map<Direction, ResourceHandler<FluidResource>> fluid = new ConcurrentHashMap<>();
+        private final Map<Direction, EnergyHandler> energy = new ConcurrentHashMap<>();
+
+        CapabilityCache(Level level, BlockPos pos) {
+            this.level = level;
+            this.pos = pos;
+        }
+
+        ResourceHandler<ItemResource> item(Direction side) {
+            if (side != null && item.containsKey(side)) return item.get(side);
+            ResourceHandler<ItemResource> h = safeItem(level, pos, side);
+            if (side != null) item.put(side, h);
+            return h;
+        }
+
+        ResourceHandler<FluidResource> fluid(Direction side) {
+            if (side != null && fluid.containsKey(side)) return fluid.get(side);
+            ResourceHandler<FluidResource> h = safeFluid(level, pos, side);
+            if (side != null) fluid.put(side, h);
+            return h;
+        }
+
+        EnergyHandler energy(Direction side) {
+            if (side != null && energy.containsKey(side)) return energy.get(side);
+            EnergyHandler h = safeEnergy(level, pos, side);
+            if (side != null) energy.put(side, h);
+            return h;
+        }
+    }
 
     private static final Set<String> COMPAT_NAMESPACES = Set.of(
             CompatRegistry.NAMESPACE_AE2,
@@ -64,7 +100,7 @@ public class ServerTelemetrySampler {
 
     private static final Direction[] SIDES_TO_QUERY = new Direction[] { null, Direction.UP, Direction.DOWN, Direction.NORTH, Direction.SOUTH, Direction.WEST, Direction.EAST };
 
-    private record Sample(long timestampMs, int[] itemSlots, int[] fluidTanks, long energyAmount, int totalItems, long totalFluid,
+    private record Sample(long timestampMs, int[] itemSlots, int[] fluidTanks, long energyAmount, long totalItems, long totalFluid,
     long totalChemical, float[] sideMetrics) {}
 
     private static class SampleHistory {
@@ -77,7 +113,7 @@ public class ServerTelemetrySampler {
         private float lastEnergyDelta;
         private float[] lastSideRates = new float[18];
         private int cachedItemSlotCount = -1;
-        private int cachedMaxItemCapacity = 0;
+        private long cachedMaxItemCapacity = 0L;
 
         public SampleHistory(Sample initialSample) {
             this.lastSample = initialSample;
@@ -133,7 +169,8 @@ public class ServerTelemetrySampler {
             return TelemetryData.empty();
         }
 
-        SampleHistory existingHistory = CACHE.get(pos);
+        SampleHistory existingHistory = CACHE.get(new SampleKey(pos, hitFace));
+        CapabilityCache capabilities = new CapabilityCache(level, pos);
 
         boolean allowItems = ServerConfig.ALLOW_ITEMS == null || ServerConfig.ALLOW_ITEMS.get();
         boolean allowFluids = ServerConfig.ALLOW_FLUIDS == null || ServerConfig.ALLOW_FLUIDS.get();
@@ -142,8 +179,8 @@ public class ServerTelemetrySampler {
         boolean allowChemicals = ServerConfig.ALLOW_CHEMICALS == null || ServerConfig.ALLOW_CHEMICALS.get();
         boolean allowSides = ServerConfig.ALLOW_SIDE_METRICS == null || ServerConfig.ALLOW_SIDE_METRICS.get();
 
-        int currentItems = 0;
-        int maxItems = 0;
+        long currentItems = 0L;
+        long maxItems = 0L;
         long currentFluid = 0L;
         long maxFluid = 0L;
         long currentEnergy = 0L;
@@ -155,7 +192,6 @@ public class ServerTelemetrySampler {
         float[] sideMetrics = new float[18];
 
         IntArrayList allSlotCounts = new IntArrayList();
-        Set<ResourceHandler<ItemResource>> processedItemHandlers = Collections.newSetFromMap(new IdentityHashMap<>());
 
         var transporterOpt = MekanismTransporterInspector.inspect(be);
         boolean isTransporter = transporterOpt.isPresent() && transporterOpt.get().isTransporter();
@@ -179,7 +215,7 @@ public class ServerTelemetrySampler {
                 if (allowSides) {
                     for (Direction side : Direction.values()) {
                         try {
-                            ResourceHandler<ItemResource> itemHandler = level.getCapability(Capabilities.Item.BLOCK, pos, side);
+                            ResourceHandler<ItemResource> itemHandler = capabilities.item(side);
                             if (itemHandler != null && itemHandler.size() > 0) {
                                 int sideCount = 0;
                                 for (int i = 0; i < itemHandler.size(); i++) {
@@ -195,14 +231,13 @@ public class ServerTelemetrySampler {
                     }
                 }
 
-        ResourceHandler<ItemResource> itemHandler = resolveItemHandler(level, pos, hitFace);
+        ResourceHandler<ItemResource> itemHandler = resolveItemHandler(capabilities, hitFace);
 
         if (itemHandler != null && itemHandler.size() > 0) {
             hasAnyCapability = true;
-            processedItemHandlers.add(itemHandler);
             int slotCount = itemHandler.size();
             boolean useCachedLimit = existingHistory != null && existingHistory.cachedItemSlotCount == slotCount && existingHistory.cachedMaxItemCapacity > 0;
-            int handlerMaxCap = 0;
+            long handlerMaxCap = 0L;
 
             if (useCachedLimit) {
                 handlerMaxCap = existingHistory.cachedMaxItemCapacity;
@@ -242,13 +277,12 @@ public class ServerTelemetrySampler {
 
         String fluidName = "";
         IntArrayList allTankAmounts = new IntArrayList();
-        Set<ResourceHandler<FluidResource>> processedFluidHandlers = Collections.newSetFromMap(new IdentityHashMap<>());
 
         if (allowFluids) {
             if (allowSides) {
                 for (Direction side : Direction.values()) {
                     try {
-                        ResourceHandler<FluidResource> fluidHandler = level.getCapability(Capabilities.Fluid.BLOCK, pos, side);
+                        ResourceHandler<FluidResource> fluidHandler = capabilities.fluid(side);
                         if (fluidHandler != null && fluidHandler.size() > 0) {
                             long sideFluidAmount = 0L;
                             for (int i = 0; i < fluidHandler.size(); i++) {
@@ -264,11 +298,10 @@ public class ServerTelemetrySampler {
                 }
             }
 
-            ResourceHandler<FluidResource> fluidHandler = resolveFluidHandler(level, pos, hitFace);
+            ResourceHandler<FluidResource> fluidHandler = resolveFluidHandler(capabilities, hitFace);
 
             if (fluidHandler != null && fluidHandler.size() > 0) {
                 hasAnyCapability = true;
-                processedFluidHandlers.add(fluidHandler);
                 for (int i = 0; i < fluidHandler.size(); i++) {
                     var fluidResource = fluidHandler.getResource(i);
                     long tankCap = fluidHandler.getCapacityAsLong(i, fluidResource);
@@ -277,7 +310,10 @@ public class ServerTelemetrySampler {
                         currentFluid += amount;
                         allTankAmounts.add((int) Math.min(amount, Integer.MAX_VALUE));
                         if (fluidName.isEmpty()) {
-                            fluidName = fluidResource.toStack(1).getHoverName().getString();
+                            try {
+                                fluidName = fluidResource.toStack(1).getHoverName().getString();
+                            } catch (Throwable ignored) {
+                            }
                         }
                     } else {
                         allTankAmounts.add(0);
@@ -303,7 +339,7 @@ public class ServerTelemetrySampler {
         }
 
         if (allowEnergy) {
-            EnergyHandler energyStorage = resolveEnergyStorage(level, pos, hitFace);
+            EnergyHandler energyStorage = resolveEnergyStorage(capabilities, hitFace);
             if (energyStorage != null) {
                 long maxCap = energyStorage.getCapacityAsLong();
                 if (maxCap > 0) {
@@ -361,7 +397,8 @@ public class ServerTelemetrySampler {
         }
 
         boolean isAe2Storage = allowAe2 && isAe2Block;
-        boolean hasStorageCapacity = BlockCapacityReader.readCapacity(level, pos, hitFace).hasStorage()
+        StorageCapacity capacity = BlockCapacityReader.readCapacity(level, pos, hitFace);
+        boolean hasStorageCapacity = capacity.hasStorage()
                 || CompatRegistry.isDrawerBlock(level, pos)
                 || CompatRegistry.isSophisticatedStorageBlock(level, pos);
 
@@ -379,10 +416,12 @@ public class ServerTelemetrySampler {
         INERT_BLOCK_CACHE.remove(pos);
 
         Sample currentSample = new Sample(now, itemSlots, fluidTanks, currentEnergy, currentItems, currentFluid, chemicalAmount, sideMetrics);
-        SampleHistory history = CACHE.computeIfAbsent(pos, p -> new SampleHistory(currentSample));
+        SampleHistory history = CACHE.computeIfAbsent(new SampleKey(pos, hitFace), p -> new SampleHistory(currentSample));
 
+        boolean addedNewSample = false;
         if (now - history.lastSample.timestampMs() >= 100L) {
             history.addSample(currentSample);
+            addedNewSample = true;
         }
 
         float itemThroughput = 0f;
@@ -399,7 +438,7 @@ public class ServerTelemetrySampler {
             if (timeDiffSec > 0) {
                 int[] prevSlots = history.previousSample.itemSlots();
                 int[] currSlots = history.lastSample.itemSlots();
-                int slotDeltaSum = 0;
+                long slotDeltaSum = 0L;
                 int maxLen = Math.max(prevSlots.length, currSlots.length);
                 for (int i = 0; i < maxLen; i++) {
                     int p = i < prevSlots.length ? prevSlots[i] : 0;
@@ -418,7 +457,7 @@ public class ServerTelemetrySampler {
 
                 int[] prevTanks = history.previousSample.fluidTanks();
                 int[] currTanks = history.lastSample.fluidTanks();
-                int tankDeltaSum = 0;
+                long tankDeltaSum = 0L;
                 int maxTankLen = Math.max(prevTanks.length, currTanks.length);
                 for (int i = 0; i < maxTankLen; i++) {
                     int p = i < prevTanks.length ? prevTanks[i] : 0;
@@ -642,7 +681,7 @@ public class ServerTelemetrySampler {
             storageMax = chemicalCapacity;
             primaryNetRate = chemicalNetRate;
             hasStorage = true;
-            if (chemicalCapacity >= Integer.MAX_VALUE) {
+            if (chemicalCapacity >= TelemetryData.INFINITE_CAPACITY) {
                 isInfiniteStorage = true;
             }
         }
@@ -652,21 +691,20 @@ public class ServerTelemetrySampler {
             storageMax = maxFluid;
             primaryNetRate = fluidNetRate;
             hasStorage = true;
-            if (maxFluid >= Integer.MAX_VALUE) {
+            if (maxFluid >= TelemetryData.INFINITE_CAPACITY) {
                 isInfiniteStorage = true;
             }
         }
 
         if (!hasStorage) {
-            StorageCapacity cap = BlockCapacityReader.readCapacity(level, pos, hitFace);
-            if (cap.hasStorage()) {
-                storageCurrent = cap.current();
-                storageMax = cap.max();
+            if (capacity.hasStorage()) {
+                storageCurrent = capacity.current();
+                storageMax = capacity.max();
                 hasStorage = true;
-                if (cap.isInfinite()) {
+                if (capacity.isInfinite()) {
                     isInfiniteStorage = true;
                 }
-                primaryNetRate = switch (cap.type()) {
+                primaryNetRate = switch (capacity.type()) {
                     case FLUID -> fluidNetRate;
                     case ENERGY -> energyNetRate;
                     default -> isTransporter ? 0f : itemNetRate;
@@ -675,8 +713,7 @@ public class ServerTelemetrySampler {
         }
 
         boolean isInfinite = isInfiniteStorage
-                || (storageMax == Integer.MAX_VALUE)
-                || (storageMax >= (Long.MAX_VALUE / 2))
+                || (storageMax >= TelemetryData.INFINITE_CAPACITY)
                 || (hasAe2Network && aeIsCreative);
 
         boolean isDraining = primaryNetRate < -0.001f;
@@ -690,6 +727,11 @@ public class ServerTelemetrySampler {
         }
         if (isDraining) {
             logisticsFlags |= TelemetryData.FLAG_LOGISTICS_IS_DRAINING;
+        }
+
+        if (addedNewSample && ServerConfig.DEBUG_LOGGING.get()) {
+            LOGGER.info("[TelemetryDebug] Block: {} | Slots: {} | Tanks: {} | itemTp: {}/s | fluidTp: {} mB/s | energyDelta: {} FE/t | state: {}",
+                    CompatRegistry.friendlyNameOf(level, pos), itemSlots.length, Arrays.toString(fluidTanks), itemThroughput, fluidThroughput, energyDelta, state);
         }
 
         return new TelemetryData(
@@ -708,15 +750,15 @@ public class ServerTelemetrySampler {
 
 
 
-    private static ResourceHandler<ItemResource> resolveItemHandler(Level level, BlockPos pos, Direction hitFace) {
+    private static ResourceHandler<ItemResource> resolveItemHandler(CapabilityCache cache, Direction hitFace) {
         if (hitFace != null) {
-            ResourceHandler<ItemResource> h = safeItem(level, pos, hitFace);
+            ResourceHandler<ItemResource> h = cache.item(hitFace);
             if (h != null && h.size() > 0) return h;
         }
-        ResourceHandler<ItemResource> h = safeItem(level, pos, null);
+        ResourceHandler<ItemResource> h = cache.item(null);
         if (h != null && h.size() > 0) return h;
         for (Direction side : Direction.values()) {
-            h = safeItem(level, pos, side);
+            h = cache.item(side);
             if (h != null && h.size() > 0) return h;
         }
         return null;
@@ -730,15 +772,15 @@ public class ServerTelemetrySampler {
         }
     }
 
-    private static ResourceHandler<FluidResource> resolveFluidHandler(Level level, BlockPos pos, Direction hitFace) {
+    private static ResourceHandler<FluidResource> resolveFluidHandler(CapabilityCache cache, Direction hitFace) {
         if (hitFace != null) {
-            ResourceHandler<FluidResource> h = safeFluid(level, pos, hitFace);
+            ResourceHandler<FluidResource> h = cache.fluid(hitFace);
             if (h != null && h.size() > 0) return h;
         }
-        ResourceHandler<FluidResource> h = safeFluid(level, pos, null);
+        ResourceHandler<FluidResource> h = cache.fluid(null);
         if (h != null && h.size() > 0) return h;
         for (Direction side : Direction.values()) {
-            h = safeFluid(level, pos, side);
+            h = cache.fluid(side);
             if (h != null && h.size() > 0) return h;
         }
         return null;
@@ -752,15 +794,15 @@ public class ServerTelemetrySampler {
         }
     }
 
-    private static EnergyHandler resolveEnergyStorage(Level level, BlockPos pos, Direction hitFace) {
+    private static EnergyHandler resolveEnergyStorage(CapabilityCache cache, Direction hitFace) {
         if (hitFace != null) {
-            EnergyHandler s = safeEnergy(level, pos, hitFace);
+            EnergyHandler s = cache.energy(hitFace);
             if (s != null && s.getCapacityAsLong() > 0) return s;
         }
-        EnergyHandler s = safeEnergy(level, pos, null);
+        EnergyHandler s = cache.energy(null);
         if (s != null && s.getCapacityAsLong() > 0) return s;
         for (Direction side : Direction.values()) {
-            s = safeEnergy(level, pos, side);
+            s = cache.energy(side);
             if (s != null && s.getCapacityAsLong() > 0) return s;
         }
         return null;
@@ -775,7 +817,12 @@ public class ServerTelemetrySampler {
     }
 
     private static void cleanupStaleEntries(long now) {
+        if (now - lastCleanupMs < CLEANUP_INTERVAL_MS) {
+            return;
+        }
+        lastCleanupMs = now;
         CACHE.entrySet().removeIf(entry -> now - entry.getValue().lastAccessMs > CLEANUP_EXPIRE_MS);
+        INERT_BLOCK_CACHE.entrySet().removeIf(entry -> now - entry.getValue() > INERT_EXPIRE_MS);
     }
 }
 

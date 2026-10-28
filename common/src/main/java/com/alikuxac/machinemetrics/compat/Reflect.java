@@ -9,6 +9,25 @@ public final class Reflect {
 
     private static final Map<Class<?>, Map<String, Method>> METHOD_CACHE = new ConcurrentHashMap<>();
     private static final Map<Class<?>, Map<String, Field>> FIELD_CACHE = new ConcurrentHashMap<>();
+    private static final Map<Class<?>, Map<String, Method>> TYPED_METHOD_CACHE = new ConcurrentHashMap<>();
+
+    private static final Method MISSING_METHOD;
+    private static final Field MISSING_FIELD;
+
+    static {
+        Method m = null;
+        Field f = null;
+        try {
+            m = Reflect.class.getDeclaredMethod("missSentinel");
+            f = Reflect.class.getDeclaredField("METHOD_CACHE");
+        } catch (Throwable ignored) {
+        }
+        MISSING_METHOD = m;
+        MISSING_FIELD = f;
+    }
+
+    private static void missSentinel() {
+    }
 
     private Reflect() {
     }
@@ -19,14 +38,12 @@ public final class Reflect {
         }
         Map<String, Method> slot = METHOD_CACHE.computeIfAbsent(clazz, c -> new ConcurrentHashMap<>());
         String key = cacheKey(names);
-        Method existing = slot.get(key);
-        if (existing != null) {
-            return existing;
+        if (slot.containsKey(key)) {
+            Method cached = slot.get(key);
+            return cached == MISSING_METHOD ? null : cached;
         }
         Method resolved = resolveMethod(clazz, names);
-        if (resolved != null) {
-            slot.put(key, resolved);
-        }
+        slot.put(key, resolved != null ? resolved : MISSING_METHOD);
         return resolved;
     }
 
@@ -34,6 +51,18 @@ public final class Reflect {
         if (clazz == null || names == null) {
             return null;
         }
+        Map<String, Method> slot = TYPED_METHOD_CACHE.computeIfAbsent(clazz, c -> new ConcurrentHashMap<>());
+        String key = typedCacheKey(paramTypes, names);
+        if (slot.containsKey(key)) {
+            Method cached = slot.get(key);
+            return cached == MISSING_METHOD ? null : cached;
+        }
+        Method resolved = resolveMethodTyped(clazz, paramTypes, names);
+        slot.put(key, resolved != null ? resolved : MISSING_METHOD);
+        return resolved;
+    }
+
+    private static Method resolveMethodTyped(Class<?> clazz, Class<?>[] paramTypes, String... names) {
         Class<?> curr = clazz;
         while (curr != null && curr != Object.class) {
             for (String name : names) {
@@ -55,14 +84,12 @@ public final class Reflect {
         }
         Map<String, Field> slot = FIELD_CACHE.computeIfAbsent(clazz, c -> new ConcurrentHashMap<>());
         String key = cacheKey(names);
-        Field existing = slot.get(key);
-        if (existing != null) {
-            return existing;
+        if (slot.containsKey(key)) {
+            Field cached = slot.get(key);
+            return cached == MISSING_FIELD ? null : cached;
         }
         Field resolved = resolveField(clazz, names);
-        if (resolved != null) {
-            slot.put(key, resolved);
-        }
+        slot.put(key, resolved != null ? resolved : MISSING_FIELD);
         return resolved;
     }
 
@@ -220,5 +247,17 @@ public final class Reflect {
 
     private static String cacheKey(String... names) {
         return String.join("\u0000", names);
+    }
+
+    private static String typedCacheKey(Class<?>[] paramTypes, String... names) {
+        StringBuilder sb = new StringBuilder();
+        if (paramTypes != null) {
+            for (Class<?> p : paramTypes) {
+                sb.append(p != null ? p.getName() : "null").append('\u0001');
+            }
+        }
+        sb.append('\u0000');
+        sb.append(String.join("\u0000", names));
+        return sb.toString();
     }
 }

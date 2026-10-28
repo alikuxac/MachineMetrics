@@ -2,6 +2,8 @@
 
 Machine Metrics splits configuration between client HUD options and server telemetry permissions.
 
+> **Target:** NeoForge 26.1.2 (Java 25). Config keys are unchanged from the earlier 1.21.1 line; the server config gained request-validation keys (`max_request_range`, `max_requests_per_second`) in this line. See [Migrating to Minecraft 26.1.2](26.1.2-migration.md) for the upgrade summary.
+
 ---
 
 ## In-Game HUD Editor
@@ -224,7 +226,19 @@ Servers control which telemetry data is sampled and transmitted to connected cli
 [sync]
   # Minimum container fill percentage change required to sync storage
   storage_sync_deadband_percent = 1.0
+  # Max distance (blocks) a player may request telemetry for (range: 1.0 to 64.0)
+  max_request_range = 12.0
+  # Max telemetry requests processed per player per second (0 = unlimited, range: 0 to 200)
+  max_requests_per_second = 20
 ```
+
+### Request Validation
+
+The server validates every `RequestTelemetryPayload` before sampling:
+- **Range check**: Requests for blocks farther than `max_request_range` from the player are ignored.
+- **Loaded check**: Requests for unloaded positions are ignored.
+- **Rate limit**: Each player is limited to `max_requests_per_second` requests per one-second window, applied before the expensive capability sampling so a modified client cannot force unbounded server work.
+- **Cache scope**: Server-side delta caching is keyed per `(player, block position)`, so one player's requests do not suppress another player's sync.
 
 ### Behavior when disabled
 

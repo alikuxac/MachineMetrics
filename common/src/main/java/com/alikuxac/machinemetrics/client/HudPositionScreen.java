@@ -8,7 +8,6 @@ import com.alikuxac.machinemetrics.compat.mekanism.MekanismChemicalInspector;
 import com.alikuxac.machinemetrics.config.ClientConfig;
 import com.alikuxac.machinemetrics.telemetry.TelemetryData;
 import it.unimi.dsi.fastutil.ints.IntArrayList;
-import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.screens.Screen;
@@ -414,23 +413,11 @@ public class HudPositionScreen extends Screen {
         graphics.centeredText(this.font, Component.translatable("machinemetrics.hud.drag_hint"), this.width / 2, 20, 0xAAAAAA);
 
         TelemetryData sampleData = createSampleTelemetryData();
-        List<TelemetryHudRenderer.HudLine> lines = TelemetryHudRenderer.buildHudLines("Sample Generator", sampleData);
-        if (lines.isEmpty()) {
-            lines = List.of(new TelemetryHudRenderer.HudLine(Component.translatable("machinemetrics.hud.all_hidden"), 0xAAAAAA));
-        }
+        List<TelemetryHudRenderer.HudLine> lines = sampleHudLines(sampleData);
 
-        Font font = this.font;
-        int maxLineWidth = 0;
-        for (TelemetryHudRenderer.HudLine line : lines) {
-            int w = font.width(line.text());
-            if (w > maxLineWidth) maxLineWidth = w;
-        }
-
-        int paddingX = 8;
-        int paddingY = 6;
-        int lineHeight = font.lineHeight + 3;
-        int boxWidth = maxLineWidth + (paddingX * 2);
-        int boxHeight = (lines.size() * lineHeight) + (paddingY * 2) - 2;
+        int[] box = computeSampleBox(lines);
+        int boxWidth = box[0];
+        int boxHeight = box[1];
 
         int[] coords = TelemetryHudRenderer.calculateRenderCoordinates(boxWidth, boxHeight, this.width, this.height);
         int renderX = coords[0];
@@ -439,22 +426,56 @@ public class HudPositionScreen extends Screen {
         int bgColor = ClientConfig.parseHexColor(ClientConfig.BACKGROUND_COLOR, 0x90000000);
         int borderColor = isDragging ? 0xFFFFFFFF : ClientConfig.parseHexColor(ClientConfig.BORDER_COLOR, 0xFF00FFCC);
 
+        float scale = TelemetryHudRenderer.getHudScale();
+        graphics.pose().pushMatrix();
+        TelemetryHudRenderer.applyHudScale(graphics, renderX, renderY, scale);
+
+        int paddingX = 8;
+        int paddingY = 6;
+        int lineHeight = this.font.lineHeight + 3;
+
         graphics.fill(renderX, renderY, renderX + boxWidth, renderY + boxHeight, bgColor);
         graphics.outline(renderX, renderY, boxWidth, boxHeight, borderColor);
 
         int currentY = renderY + paddingY;
         for (TelemetryHudRenderer.HudLine line : lines) {
-            graphics.text(font, line.text(), renderX + paddingX, currentY, line.color());
+            graphics.text(this.font, line.text(), renderX + paddingX, currentY, line.color());
             currentY += lineHeight;
         }
 
-        if (isMouseOverBox(mouseX, mouseY, renderX, renderY, boxWidth, boxHeight)) {
-            graphics.text(font, Component.translatable("machinemetrics.hud.drag_action"), renderX, renderY - 10, 0xFFFF55);
+        graphics.pose().popMatrix();
+
+        if (isMouseOverBox(mouseX, mouseY, renderX, renderY, boxWidth, boxHeight, scale)) {
+            graphics.text(this.font, Component.translatable("machinemetrics.hud.drag_action"), renderX, renderY - 10, 0xFFFF55);
         }
     }
 
-    private boolean isMouseOverBox(int mouseX, int mouseY, int boxX, int boxY, int boxWidth, int boxHeight) {
-        return mouseX >= boxX && mouseX <= boxX + boxWidth && mouseY >= boxY && mouseY <= boxY + boxHeight;
+    private List<TelemetryHudRenderer.HudLine> sampleHudLines(TelemetryData sampleData) {
+        List<TelemetryHudRenderer.HudLine> lines = TelemetryHudRenderer.buildHudLines("Sample Generator", sampleData);
+        if (lines.isEmpty()) {
+            lines = List.of(new TelemetryHudRenderer.HudLine(Component.translatable("machinemetrics.hud.all_hidden"), 0xAAAAAA));
+        }
+        return lines;
+    }
+
+    private int[] computeSampleBox(List<TelemetryHudRenderer.HudLine> lines) {
+        int maxLineWidth = 0;
+        for (TelemetryHudRenderer.HudLine line : lines) {
+            int w = this.font.width(line.text());
+            if (w > maxLineWidth) maxLineWidth = w;
+        }
+        int paddingX = 8;
+        int paddingY = 6;
+        int lineHeight = this.font.lineHeight + 3;
+        int boxWidth = maxLineWidth + (paddingX * 2);
+        int boxHeight = (lines.size() * lineHeight) + (paddingY * 2) - 2;
+        return new int[]{boxWidth, boxHeight};
+    }
+
+    private boolean isMouseOverBox(int mouseX, int mouseY, int boxX, int boxY, int boxWidth, int boxHeight, float scale) {
+        int scaledW = Math.round(boxWidth * scale);
+        int scaledH = Math.round(boxHeight * scale);
+        return mouseX >= boxX && mouseX <= boxX + scaledW && mouseY >= boxY && mouseY <= boxY + scaledH;
     }
 
     @Override
@@ -464,26 +485,14 @@ public class HudPositionScreen extends Screen {
         int button = event.button();
         if (button == 0) {
             TelemetryData sampleData = createSampleTelemetryData();
-            List<TelemetryHudRenderer.HudLine> lines = TelemetryHudRenderer.buildHudLines("Sample Generator", sampleData);
-            if (lines.isEmpty()) {
-                lines = List.of(new TelemetryHudRenderer.HudLine(Component.translatable("machinemetrics.hud.all_hidden"), 0xAAAAAA));
-            }
-            int maxLineWidth = 0;
-            for (TelemetryHudRenderer.HudLine line : lines) {
-                int w = this.font.width(line.text());
-                if (w > maxLineWidth) maxLineWidth = w;
-            }
-            int paddingX = 8;
-            int paddingY = 6;
-            int lineHeight = this.font.lineHeight + 3;
-            int boxWidth = maxLineWidth + (paddingX * 2);
-            int boxHeight = (lines.size() * lineHeight) + (paddingY * 2) - 2;
+            List<TelemetryHudRenderer.HudLine> lines = sampleHudLines(sampleData);
+            int[] box = computeSampleBox(lines);
 
-            int[] coords = TelemetryHudRenderer.calculateRenderCoordinates(boxWidth, boxHeight, this.width, this.height);
+            int[] coords = TelemetryHudRenderer.calculateRenderCoordinates(box[0], box[1], this.width, this.height);
             int renderX = coords[0];
             int renderY = coords[1];
 
-            if (isMouseOverBox((int) mouseX, (int) mouseY, renderX, renderY, boxWidth, boxHeight)) {
+            if (isMouseOverBox((int) mouseX, (int) mouseY, renderX, renderY, box[0], box[1], TelemetryHudRenderer.getHudScale())) {
                 isDragging = true;
                 dragMouseStartX = (int) mouseX;
                 dragMouseStartY = (int) mouseY;
@@ -539,6 +548,9 @@ public class HudPositionScreen extends Screen {
                 }
             }
 
+            newOffsetX = clampOffset(newOffsetX);
+            newOffsetY = clampOffset(newOffsetY);
+
             if (ClientConfig.HUD_X_OFFSET != null) {
                 ClientConfig.HUD_X_OFFSET.set(newOffsetX);
             }
@@ -550,14 +562,13 @@ public class HudPositionScreen extends Screen {
         return super.mouseDragged(event, dragX, dragY);
     }
 
+    private static int clampOffset(int value) {
+        return Math.max(-4000, Math.min(4000, value));
+    }
+
     @Override
     public void onClose() {
-        if (ClientConfig.SPEC != null) {
-            try {
-                ClientConfig.SPEC.save();
-            } catch (Throwable ignored) {
-            }
-        }
+        persistConfig();
         if (this.minecraft != null && this.lastScreen != null) {
             this.minecraft.setScreen(this.lastScreen);
         } else {
@@ -566,8 +577,20 @@ public class HudPositionScreen extends Screen {
     }
 
     @Override
-    public void extractBackground(GuiGraphicsExtractor graphics, int mouseX, int mouseY, float partialTick) {
-        super.extractBackground(graphics, mouseX, mouseY, partialTick);
+    public void removed() {
+        super.removed();
+        persistConfig();
+    }
+
+    private void persistConfig() {
+        if (ClientConfig.SPEC != null) {
+            try {
+                ClientConfig.SPEC.save();
+            } catch (Throwable t) {
+                com.mojang.logging.LogUtils.getLogger()
+                        .warn("[Machinemetrics] Failed to save HUD position config", t);
+            }
+        }
     }
 
     @Override

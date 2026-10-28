@@ -6,7 +6,6 @@ public class ServerConfig {
 
     public static final ModConfigSpec SPEC;
 
-    // Feature Toggles (default: true)
     public static final ModConfigSpec.BooleanValue ALLOW_ITEMS;
     public static final ModConfigSpec.BooleanValue ALLOW_FLUIDS;
     public static final ModConfigSpec.BooleanValue ALLOW_ENERGY;
@@ -15,11 +14,12 @@ public class ServerConfig {
     public static final ModConfigSpec.BooleanValue ALLOW_SIDE_METRICS;
     public static final ModConfigSpec.BooleanValue ALLOW_AE2;
 
-    // Debug
     public static final ModConfigSpec.BooleanValue DEBUG_LOGGING;
 
-    // Synchronization & Throttling
     public static final ModConfigSpec.DoubleValue STORAGE_SYNC_DEADBAND_PERCENT;
+
+    public static final ModConfigSpec.DoubleValue MAX_REQUEST_RANGE;
+    public static final ModConfigSpec.IntValue MAX_REQUESTS_PER_SECOND;
 
     static {
         ModConfigSpec.Builder builder = new ModConfigSpec.Builder();
@@ -70,6 +70,14 @@ public class ServerConfig {
         STORAGE_SYNC_DEADBAND_PERCENT = builder
                 .comment("Storage synchronization deadband percentage (only sync when container fill percentage changes by more than this threshold)")
                 .defineInRange("storage_sync_deadband_percent", 1.0, 0.0, 100.0);
+
+        MAX_REQUEST_RANGE = builder
+                .comment("Maximum distance (in blocks) between the player and the block they may request telemetry for")
+                .defineInRange("max_request_range", 12.0, 1.0, 64.0);
+
+        MAX_REQUESTS_PER_SECOND = builder
+                .comment("Maximum telemetry request packets processed per player per second (0 = unlimited)")
+                .defineInRange("max_requests_per_second", 20, 0, 200);
 
         builder.pop();
         SPEC = builder.build();

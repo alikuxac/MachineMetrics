@@ -2,6 +2,8 @@
 
 Machine Metrics uses an on-demand polling model. The server does not scan chunks, track active block entities in the background, or push unsolicited metrics. Telemetry calculations execute only when a player looks at a machine with the HUD enabled.
 
+This page describes runtime behavior on **Minecraft 26.1.2** (NeoForge, Java 25). Upgrade details and interface changes from the 1.21.1 line are on the [Migrating to Minecraft 26.1.2](26.1.2-migration.md) page.
+
 ---
 
 ## Architecture Overview
@@ -53,11 +55,15 @@ The server handles `RequestTelemetryPayload` on the main server thread via `Netw
 
 ```mermaid
 flowchart TD
-    Req["RequestTelemetryPayload<br/>(targetPos, hitFace)"] --> CacheCheck{"Inert Block Cache?<br/>(Within 5s)"}
+    Req["RequestTelemetryPayload<br/>(targetPos, hitFace)"] --> RangeCheck{"Within max_request_range<br/>and chunk loaded?"}
+    RangeCheck -- "No" --> Drop["Drop Request"]
+    RangeCheck -- "Yes" --> RateCheck{"Under max_requests_per_second?"}
+    RateCheck -- "No" --> Drop
+    RateCheck -- "Yes" --> CacheCheck{"Inert Block Cache?<br/>(Within 5s)"}
     CacheCheck -- "Yes (No Capabilities)" --> ReturnEmpty["Return Empty Data"]
     CacheCheck -- "No" --> PermCheck["Check ServerConfig permissions"]
 
-    PermCheck --> CapQueries["Query Block Capabilities:<br/>- IItemHandler<br/>- IFluidHandler<br/>- IEnergyStorage<br/>- Create Kinetic Inspector<br/>- Mekanism Chemical Inspector<br/>- AE2 Network Inspector"]
+    PermCheck --> CapQueries["Query Block Capabilities:<br/>- ResourceHandler&lt;ItemResource&gt;<br/>- ResourceHandler&lt;FluidResource&gt;<br/>- EnergyHandler<br/>- Create Kinetic Inspector<br/>- Mekanism Chemical Inspector<br/>- AE2 Network Inspector"]
 
     CapQueries --> HistoryDiff["Compare with SampleHistory:<br/>Delta = (Current - Previous) / DeltaSeconds"]
     HistoryDiff --> StateAnalysis["Deduce Machine State:<br/>- OPTIMAL (Active throughput)<br/>- STARVED (Empty inputs, unpowered)<br/>- CLOGGED (Full output buffers)<br/>- IDLE (Zero throughput)"]
@@ -66,16 +72,17 @@ flowchart TD
 
 ### Capability Sampling
 
-The sampler queries supported capabilities on all 6 faces plus the center block:
-- **NeoForge Capabilities**:
-  - `Capabilities.ItemHandler.BLOCK`: Item inventory and slot counts.
-  - `Capabilities.FluidHandler.BLOCK`: Tank capacities and fluid amounts.
-  - `Capabilities.EnergyStorage.BLOCK`: Stored FE amounts.
+The sampler queries supported capabilities on the requested hit face, then the unsided lookup, then all 6 faces. Per-sample lookups are memoized in a `CapabilityCache` so each face is queried at most once.
+- **NeoForge transfer capabilities (26.1.2 API)**:
+  - `Capabilities.Item.BLOCK` → `ResourceHandler<ItemResource>`: item inventory, per-slot capacity and amounts.
+  - `Capabilities.Fluid.BLOCK` → `ResourceHandler<FluidResource>`: tank capacities and fluid amounts.
+  - `Capabilities.Energy.BLOCK` → `EnergyHandler`: stored FE amounts and capacity.
 - **Mod Integrations**:
-  - **Create**: Reads rotational speed, network stress draw, capacity (SU), and overstress flags directly from `KineticBlockEntity`.
-  - **Mekanism**: Reads chemical tanks (Gas, Infuse, Pigment, Slurry). For logistical transporters, inspects active in-flight transit stacks directly to measure item rate and stack capacity, bypassing dummy item handlers.
+  - **Create**: Reads rotational speed, network stress draw, capacity (SU), and overstress flags. `CreateKineticInspector` is fully reflective and inert when Create is absent. Create has no official 26.1.2 build; unofficial ports are required for kinetic metrics.
+  - **Mekanism**: Reads chemical tanks (Gas, Infuse, Pigment, Slurry). For logistical transporters, inspects active in-flight transit stacks directly to measure item rate and stack capacity, bypassing dummy item handlers. Mekanism has no official 26.1.2 build; the adapter is compile-decoupled (see `mekanism-api-stub`) and falls back to Tier 2 when absent.
   - **Storage Drawers & Functional Storage**: Queries drawer controllers and slave blocks directly to sum items and maximum capacity without slot iteration overhead.
-  - **Applied Energistics 2**: Traverses the grid via `IGridNodeHost` to calculate net power rate, active drain, buffer percentage, stability states (`STABLE`, `BROWNOUT`, `BOOTING`, `DISCHARGING`, `CREATIVE`), and connected quartz fiber subnet drain.
+  - **Sophisticated Storage**: Namespace-gated adapter; capacity is summed from each slot's actual limit, and the display name is rebuilt from the block entity's tier.
+  - **Applied Energistics 2**: Traverses the grid via `IInWorldGridNodeHost`/`IGridNode` to calculate net power rate, active drain, buffer percentage, stability states (`STABLE`, `BROWNOUT`, `BOOTING`, `DISCHARGING`, `CREATIVE`), and connected quartz fiber subnet drain. AE2 remains on an official 26.1.2 line (`26.1.13-beta+`).
 
 ### Rate Calculation & Storage Tracking
 
@@ -91,18 +98,19 @@ Rates use differential time sampling against `SampleHistory`:
 
 ## 3. Network Payload Compression
 
-`SyncTelemetryPayload` uses bitmask serialization. A 1-byte presence mask indicates which data fields follow in the packet:
+`SyncTelemetryPayload` uses bitmask serialization. A VarInt presence mask indicates which data fields follow in the packet. Unknown high bits are masked off on decode, and fluid/chemical name strings are length-bounded (`readUtf(64)`), so a malformed payload cannot force unbounded allocation.
 
 | Bit Flag | Mask Name | Payload Written if Bit Set |
 | :--- | :--- | :--- |
-| `0x01` | Items | `float itemThroughput`, `boolean hasItems` |
-| `0x02` | Fluids | `float fluidThroughput`, `boolean hasFluids` |
-| `0x04` | Energy | `float energyDelta`, `boolean hasEnergy` |
-| `0x08` | Kinetic | `float speed`, `stress`, `capacity`, `byte direction` |
-| `0x10` | Chemicals | `float chemicalThroughput`, `boolean hasChemicals` |
-| `0x20` | AE2 | `float powerRate`, `powerDrain`, `subnetDrain`, `short subnets`, `double stored`, `double max`, `byte stability`, `int usedChannels`, `int maxChannels` |
-| `0x40` | Directional Sides | Variable length array of per-face active rates |
-| `0x80` | Server Disabled Mask | `short serverDisabledMask` (Flags restricted features) |
+| `0x001` | Items | `float itemThroughput`, `boolean hasItems` |
+| `0x002` | Fluids | `float fluidThroughput`, `boolean hasFluids`, `String fluidName` (≤64), `long amount`, `long capacity` |
+| `0x004` | Energy | `float energyDelta`, `boolean hasEnergy` |
+| `0x008` | Kinetic | `float speed`, `stress`, `capacity`, `blockStress`, `byte direction` |
+| `0x010` | Chemicals | `float chemicalThroughput`, `String chemicalName` (≤64), `long amount`, `long capacity` |
+| `0x020` | AE2 | `float powerRate`, `powerDrain`, `subnetDrain`, `int subnets`, `double stored`, `double max`, `byte stability`, `int usedChannels`, `int maxChannels` |
+| `0x040` | Directional Sides | Variable length array of per-face active rates |
+| `0x080` | Server Disabled Mask | `short serverDisabledMask` (Flags restricted features) |
+| `0x100` | Storage | `long storageCurrent`, `long storageMax`, `float netRate`, `byte logisticsFlags` |
 
 ### Storage Sync Payload
 
@@ -148,5 +156,7 @@ flowchart LR
 ## 5. Lifecycle and Cache Eviction
 
 - **Target Switching**: When the crosshair leaves a block, `ClientTelemetryCache.remove(targetPos)` clears the client cache to prevent stale data when returning to that position.
-- **Server Cache Expiration**: Inactive targets in `ServerTelemetrySampler.CACHE` expire after 10 seconds without requests.
+- **Client Cache Expiration**: Client entries expire after 2 seconds; a background sweep removes stale entries at most every 5 seconds.
+- **Server Cache Expiration**: Inactive targets in `ServerTelemetrySampler.CACHE` expire after 10 seconds without requests; the sweep is throttled to once per second. Cache history is keyed by `(BlockPos, hitFace)`.
 - **Inert Blocks**: Blocks lacking compatible capability providers stay in `INERT_BLOCK_CACHE` for 5 seconds to bypass redundant capability checks on building blocks.
+- **HUD Render Cache**: `TelemetryHudRenderer` caches the built HUD lines and the resolved block name per `(BlockPos, hitFace, data signature, config signature)`. Local (client-only) sampling is throttled to one sample per 100 ms per target.

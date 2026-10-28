@@ -90,7 +90,7 @@ public class SophisticatedStorageAdapter {
         } catch (Throwable ignored) {
         }
 
-        for (String methodName : new String[]{"getCustomName", "getDisplayName"}) {
+        for (String methodName : new String[]{"getCustomName"}) {
             try {
                 Method m = be.getClass().getMethod(methodName);
                 Object result = m.invoke(be);
