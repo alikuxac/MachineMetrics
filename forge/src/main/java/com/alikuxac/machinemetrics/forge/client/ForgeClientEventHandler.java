@@ -36,7 +36,7 @@ public class ForgeClientEventHandler {
             int y = 8;
 
             Button configBtn = Button.builder(Component.translatable("machinemetrics.hud.button"), b -> {
-                Minecraft.getInstance().setScreen(new HudPositionScreen());
+                Minecraft.getInstance().setScreen(new HudPositionScreen(screen));
             }).bounds(x, y, buttonWidth, buttonHeight).build();
 
             event.addListener(configBtn);

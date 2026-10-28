@@ -127,7 +127,7 @@ public final class CompatRegistry {
         if (fragment == null || fragment.isEmpty()) {
             return false;
         }
-        return pathOf(level, pos).toLowerCase().contains(fragment.toLowerCase());
+        return pathOf(level, pos).toLowerCase(java.util.Locale.ROOT).contains(fragment.toLowerCase(java.util.Locale.ROOT));
     }
 
     private static BlockState blockStateOf(Level level, BlockPos pos) {

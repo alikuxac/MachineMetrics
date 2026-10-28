@@ -34,6 +34,97 @@ public class TelemetryHudRenderer {
     private static Direction lastSentFace = null;
     private static long lastRequestTimeMs = 0L;
 
+    private static BlockPos cachedLinesPos = null;
+    private static Direction cachedLinesFace = null;
+    private static int cachedLinesDataSig = 0;
+    private static int cachedLinesConfigSig = 0;
+    private static List<HudLine> cachedLines = null;
+    private static String cachedMachineName = null;
+
+    private static final long LOCAL_SAMPLE_INTERVAL_MS = 100L;
+    private static long lastLocalSampleMs = 0L;
+    private static BlockPos lastLocalSamplePos = null;
+    private static Direction lastLocalSampleFace = null;
+    private static TelemetryData lastLocalSampleData = null;
+
+    private static int computeConfigSignature() {
+        return java.util.Objects.hash(
+                ClientConfig.COMPACT_MODE != null && ClientConfig.COMPACT_MODE.get(),
+                ClientConfig.COMPACT_TEMPLATE != null ? ClientConfig.COMPACT_TEMPLATE.get() : "",
+                ClientConfig.SHOW_MACHINE_TITLE != null && ClientConfig.SHOW_MACHINE_TITLE.get(),
+                ClientConfig.SHOW_STATUS_BADGE != null && ClientConfig.SHOW_STATUS_BADGE.get(),
+                ClientConfig.SHOW_STORAGE_CAPACITY != null && ClientConfig.SHOW_STORAGE_CAPACITY.get(),
+                ClientConfig.SHOW_TIME_TO_FULL != null && ClientConfig.SHOW_TIME_TO_FULL.get(),
+                ClientConfig.AUTO_HIDE_TITLE_WITH_INFO_MODS != null && ClientConfig.AUTO_HIDE_TITLE_WITH_INFO_MODS.get(),
+                ClientConfig.AUTO_HIDE_REDUNDANT_WITH_INFOHUD != null && ClientConfig.AUTO_HIDE_REDUNDANT_WITH_INFOHUD.get(),
+                ClientConfig.COLOR_HEADER != null ? ClientConfig.COLOR_HEADER.get() : "",
+                ClientConfig.COLOR_ITEMS != null ? ClientConfig.COLOR_ITEMS.get() : "",
+                ClientConfig.COLOR_FLUIDS != null ? ClientConfig.COLOR_FLUIDS.get() : "",
+                ClientConfig.COLOR_CHEMICALS != null ? ClientConfig.COLOR_CHEMICALS.get() : "",
+                ClientConfig.COLOR_KINETIC != null ? ClientConfig.COLOR_KINETIC.get() : ""
+        );
+    }
+
+    private static int computeDataSignature(TelemetryData data) {
+        if (data == null) {
+            return 0;
+        }
+        return java.util.Objects.hash(
+                data.bottleneckState(),
+                data.itemThroughput(),
+                data.fluidThroughput(),
+                data.chemicalThroughput(),
+                data.kineticSpeed(),
+                data.energyDelta(),
+                data.storageCurrent(),
+                data.storageMax(),
+                data.netRate(),
+                data.hasItems(),
+                data.hasFluids(),
+                data.hasChemicals(),
+                data.hasEnergy(),
+                data.hasKinetic(),
+                data.hasAe2Network(),
+                data.serverDisabledMask()
+        );
+    }
+
+    private static List<HudLine> getCachedLines(String machineName, TelemetryData data, MetricResolver.EtaResult eta,
+                                                BlockPos pos, Direction face) {
+        int dataSig = computeDataSignature(data);
+        int configSig = computeConfigSignature();
+        if (cachedLines != null
+                && pos != null && pos.equals(cachedLinesPos)
+                && face == cachedLinesFace
+                && dataSig == cachedLinesDataSig
+                && configSig == cachedLinesConfigSig) {
+            return cachedLines;
+        }
+        List<HudLine> lines = buildHudLines(machineName, data, eta);
+        cachedLines = lines;
+        cachedLinesPos = pos;
+        cachedLinesFace = face;
+        cachedLinesDataSig = dataSig;
+        cachedLinesConfigSig = configSig;
+        return lines;
+    }
+
+    public static void invalidateLineCache() {
+        cachedLines = null;
+        cachedLinesPos = null;
+        cachedLinesFace = null;
+        cachedMachineName = null;
+    }
+
+    private static String getCachedMachineName(Minecraft mc, BlockPos pos) {
+        if (cachedMachineName != null && pos.equals(cachedLinesPos)) {
+            return cachedMachineName;
+        }
+        String name = MetricResolver.getBlockOrMachineName(mc.level, pos);
+        cachedMachineName = name;
+        return name;
+    }
+
     public static void renderHud(GuiGraphics graphics, ClientSampler sampler) {
         if (!KeyBindings.hudEnabled) {
             return;
@@ -71,6 +162,7 @@ public class TelemetryHudRenderer {
             currentHoverPos = targetPos;
             currentHoverFace = hitFace;
             hoverStartTimeMs = now;
+            invalidateLineCache();
         }
 
         // Raycast Debounce (~120ms hover before sending network packet)
@@ -90,16 +182,25 @@ public class TelemetryHudRenderer {
 
         TelemetryData data = ClientTelemetryCache.get(targetPos);
         if (data.isEmpty()) {
-            data = sampler.sample(targetPos, hitFace);
+            boolean sameTarget = targetPos.equals(lastLocalSamplePos) && hitFace == lastLocalSampleFace;
+            if (sameTarget && lastLocalSampleData != null && (now - lastLocalSampleMs) < LOCAL_SAMPLE_INTERVAL_MS) {
+                data = lastLocalSampleData;
+            } else {
+                data = sampler.sample(targetPos, hitFace);
+                lastLocalSampleMs = now;
+                lastLocalSamplePos = targetPos;
+                lastLocalSampleFace = hitFace;
+                lastLocalSampleData = data;
+            }
         }
 
         if (data == null || data.isEmpty()) {
             return;
         }
 
-        String machineName = MetricResolver.getBlockOrMachineName(mc.level, targetPos);
+        String machineName = getCachedMachineName(mc, targetPos);
         MetricResolver.EtaResult eta = ClientTelemetryCache.getEta(targetPos);
-        List<HudLine> lines = buildHudLines(machineName, data, eta);
+        List<HudLine> lines = getCachedLines(machineName, data, eta, targetPos, hitFace);
 
         if (lines.isEmpty()) {
             return;

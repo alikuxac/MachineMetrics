@@ -20,6 +20,8 @@ public class ServerConfig {
 
     // Synchronization & Throttling
     public static final Config.Value<Double> STORAGE_SYNC_DEADBAND_PERCENT;
+    public static final Config.Value<Double> MAX_REQUEST_RANGE;
+    public static final Config.Value<Integer> MAX_REQUESTS_PER_SECOND;
 
     static {
         Config.Builder builder = Config.builder();
@@ -70,6 +72,14 @@ public class ServerConfig {
         STORAGE_SYNC_DEADBAND_PERCENT = builder
                 .comment("Storage synchronization deadband percentage (only sync when container fill percentage changes by more than this threshold)")
                 .defineInRange("storage_sync_deadband_percent", 1.0, 0.0, 100.0);
+
+        MAX_REQUEST_RANGE = builder
+                .comment("Maximum distance (in blocks) between the player and the block they may request telemetry for")
+                .defineInRange("max_request_range", 12.0, 1.0, 64.0);
+
+        MAX_REQUESTS_PER_SECOND = builder
+                .comment("Maximum telemetry request packets processed per player per second (0 = unlimited)")
+                .defineInRange("max_requests_per_second", 20, 0, 200);
 
         builder.pop();
         SPEC = builder.build();

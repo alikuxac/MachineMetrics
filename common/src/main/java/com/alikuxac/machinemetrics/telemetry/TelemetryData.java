@@ -71,6 +71,8 @@ public record TelemetryData(
     public static final byte IS_INFINITE = FLAG_LOGISTICS_IS_INFINITE;
     public static final byte IS_DRAINING = FLAG_LOGISTICS_IS_DRAINING;
 
+    public static final long INFINITE_CAPACITY = Long.MAX_VALUE / 2;
+
     public boolean hasStorage() {
         return (logisticsFlags & FLAG_LOGISTICS_HAS_STORAGE) != 0;
     }

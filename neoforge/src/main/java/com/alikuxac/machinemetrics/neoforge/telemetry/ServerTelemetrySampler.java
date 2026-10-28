@@ -25,8 +25,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.Arrays;
-import java.util.Collections;
-import java.util.IdentityHashMap;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
@@ -34,12 +32,16 @@ import java.util.concurrent.ConcurrentHashMap;
 public class ServerTelemetrySampler {
 
     private static final Logger LOGGER = LoggerFactory.getLogger(ServerTelemetrySampler.class);
-    private static final Map<BlockPos, SampleHistory> CACHE = new ConcurrentHashMap<>();
+    private static final Map<SampleKey, SampleHistory> CACHE = new ConcurrentHashMap<>();
     private static final Map<BlockPos, Long> INERT_BLOCK_CACHE = new ConcurrentHashMap<>();
     private static final long CLEANUP_EXPIRE_MS = 10000L;
+    private static final long CLEANUP_INTERVAL_MS = 1000L;
     private static final long INERT_EXPIRE_MS = 5000L;
+    private static volatile long lastCleanupMs = 0L;
 
     private static final String WAYSTONE_NAMESPACE = "waystones";
+
+    private record SampleKey(BlockPos pos, Direction face) {}
 
     private static final Set<String> COMPAT_NAMESPACES = Set.of(
             CompatRegistry.NAMESPACE_AE2,
@@ -63,7 +65,7 @@ public class ServerTelemetrySampler {
 
     private static final Direction[] SIDES_TO_QUERY = new Direction[] { null, Direction.UP, Direction.DOWN, Direction.NORTH, Direction.SOUTH, Direction.WEST, Direction.EAST };
 
-    private record Sample(long timestampMs, int[] itemSlots, int[] fluidTanks, int energyAmount, int totalItems, int totalFluid, long totalChemical, float[] sideMetrics) {}
+    private record Sample(long timestampMs, int[] itemSlots, int[] fluidTanks, int energyAmount, long totalItems, int totalFluid, long totalChemical, float[] sideMetrics) {}
 
     private static class SampleHistory {
         private Sample previousSample;
@@ -75,7 +77,7 @@ public class ServerTelemetrySampler {
         private float lastEnergyDelta;
         private float[] lastSideRates = new float[18];
         private int cachedItemSlotCount = -1;
-        private int cachedMaxItemCapacity = 0;
+        private long cachedMaxItemCapacity = 0L;
 
         public SampleHistory(Sample initialSample) {
             this.lastSample = initialSample;
@@ -131,7 +133,8 @@ public class ServerTelemetrySampler {
             return TelemetryData.empty();
         }
 
-        SampleHistory existingHistory = CACHE.get(pos);
+        SampleKey sampleKey = new SampleKey(pos, hitFace);
+        SampleHistory existingHistory = CACHE.get(sampleKey);
 
         boolean allowItems = ServerConfig.ALLOW_ITEMS == null || ServerConfig.ALLOW_ITEMS.get();
         boolean allowFluids = ServerConfig.ALLOW_FLUIDS == null || ServerConfig.ALLOW_FLUIDS.get();
@@ -140,8 +143,8 @@ public class ServerTelemetrySampler {
         boolean allowChemicals = ServerConfig.ALLOW_CHEMICALS == null || ServerConfig.ALLOW_CHEMICALS.get();
         boolean allowSides = ServerConfig.ALLOW_SIDE_METRICS == null || ServerConfig.ALLOW_SIDE_METRICS.get();
 
-        int currentItems = 0;
-        int maxItems = 0;
+        long currentItems = 0L;
+        long maxItems = 0L;
         int currentFluid = 0;
         int maxFluid = 0;
         int currentEnergy = 0;
@@ -153,7 +156,6 @@ public class ServerTelemetrySampler {
         float[] sideMetrics = new float[18];
 
         IntArrayList allSlotCounts = new IntArrayList();
-        Set<IItemHandler> processedItemHandlers = Collections.newSetFromMap(new IdentityHashMap<>());
 
         var transporterOpt = MekanismTransporterInspector.inspect(be);
         boolean isTransporter = transporterOpt.isPresent() && transporterOpt.get().isTransporter();
@@ -197,10 +199,9 @@ public class ServerTelemetrySampler {
 
         if (itemHandler != null && itemHandler.getSlots() > 0) {
             hasAnyCapability = true;
-            processedItemHandlers.add(itemHandler);
             int slotCount = itemHandler.getSlots();
             boolean useCachedLimit = existingHistory != null && existingHistory.cachedItemSlotCount == slotCount && existingHistory.cachedMaxItemCapacity > 0;
-            int handlerMaxCap = 0;
+            long handlerMaxCap = 0L;
 
             if (useCachedLimit) {
                 handlerMaxCap = existingHistory.cachedMaxItemCapacity;
@@ -240,7 +241,6 @@ public class ServerTelemetrySampler {
 
         String fluidName = "";
         IntArrayList allTankAmounts = new IntArrayList();
-        Set<IFluidHandler> processedFluidHandlers = Collections.newSetFromMap(new IdentityHashMap<>());
 
         if (allowFluids) {
             if (allowSides) {
@@ -266,7 +266,6 @@ public class ServerTelemetrySampler {
 
             if (fluidHandler != null && fluidHandler.getTanks() > 0) {
                 hasAnyCapability = true;
-                processedFluidHandlers.add(fluidHandler);
                 for (int i = 0; i < fluidHandler.getTanks(); i++) {
                     var fluidStack = fluidHandler.getFluidInTank(i);
                     int tankCap = fluidHandler.getTankCapacity(i);
@@ -376,7 +375,7 @@ public class ServerTelemetrySampler {
         INERT_BLOCK_CACHE.remove(pos);
 
         Sample currentSample = new Sample(now, itemSlots, fluidTanks, currentEnergy, currentItems, currentFluid, chemicalAmount, sideMetrics);
-        SampleHistory history = CACHE.computeIfAbsent(pos, p -> new SampleHistory(currentSample));
+        SampleHistory history = CACHE.computeIfAbsent(sampleKey, p -> new SampleHistory(currentSample));
 
         if (now - history.lastSample.timestampMs() >= 100L) {
             history.addSample(currentSample);
@@ -396,7 +395,7 @@ public class ServerTelemetrySampler {
             if (timeDiffSec > 0) {
                 int[] prevSlots = history.previousSample.itemSlots();
                 int[] currSlots = history.lastSample.itemSlots();
-                int slotDeltaSum = 0;
+                long slotDeltaSum = 0L;
                 int maxLen = Math.max(prevSlots.length, currSlots.length);
                 for (int i = 0; i < maxLen; i++) {
                     int p = i < prevSlots.length ? prevSlots[i] : 0;
@@ -415,7 +414,7 @@ public class ServerTelemetrySampler {
 
                 int[] prevTanks = history.previousSample.fluidTanks();
                 int[] currTanks = history.lastSample.fluidTanks();
-                int tankDeltaSum = 0;
+                long tankDeltaSum = 0L;
                 int maxTankLen = Math.max(prevTanks.length, currTanks.length);
                 for (int i = 0; i < maxTankLen; i++) {
                     int p = i < prevTanks.length ? prevTanks[i] : 0;
@@ -639,7 +638,7 @@ public class ServerTelemetrySampler {
             storageMax = chemicalCapacity;
             primaryNetRate = chemicalNetRate;
             hasStorage = true;
-            if (chemicalCapacity >= Integer.MAX_VALUE) {
+            if (chemicalCapacity >= TelemetryData.INFINITE_CAPACITY) {
                 isInfiniteStorage = true;
             }
         }
@@ -649,7 +648,7 @@ public class ServerTelemetrySampler {
             storageMax = maxFluid;
             primaryNetRate = fluidNetRate;
             hasStorage = true;
-            if (maxFluid >= Integer.MAX_VALUE) {
+            if (maxFluid >= TelemetryData.INFINITE_CAPACITY) {
                 isInfiniteStorage = true;
             }
         }
@@ -672,8 +671,7 @@ public class ServerTelemetrySampler {
         }
 
         boolean isInfinite = isInfiniteStorage
-                || (storageMax == Integer.MAX_VALUE)
-                || (storageMax >= (Long.MAX_VALUE / 2))
+                || (storageMax >= TelemetryData.INFINITE_CAPACITY)
                 || (hasAe2Network && aeIsCreative);
 
         boolean isDraining = primaryNetRate < -0.001f;
@@ -772,7 +770,12 @@ public class ServerTelemetrySampler {
     }
 
     private static void cleanupStaleEntries(long now) {
+        if (now - lastCleanupMs < CLEANUP_INTERVAL_MS) {
+            return;
+        }
+        lastCleanupMs = now;
         CACHE.entrySet().removeIf(entry -> now - entry.getValue().lastAccessMs > CLEANUP_EXPIRE_MS);
+        INERT_BLOCK_CACHE.entrySet().removeIf(entry -> now - entry.getValue() > INERT_EXPIRE_MS);
     }
 }
 

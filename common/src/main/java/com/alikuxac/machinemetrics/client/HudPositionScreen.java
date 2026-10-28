@@ -438,6 +438,14 @@ public class HudPositionScreen extends Screen {
         int bgColor = ClientConfig.parseHexColor(ClientConfig.BACKGROUND_COLOR, 0x90000000);
         int borderColor = isDragging ? 0xFFFFFFFF : ClientConfig.parseHexColor(ClientConfig.BORDER_COLOR, 0xFF00FFCC);
 
+        float scale = getHudScale();
+        graphics.pose().pushPose();
+        if (scale != 1.0f) {
+            graphics.pose().translate(renderX, renderY, 0);
+            graphics.pose().scale(scale, scale, 1.0f);
+            graphics.pose().translate(-renderX, -renderY, 0);
+        }
+
         graphics.fill(renderX, renderY, renderX + boxWidth, renderY + boxHeight, bgColor);
         graphics.renderOutline(renderX, renderY, boxWidth, boxHeight, borderColor);
 
@@ -447,13 +455,21 @@ public class HudPositionScreen extends Screen {
             currentY += lineHeight;
         }
 
-        if (isMouseOverBox(mouseX, mouseY, renderX, renderY, boxWidth, boxHeight)) {
+        graphics.pose().popPose();
+
+        if (isMouseOverBox(mouseX, mouseY, renderX, renderY, boxWidth, boxHeight, scale)) {
             graphics.drawString(font, Component.translatable("machinemetrics.hud.drag_action"), renderX, renderY - 10, 0xFFFF55);
         }
     }
 
-    private boolean isMouseOverBox(int mouseX, int mouseY, int boxX, int boxY, int boxWidth, int boxHeight) {
-        return mouseX >= boxX && mouseX <= boxX + boxWidth && mouseY >= boxY && mouseY <= boxY + boxHeight;
+    private static float getHudScale() {
+        return ClientConfig.HUD_SCALE != null ? ClientConfig.HUD_SCALE.get().floatValue() : 1.0f;
+    }
+
+    private boolean isMouseOverBox(int mouseX, int mouseY, int boxX, int boxY, int boxWidth, int boxHeight, float scale) {
+        int scaledW = Math.round(boxWidth * scale);
+        int scaledH = Math.round(boxHeight * scale);
+        return mouseX >= boxX && mouseX <= boxX + scaledW && mouseY >= boxY && mouseY <= boxY + scaledH;
     }
 
     @Override
@@ -479,7 +495,7 @@ public class HudPositionScreen extends Screen {
             int renderX = coords[0];
             int renderY = coords[1];
 
-            if (isMouseOverBox((int) mouseX, (int) mouseY, renderX, renderY, boxWidth, boxHeight)) {
+            if (isMouseOverBox((int) mouseX, (int) mouseY, renderX, renderY, boxWidth, boxHeight, getHudScale())) {
                 isDragging = true;
                 dragMouseStartX = (int) mouseX;
                 dragMouseStartY = (int) mouseY;
@@ -533,6 +549,9 @@ public class HudPositionScreen extends Screen {
                 }
             }
 
+            newOffsetX = clampOffset(newOffsetX);
+            newOffsetY = clampOffset(newOffsetY);
+
             if (ClientConfig.HUD_X_OFFSET != null) {
                 ClientConfig.HUD_X_OFFSET.set(newOffsetX);
             }
@@ -544,18 +563,32 @@ public class HudPositionScreen extends Screen {
         return super.mouseDragged(mouseX, mouseY, button, dragX, dragY);
     }
 
+    private static int clampOffset(int value) {
+        return Math.max(-4000, Math.min(4000, value));
+    }
+
     @Override
     public void onClose() {
+        persistConfig();
+        if (this.minecraft != null && this.lastScreen != null) {
+            this.minecraft.setScreen(this.lastScreen);
+        } else {
+            super.onClose();
+        }
+    }
+
+    @Override
+    public void removed() {
+        super.removed();
+        persistConfig();
+    }
+
+    private void persistConfig() {
         if (ClientConfig.SPEC != null) {
             try {
                 ClientConfig.SPEC.save();
             } catch (Throwable ignored) {
             }
-        }
-        if (this.minecraft != null && this.lastScreen != null) {
-            this.minecraft.setScreen(this.lastScreen);
-        } else {
-            super.onClose();
         }
     }
 

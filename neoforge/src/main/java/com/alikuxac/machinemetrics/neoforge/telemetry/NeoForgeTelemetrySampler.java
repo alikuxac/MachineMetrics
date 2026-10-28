@@ -27,21 +27,22 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.Arrays;
-import java.util.Collections;
-import java.util.IdentityHashMap;
 import java.util.Map;
-import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 
 public class NeoForgeTelemetrySampler {
 
     private static final Logger LOGGER = LoggerFactory.getLogger(NeoForgeTelemetrySampler.class);
-    private static final Map<BlockPos, SampleHistory> CACHE = new ConcurrentHashMap<>();
+    private static final Map<SampleKey, SampleHistory> CACHE = new ConcurrentHashMap<>();
     private static final long CLEANUP_EXPIRE_MS = 10000L;
+    private static final long CLEANUP_INTERVAL_MS = 1000L;
+    private static volatile long lastCleanupMs = 0L;
 
     private static final String WAYSTONE_NAMESPACE = "waystones";
 
-    private record Sample(long timestampMs, int[] itemSlots, int[] fluidTanks, int energyAmount, int totalItems, int totalFluid, float[] sideMetrics) {}
+    private record SampleKey(BlockPos pos, Direction face) {}
+
+    private record Sample(long timestampMs, int[] itemSlots, int[] fluidTanks, int energyAmount, long totalItems, long totalFluid, float[] sideMetrics) {}
 
     private static class SampleHistory {
         private Sample previousSample;
@@ -53,7 +54,7 @@ public class NeoForgeTelemetrySampler {
         private float lastEnergyDelta;
         private float[] lastSideRates = new float[18];
         private int cachedItemSlotCount = -1;
-        private int cachedMaxItemCapacity = 0;
+        private long cachedMaxItemCapacity = 0L;
 
         public SampleHistory(Sample initialSample) {
             this.lastSample = initialSample;
@@ -98,10 +99,11 @@ public class NeoForgeTelemetrySampler {
             return TelemetryData.empty();
         }
 
-        SampleHistory existingHistory = CACHE.get(pos);
+        SampleKey sampleKey = new SampleKey(pos, hitFace);
+        SampleHistory existingHistory = CACHE.get(sampleKey);
 
-        int currentItems = 0;
-        int maxItems = 0;
+        long currentItems = 0L;
+        long maxItems = 0L;
         int currentFluid = 0;
         int maxFluid = 0;
         int currentEnergy = 0;
@@ -111,7 +113,6 @@ public class NeoForgeTelemetrySampler {
 
         float[] sideMetrics = new float[18];
         IntArrayList allSlotCounts = new IntArrayList();
-        Set<IItemHandler> processedItemHandlers = Collections.newSetFromMap(new IdentityHashMap<>());
 
         var transporterOpt = MekanismTransporterInspector.inspect(be);
         boolean isTransporter = transporterOpt.isPresent() && transporterOpt.get().isTransporter();
@@ -150,10 +151,9 @@ public class NeoForgeTelemetrySampler {
 
                 if (itemHandler != null && itemHandler.getSlots() > 0) {
                     hasAnyCapability = true;
-                    processedItemHandlers.add(itemHandler);
                     int slotCount = itemHandler.getSlots();
                     boolean useCachedLimit = existingHistory != null && existingHistory.cachedItemSlotCount == slotCount && existingHistory.cachedMaxItemCapacity > 0;
-                    int handlerMaxCap = 0;
+                    long handlerMaxCap = 0L;
 
                     if (useCachedLimit) {
                         handlerMaxCap = existingHistory.cachedMaxItemCapacity;
@@ -190,7 +190,6 @@ public class NeoForgeTelemetrySampler {
         int[] itemSlots = allSlotCounts.toIntArray();
 
         IntArrayList allTankAmounts = new IntArrayList();
-        Set<IFluidHandler> processedFluidHandlers = Collections.newSetFromMap(new IdentityHashMap<>());
         String fluidName = "";
 
         for (Direction side : Direction.values()) {
@@ -211,7 +210,6 @@ public class NeoForgeTelemetrySampler {
 
         if (fluidHandler != null && fluidHandler.getTanks() > 0) {
             hasAnyCapability = true;
-            processedFluidHandlers.add(fluidHandler);
             for (int i = 0; i < fluidHandler.getTanks(); i++) {
                 var fluidStack = fluidHandler.getFluidInTank(i);
                 int tankCap = fluidHandler.getTankCapacity(i);
@@ -330,7 +328,7 @@ public class NeoForgeTelemetrySampler {
         }
 
         Sample currentSample = new Sample(now, itemSlots, fluidTanks, currentEnergy, currentItems, currentFluid, sideMetrics);
-        SampleHistory history = CACHE.computeIfAbsent(pos, p -> new SampleHistory(currentSample));
+        SampleHistory history = CACHE.computeIfAbsent(sampleKey, p -> new SampleHistory(currentSample));
 
         boolean addedNewSample = false;
         if (now - history.lastSample.timestampMs() >= 100L) {
@@ -352,7 +350,7 @@ public class NeoForgeTelemetrySampler {
             if (timeDiffSec > 0) {
                 int[] prevSlots = history.previousSample.itemSlots();
                 int[] currSlots = history.lastSample.itemSlots();
-                int slotDeltaSum = 0;
+                long slotDeltaSum = 0L;
                 int maxLen = Math.max(prevSlots.length, currSlots.length);
                 for (int i = 0; i < maxLen; i++) {
                     int p = i < prevSlots.length ? prevSlots[i] : 0;
@@ -371,7 +369,7 @@ public class NeoForgeTelemetrySampler {
 
                 int[] prevTanks = history.previousSample.fluidTanks();
                 int[] currTanks = history.lastSample.fluidTanks();
-                int tankDeltaSum = 0;
+                long tankDeltaSum = 0L;
                 int maxTankLen = Math.max(prevTanks.length, currTanks.length);
                 for (int i = 0; i < maxTankLen; i++) {
                     int p = i < prevTanks.length ? prevTanks[i] : 0;
@@ -548,7 +546,7 @@ public class NeoForgeTelemetrySampler {
             storageMax = chemicalCapacity;
             primaryNetRate = 0f;
             hasStorage = true;
-            if (chemicalCapacity >= Integer.MAX_VALUE) {
+            if (chemicalCapacity >= TelemetryData.INFINITE_CAPACITY) {
                 isInfiniteStorage = true;
             }
         }
@@ -558,7 +556,7 @@ public class NeoForgeTelemetrySampler {
             storageMax = maxFluid;
             primaryNetRate = fluidNetRate;
             hasStorage = true;
-            if (maxFluid >= Integer.MAX_VALUE) {
+            if (maxFluid >= TelemetryData.INFINITE_CAPACITY) {
                 isInfiniteStorage = true;
             }
         }
@@ -581,8 +579,7 @@ public class NeoForgeTelemetrySampler {
         }
 
         boolean isInfinite = isInfiniteStorage
-                || (storageMax == Integer.MAX_VALUE)
-                || (storageMax >= (Long.MAX_VALUE / 2))
+                || (storageMax >= TelemetryData.INFINITE_CAPACITY)
                 || (hasAe2Network && aeIsCreative);
 
         boolean isDraining = primaryNetRate < -0.001f;
@@ -680,6 +677,10 @@ public class NeoForgeTelemetrySampler {
     }
 
     private static void cleanupStaleEntries(long now) {
+        if (now - lastCleanupMs < CLEANUP_INTERVAL_MS) {
+            return;
+        }
+        lastCleanupMs = now;
         CACHE.entrySet().removeIf(entry -> now - entry.getValue().lastAccessMs > CLEANUP_EXPIRE_MS);
     }
 }

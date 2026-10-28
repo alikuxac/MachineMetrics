@@ -12,22 +12,66 @@ import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.core.BlockPos;
 
 import java.util.Map;
+import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 
 public class NetworkHandler {
 
+    private record SentKey(UUID playerId, BlockPos pos) {}
     private record SentEntry(TelemetryData data, long timestampMs) {}
-    private static final Map<BlockPos, SentEntry> LAST_SENT_TO_CLIENT = new ConcurrentHashMap<>();
+    private record RateWindow(long windowStartMs, int count) {}
+
+    private static final Map<SentKey, SentEntry> LAST_SENT_TO_CLIENT = new ConcurrentHashMap<>();
+    private static final Map<UUID, RateWindow> RATE_LIMITS = new ConcurrentHashMap<>();
     // ponytail: entries only need to live long enough for the next request; evict anything idle.
     private static final long SENT_ENTRY_EXPIRE_MS = 10000L;
+    private static final long RATE_WINDOW_MS = 1000L;
+    private static final int MAX_SENT_ENTRIES = 4096;
     private static volatile long lastCleanupMs = 0L;
 
     private static void cleanupStaleEntries(long now) {
-        if (now - lastCleanupMs < SENT_ENTRY_EXPIRE_MS) {
+        cleanupStaleEntries(now, false);
+    }
+
+    private static void cleanupStaleEntries(long now, boolean force) {
+        if (!force && now - lastCleanupMs < SENT_ENTRY_EXPIRE_MS) {
             return;
         }
         lastCleanupMs = now;
         LAST_SENT_TO_CLIENT.entrySet().removeIf(entry -> now - entry.getValue().timestampMs() > SENT_ENTRY_EXPIRE_MS);
+        RATE_LIMITS.entrySet().removeIf(entry -> now - entry.getValue().windowStartMs() > SENT_ENTRY_EXPIRE_MS);
+    }
+
+    private static void enforceSentEntryCap(long now) {
+        if (LAST_SENT_TO_CLIENT.size() <= MAX_SENT_ENTRIES) {
+            return;
+        }
+        cleanupStaleEntries(now, true);
+        int excess = LAST_SENT_TO_CLIENT.size() - MAX_SENT_ENTRIES;
+        if (excess <= 0) {
+            return;
+        }
+        LAST_SENT_TO_CLIENT.entrySet().stream()
+                .sorted(java.util.Comparator.comparingLong(e -> e.getValue().timestampMs()))
+                .limit(excess)
+                .map(Map.Entry::getKey)
+                .forEach(LAST_SENT_TO_CLIENT::remove);
+    }
+
+    private static boolean allowRequest(UUID playerId, long now, int maxPerSecond) {
+        if (maxPerSecond <= 0) {
+            return true;
+        }
+        RateWindow window = RATE_LIMITS.get(playerId);
+        if (window == null || now - window.windowStartMs() >= RATE_WINDOW_MS) {
+            RATE_LIMITS.put(playerId, new RateWindow(now, 1));
+            return true;
+        }
+        if (window.count() >= maxPerSecond) {
+            return false;
+        }
+        RATE_LIMITS.put(playerId, new RateWindow(window.windowStartMs(), window.count() + 1));
+        return true;
     }
 
     public static void register(NetworkPlatform.RegisterEvent event) {
@@ -52,8 +96,28 @@ public class NetworkHandler {
         context.enqueueWork(() -> {
             ServerPlayer serverPlayer = context.player();
             if (serverPlayer != null) {
-                ServerLevel serverLevel = serverPlayer.serverLevel();
                 BlockPos targetPos = payload.targetPos();
+                if (targetPos == null) {
+                    return;
+                }
+
+                double maxRange = ServerConfig.MAX_REQUEST_RANGE != null ? ServerConfig.MAX_REQUEST_RANGE.get() : 12.0;
+                if (!serverPlayer.blockPosition().closerThan(targetPos, maxRange)) {
+                    return;
+                }
+
+                ServerLevel serverLevel = serverPlayer.serverLevel();
+                if (!serverLevel.isLoaded(targetPos)) {
+                    return;
+                }
+
+                long now = System.currentTimeMillis();
+                cleanupStaleEntries(now);
+                int maxPerSecond = ServerConfig.MAX_REQUESTS_PER_SECOND != null ? ServerConfig.MAX_REQUESTS_PER_SECOND.get() : 20;
+                if (!allowRequest(serverPlayer.getUUID(), now, maxPerSecond)) {
+                    return;
+                }
+
                 Direction hitFace = payload.hitFace();
                 TelemetryData data = Services.SERVER_SAMPLER.sample(serverLevel, targetPos, hitFace);
 
@@ -77,11 +141,11 @@ public class NetworkHandler {
                     disabledMask |= TelemetryData.MASK_SIDES;
                 }
 
-                long now = System.currentTimeMillis();
-                cleanupStaleEntries(now);
-                SentEntry lastSent = LAST_SENT_TO_CLIENT.get(targetPos);
-                if (lastSent == null || data.hasSignificantDelta(lastSent.data) || (now - lastSent.timestampMs >= 1500L)) {
-                    LAST_SENT_TO_CLIENT.put(targetPos, new SentEntry(data, now));
+                SentKey key = new SentKey(serverPlayer.getUUID(), targetPos);
+                SentEntry lastSent = LAST_SENT_TO_CLIENT.get(key);
+                if (lastSent == null || data.hasSignificantDelta(lastSent.data) || (now - lastSent.timestampMs() >= 1500L)) {
+                    LAST_SENT_TO_CLIENT.put(key, new SentEntry(data, now));
+                    enforceSentEntryCap(now);
                     SyncTelemetryPayload response = SyncTelemetryPayload.from(targetPos, data, disabledMask);
                     context.reply(response);
                 }

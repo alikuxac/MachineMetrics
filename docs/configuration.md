@@ -224,7 +224,19 @@ Servers control which telemetry data is sampled and transmitted to connected cli
 [sync]
   # Minimum container fill percentage change required to sync storage
   storage_sync_deadband_percent = 1.0
+  # Max distance (blocks) a player may request telemetry for (range: 1.0 to 64.0)
+  max_request_range = 12.0
+  # Max telemetry requests processed per player per second (0 = unlimited, range: 0 to 200)
+  max_requests_per_second = 20
 ```
+
+### Request Validation
+
+The server validates every telemetry request before sampling:
+- **Range check**: requests for blocks farther than `max_request_range` from the player are ignored.
+- **Loaded check**: requests for unloaded positions are ignored.
+- **Rate limit**: each player is limited to `max_requests_per_second` per one-second window, applied before capability sampling.
+- **Cache scope**: server-side delta caching is keyed per `(player, block position)`.
 
 ### Behavior when disabled
 

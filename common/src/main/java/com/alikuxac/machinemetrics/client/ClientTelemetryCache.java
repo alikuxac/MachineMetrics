@@ -45,9 +45,21 @@ public class ClientTelemetryCache {
 
     private static final Map<BlockPos, Entry> CACHE = new ConcurrentHashMap<>();
     private static final long EXPIRE_MS = 2000L;
+    private static final long SWEEP_INTERVAL_MS = 5000L;
+    private static volatile long lastSweepMs = 0L;
+
+    private static void sweepIfDue() {
+        long now = System.currentTimeMillis();
+        if (now - lastSweepMs < SWEEP_INTERVAL_MS) {
+            return;
+        }
+        lastSweepMs = now;
+        CACHE.entrySet().removeIf(entry -> now - entry.getValue().receivedTimeMs > EXPIRE_MS);
+    }
 
     public static void putSynced(BlockPos pos, TelemetryData data) {
         if (pos != null && data != null) {
+            sweepIfDue();
             Entry existing = CACHE.get(pos);
             boolean hasExisting = existing != null && (System.currentTimeMillis() - existing.receivedTimeMs < EXPIRE_MS);
             float smoothedRate = MetricResolver.smoothRate(

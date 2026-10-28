@@ -165,6 +165,11 @@ public record SyncTelemetryPayload(
     public static final int PRESENT_DISABLED  = 1 << 7;
     public static final int PRESENT_STORAGE   = 1 << 8;
 
+    public static final int MAX_NAME_LENGTH = 64;
+
+    private static final int KNOWN_FLAGS = PRESENT_ITEMS | PRESENT_FLUIDS | PRESENT_ENERGY | PRESENT_KINETIC
+            | PRESENT_CHEMICALS | PRESENT_AE2 | PRESENT_SIDES | PRESENT_DISABLED | PRESENT_STORAGE;
+
     private static boolean hasActiveSides(float[] sides) {
         if (sides == null) return false;
         for (float val : sides) {
@@ -219,7 +224,7 @@ public record SyncTelemetryPayload(
         if ((flags & PRESENT_FLUIDS) != 0) {
             buf.writeFloat(payload.fluidThroughput);
             buf.writeBoolean(payload.hasFluids);
-            buf.writeUtf(payload.fluidName != null ? payload.fluidName : "");
+            buf.writeUtf(payload.fluidName != null ? payload.fluidName : "", MAX_NAME_LENGTH);
             buf.writeVarLong(payload.fluidAmount);
             buf.writeVarLong(payload.fluidCapacity);
         }
@@ -239,7 +244,7 @@ public record SyncTelemetryPayload(
 
         if ((flags & PRESENT_CHEMICALS) != 0) {
             buf.writeFloat(payload.chemicalThroughput);
-            buf.writeUtf(payload.chemicalName != null ? payload.chemicalName : "");
+            buf.writeUtf(payload.chemicalName != null ? payload.chemicalName : "", MAX_NAME_LENGTH);
             buf.writeVarLong(payload.chemicalAmount);
             buf.writeVarLong(payload.chemicalCapacity);
         }
@@ -283,7 +288,7 @@ public record SyncTelemetryPayload(
     private static SyncTelemetryPayload decode(FriendlyByteBuf buf) {
         BlockPos targetPos = buf.readBlockPos();
         byte machineState = buf.readByte();
-        int flags = buf.readVarInt();
+        int flags = buf.readVarInt() & KNOWN_FLAGS;
 
         short serverDisabledMask = (flags & PRESENT_DISABLED) != 0 ? buf.readShort() : (short) 0;
 
@@ -302,7 +307,7 @@ public record SyncTelemetryPayload(
         if ((flags & PRESENT_FLUIDS) != 0) {
             fluidThroughput = buf.readFloat();
             hasFluids = buf.readBoolean();
-            fluidName = buf.readUtf();
+            fluidName = buf.readUtf(MAX_NAME_LENGTH);
             fluidAmount = buf.readVarLong();
             fluidCapacity = buf.readVarLong();
         }
@@ -335,7 +340,7 @@ public record SyncTelemetryPayload(
         long chemicalCapacity = 0L;
         if (hasChemicals) {
             chemicalThroughput = buf.readFloat();
-            chemicalName = buf.readUtf();
+            chemicalName = buf.readUtf(MAX_NAME_LENGTH);
             chemicalAmount = buf.readVarLong();
             chemicalCapacity = buf.readVarLong();
         }

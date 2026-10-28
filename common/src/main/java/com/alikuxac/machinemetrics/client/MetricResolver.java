@@ -1,6 +1,7 @@
 package com.alikuxac.machinemetrics.client;
 
 import com.alikuxac.machinemetrics.config.ClientConfig;
+import com.alikuxac.machinemetrics.compat.CompatRegistry;
 import com.alikuxac.machinemetrics.compat.ae2.AE2NetworkInspector;
 import com.alikuxac.machinemetrics.compat.create.CreateKineticInspector;
 import com.alikuxac.machinemetrics.compat.storage.SophisticatedStorageAdapter;
@@ -375,15 +376,26 @@ public class MetricResolver {
         if (state.isAir()) {
             return Component.translatable("machinemetrics.hud.title").getString();
         }
-        String name = state.getBlock().getName().getString();
-        if (containsFormatPlaceholder(name)) {
+        if (CompatRegistry.isSophisticatedStorageBlock(level, pos)) {
             String resolved = resolveStorageDisplayName(level, pos);
             if (resolved != null && !resolved.isEmpty()) {
                 return resolved;
             }
-            return DEFAULT_BLOCK_NAME;
+        }
+
+        String name = state.getBlock().getName().getString();
+        if (isUnresolvedName(name, state)) {
+            return Component.translatable("machinemetrics.hud.title").getString();
         }
         return name;
+    }
+
+    private static boolean isUnresolvedName(String name, BlockState state) {
+        if (name == null || name.isEmpty()) {
+            return true;
+        }
+        String descriptionId = state.getBlock().getDescriptionId();
+        return name.equals(descriptionId) || name.endsWith(descriptionId);
     }
 
     private static String resolveStorageDisplayName(Level level, BlockPos pos) {
@@ -396,24 +408,6 @@ public class MetricResolver {
         }
         return null;
     }
-
-    private static boolean containsFormatPlaceholder(String name) {
-        if (name == null) {
-            return false;
-        }
-        for (int i = 0; i + 1 < name.length(); i++) {
-            if (name.charAt(i) == '%') {
-                char next = name.charAt(i + 1);
-                if (next == 's' || next == 'd' || next == 'f' || next == 'b' || next == 'n'
-                        || (next >= '0' && next <= '9') || next == '$') {
-                    return true;
-                }
-            }
-        }
-        return false;
-    }
-
-    public static final String DEFAULT_BLOCK_NAME = "Oak netherite chest";
 
     public static String resolveTemplate(
             String template,
