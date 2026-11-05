@@ -2,6 +2,8 @@ package com.alikuxac.machinemetrics.config;
 
 import com.alikuxac.machinemetrics.platform.config.Config;
 
+import java.util.List;
+
 public class ClientConfig {
 
     public enum HudAnchor {
@@ -81,6 +83,11 @@ public class ClientConfig {
     public static final Config.Value<String> COLOR_STATE_OVERLOADED;
     public static final Config.Value<String> COLOR_STATE_IDLE;
 
+    // Inspection Gate & Zoom
+    public static final Config.Value<Boolean> REQUIRE_INSPECTION_ITEM;
+    public static final Config.Value<List<? extends String>> INSPECTION_ITEM_TAGS;
+    public static final Config.Value<Double> SPYGLASS_RAYCAST_DISTANCE;
+
     static {
         Config.Builder builder = Config.builder();
 
@@ -151,51 +158,51 @@ public class ClientConfig {
                 .define("show_speed", true);
 
         SHOW_ROTATION_DIRECTION = builder
-                .comment("Show rotation direction (CW/CCW)")
+                .comment("Show Create rotation direction (CW/CCW)")
                 .define("show_rotation_direction", true);
 
         SHOW_LOCAL_IMPACT = builder
-                .comment("Show local block stress impact")
-                .define("show_local_impact", false);
+                .comment("Show Create local impact (Stress Units)")
+                .define("show_local_impact", true);
 
         SHOW_NETWORK_STRESS = builder
-                .comment("Show total network stress & capacity (SU)")
+                .comment("Show Create network stress summary")
                 .define("show_network_stress", true);
 
         SHOW_HEADROOM = builder
-                .comment("Show remaining network capacity")
+                .comment("Show Create available headroom (Remaining SU)")
                 .define("show_headroom", true);
 
         SHOW_ENERGY_FE = builder
-                .comment("Show Forge Energy rate (FE/t)")
+                .comment("Show energy throughput (FE/t)")
                 .define("show_energy_fe", true);
 
         SHOW_SIDES = builder
-                .comment("Show per-side rates when active")
+                .comment("Show side-specific throughput rates")
                 .define("show_sides", true);
 
         SHOW_AE2_POWER = builder
-                .comment("Show AE2 grid power drain & buffer percentage")
+                .comment("Show Applied Energistics 2 grid power state")
                 .define("show_ae2_power", true);
 
         SHOW_AE2_STABILITY = builder
-                .comment("Show AE2 grid stability state and brownout warnings")
+                .comment("Show AE2 power stability state (STABLE/BROWNOUT/CRITICAL)")
                 .define("show_ae2_stability", true);
 
         AUTO_HIDE_AE2_CHANNELS_WITH_INFOHUD = builder
-                .comment("Automatically delegate and hide AE2 channels if Jade/WTHIT is installed")
-                .define("auto_hide_ae2_channels_with_info_mods", true);
+                .comment("Hide AE2 channels metric when Jade/Waila/WTHIT/TOP already provides channel information")
+                .define("auto_hide_ae2_channels_with_infohud", true);
 
         SHOW_AE2_CHANNELS = builder
-                .comment("Show AE2 node used/max channels (will be hidden if Jade is present and auto-hide is true)")
+                .comment("Show AE2 cable channel usage (Used / Max)")
                 .define("show_ae2_channels", true);
 
         AE2_POWER_UNIT = builder
-                .comment("Display unit for AE2 power: 'AUTO' (syncs with AE2 client option button), 'AE', or 'FE' (1 AE = 2 FE)")
-                .define("ae2_power_unit", "AUTO");
+                .comment("Unit for AE2 power display (AE or FE)")
+                .define("ae2_power_unit", "AE");
 
         SHOW_STORAGE_CAPACITY = builder
-                .comment("Show storage capacity progress bar")
+                .comment("Show storage fill percentage and capacity bar for containers and tanks")
                 .define("show_storage_capacity", true);
 
         SHOW_TIME_TO_FULL = builder
@@ -323,6 +330,23 @@ public class ClientConfig {
                 .define("stateIdleColor", "#AAAAAA");
 
         builder.pop();
+
+        builder.comment("Inspection Gate & Zoom Mode").push("inspection");
+
+        REQUIRE_INSPECTION_ITEM = builder
+                .comment("Require holding an inspection item (wrench, spyglass, etc.) to view HUD and poll server")
+                .define("requireInspectionItem", false);
+
+        INSPECTION_ITEM_TAGS = builder
+                .comment("List of valid item IDs or item tags (prefixed with #) for inspection requirement")
+                .defineList("inspectionItemTags", List.of("#c:tools/wrench", "minecraft:spyglass"), o -> o instanceof String);
+
+        SPYGLASS_RAYCAST_DISTANCE = builder
+                .comment("Raycast distance (in blocks) when zooming through a Spyglass")
+                .defineInRange("spyglassRaycastDistance", 32.0, 4.0, 64.0);
+
+        builder.pop();
+
         SPEC = builder.build();
     }
 

@@ -1,5 +1,7 @@
 package com.alikuxac.machinemetrics.platform.config;
 
+import java.util.List;
+import java.util.function.Predicate;
 import java.util.function.Supplier;
 
 public final class Config {
@@ -33,6 +35,8 @@ public final class Config {
 
         <E extends Enum<E>> Value<E> defineEnum(String key, E defaultValue);
 
+        Value<List<? extends String>> defineList(String key, List<? extends String> defaultValue, Predicate<Object> elementValidator);
+
         Spec build();
     }
 
@@ -40,8 +44,6 @@ public final class Config {
         Builder builder();
     }
 
-    // ponytail: the loader entrypoint MUST call setFactory() before any Config.* class
-    // (ClientConfig/ServerConfig) is class-loaded, because their SPEC builds in a static initializer.
     private static Factory factory = () -> {
         throw new IllegalStateException(
                 "Config factory not installed; the loader entrypoint must call setFactory() "

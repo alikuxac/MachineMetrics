@@ -3,6 +3,9 @@ package com.alikuxac.machinemetrics.neoforge.platform;
 import com.alikuxac.machinemetrics.platform.config.Config;
 import net.neoforged.neoforge.common.ModConfigSpec;
 
+import java.util.List;
+import java.util.function.Predicate;
+
 public final class NeoForgeConfigFactory implements Config.Factory {
 
     public static void install() {
@@ -48,6 +51,11 @@ public final class NeoForgeConfigFactory implements Config.Factory {
         @Override
         public <E extends Enum<E>> Config.Value<E> defineEnum(String key, E defaultValue) {
             return wrap(delegate.defineEnum(key, defaultValue));
+        }
+
+        @Override
+        public Config.Value<List<? extends String>> defineList(String key, List<? extends String> defaultValue, Predicate<Object> elementValidator) {
+            return wrap(delegate.defineList(key, defaultValue, elementValidator));
         }
 
         @Override

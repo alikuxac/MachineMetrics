@@ -61,7 +61,8 @@ public class TelemetryHudRenderer {
                 ClientConfig.COLOR_ITEMS != null ? ClientConfig.COLOR_ITEMS.get() : "",
                 ClientConfig.COLOR_FLUIDS != null ? ClientConfig.COLOR_FLUIDS.get() : "",
                 ClientConfig.COLOR_CHEMICALS != null ? ClientConfig.COLOR_CHEMICALS.get() : "",
-                ClientConfig.COLOR_KINETIC != null ? ClientConfig.COLOR_KINETIC.get() : ""
+                ClientConfig.COLOR_KINETIC != null ? ClientConfig.COLOR_KINETIC.get() : "",
+                ClientConfig.REQUIRE_INSPECTION_ITEM != null && ClientConfig.REQUIRE_INSPECTION_ITEM.get()
         );
     }
 
@@ -139,7 +140,16 @@ public class TelemetryHudRenderer {
             return;
         }
 
-        HitResult hitResult = mc.hitResult;
+        if (!InspectionGate.canInspect(mc.player)) {
+            if (currentHoverPos != null) {
+                ClientTelemetryCache.remove(currentHoverPos);
+                currentHoverPos = null;
+                currentHoverFace = null;
+            }
+            return;
+        }
+
+        HitResult hitResult = InspectionGate.performRaycast(mc);
         if (hitResult == null || hitResult.getType() != HitResult.Type.BLOCK) {
             if (currentHoverPos != null) {
                 ClientTelemetryCache.remove(currentHoverPos);
