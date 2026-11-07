@@ -31,5 +31,6 @@ public class ForgeClientInit {
 
     private static void registerKeyMappings(RegisterKeyMappingsEvent event) {
         event.register(KeyBindings.TOGGLE_HUD_KEY);
+        event.register(KeyBindings.PIN_TARGET_KEY);
     }
 }

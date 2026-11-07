@@ -26,6 +26,7 @@ public class ClientConfig {
     // HUD Colors
     public static final Config.Value<String> BACKGROUND_COLOR;
     public static final Config.Value<String> BORDER_COLOR;
+    public static final Config.Value<String> PINNED_BORDER_COLOR;
 
     // Granular Element Switches
     public static final Config.Value<Boolean> SHOW_MACHINE_TITLE;
@@ -120,6 +121,10 @@ public class ClientConfig {
         BORDER_COLOR = builder
                 .comment("Border color (hex ARGB/RGB)")
                 .define("border_color", "#FF00FFCC");
+
+        PINNED_BORDER_COLOR = builder
+                .comment("Pinned HUD Border color (hex ARGB/RGB)")
+                .define("pinned_border_color", "#FFFFD700");
 
         builder.pop();
 

@@ -54,7 +54,12 @@ public class ClientTelemetryCache {
             return;
         }
         lastSweepMs = now;
-        CACHE.entrySet().removeIf(entry -> now - entry.getValue().receivedTimeMs > EXPIRE_MS);
+        CACHE.entrySet().removeIf(entry -> {
+            if (PinnedTargetManager.isPinned(entry.getKey())) {
+                return false;
+            }
+            return now - entry.getValue().receivedTimeMs > EXPIRE_MS;
+        });
     }
 
     public static void putSynced(BlockPos pos, TelemetryData data) {
@@ -147,14 +152,16 @@ public class ClientTelemetryCache {
             return null;
         }
         if (System.currentTimeMillis() - entry.receivedTimeMs > EXPIRE_MS) {
-            CACHE.remove(pos);
-            return null;
+            if (!PinnedTargetManager.isPinned(pos)) {
+                CACHE.remove(pos);
+                return null;
+            }
         }
         return entry;
     }
 
     public static void remove(BlockPos pos) {
-        if (pos != null) {
+        if (pos != null && !PinnedTargetManager.isPinned(pos)) {
             CACHE.remove(pos);
         }
     }
