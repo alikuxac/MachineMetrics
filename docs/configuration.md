@@ -19,6 +19,7 @@ Configure HUD placement and presets directly in-game without editing config file
 | **Reset** | Click button | Resets offsets to defaults (`x: 10`, `y: 10`). |
 | **Block Name** | Click toggle | Toggles the targeted block name line on or off. |
 | **Preset** | Click button | Applies a layout preset. |
+| **Pin Target** | Press Key (`H`) | Pins or unpins the targeted machine telemetry overlay on screen. |
 
 ### Presets
 
@@ -50,6 +51,7 @@ Configure HUD placement and presets directly in-game without editing config file
   # Background and border colors in ARGB/RGB hex
   background_color = "#90000000"
   border_color = "#FF00FFCC"
+  pinned_border_color = "#FFFFD700"
 ```
 
 ### Metric Toggles (`[elements]`)
@@ -77,6 +79,7 @@ Configure HUD placement and presets directly in-game without editing config file
 | `ae2_power_unit` | `"AUTO"` | Power unit for AE2 metrics: `"AUTO"` (matches AE2 client button), `"AE"`, or `"FE"`. |
 | `show_storage_capacity` | `true` | Shows container capacity progress bar. |
 | `show_time_to_full` | `true` | Shows estimated time until storage fills or empties (ETA). |
+| `show_targeted_face_io` | `true` | Shows targeted face directional I/O (`▶ [FACE] [I/O]`) and bottleneck diagnostics. |
 
 ### Thresholds & Compact Settings (`[formatting]`)
 
@@ -115,6 +118,30 @@ Configure HUD placement and presets directly in-game without editing config file
   - Item transport cables (such as Mekanism logistical transporters) display active in-flight items against standard stack capacity (64 items).
   - The sampler holds net rate at 0 for in-transit items to suppress false empty or full ETA alerts while items pass through.
 
+### Inspection Gate & Zoom Mode (`[inspection]`)
+
+Control item gating requirements and extended spyglass reach:
+
+```toml
+[inspection]
+  # Require holding an inspection item (wrench, spyglass, etc.) to view HUD and poll server
+  requireInspectionItem = false
+  # List of valid item IDs or item tags (prefixed with #) for inspection requirement
+  inspectionItemTags = ["#c:tools/wrench", "minecraft:spyglass"]
+  # Raycast distance (in blocks) when zooming through a Spyglass (range: 4.0 to 64.0)
+  spyglassRaycastDistance = 32.0
+```
+
+- **Inspection Gate**: When `requireInspectionItem = true`, the HUD only activates if the player holds an item matching `inspectionItemTags` in either the main hand or offhand. When unmet, HUD rendering is suspended and outbound network request packets are completely suppressed (0% server polling overhead).
+- **Spyglass Zoom**: When aiming with a Spyglass (`player.isScoping()`), client raycast reach dynamically extends up to `spyglassRaycastDistance` (default 32 blocks) with matching server distance tolerance to inspect distant or elevated machinery without scaffolding.
+
+### Pinned Target Overlay
+
+- **Hotkey**: Press `H` (configurable under Controls > Machine Metrics > Pin/Freeze Target Telemetry) while targeting a block to pin its telemetry.
+- **Dual-Overlay Stacking**: Renders as an independent overlay framed with `pinned_border_color` (`#FFFFD700`) and a `[PINNED]` badge, stacked directly below the active crosshair hover HUD.
+- **Persistent Polling**: Continues polling at 5 Hz even when looking away or inspecting other blocks.
+- **Auto-Unpin**: Automatically unpins if the block entity is broken/replaced, leaves chunk render distance, or the player changes dimensions.
+
 ### Colors (`[colors]`)
 
 Colors accept `#RRGGBB` or `#AARRGGBB` hex values:
@@ -147,6 +174,11 @@ Colors accept `#RRGGBB` or `#AARRGGBB` hex values:
   stateCloggedColor = "#FF5555"
   stateOverloadedColor = "#FF3333"
   stateIdleColor = "#AAAAAA"
+
+  # Targeted face directional I/O
+  color_io_input = "#4FC3F7"
+  color_io_output = "#FFA726"
+  color_io_bidirectional = "#CE93D8"
 ```
 
 ---
