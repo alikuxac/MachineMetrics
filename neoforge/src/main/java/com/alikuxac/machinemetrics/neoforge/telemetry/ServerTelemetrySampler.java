@@ -10,6 +10,7 @@ import com.alikuxac.machinemetrics.compat.storage.SophisticatedStorageAdapter;
 import com.alikuxac.machinemetrics.config.ServerConfig;
 import com.alikuxac.machinemetrics.storage.BlockCapacityReader;
 import com.alikuxac.machinemetrics.storage.BlockCapacityReader.StorageCapacity;
+import com.alikuxac.machinemetrics.telemetry.DirectionalCapabilityScanner;
 import com.alikuxac.machinemetrics.telemetry.TelemetryData;
 import it.unimi.dsi.fastutil.ints.IntArrayList;
 import net.minecraft.core.BlockPos;
@@ -478,7 +479,19 @@ public class ServerTelemetrySampler {
                     for (int i = 0; i < 18; i++) {
                         float p = i < prevSideMetrics.length ? prevSideMetrics[i] : 0.0f;
                         float c = i < currSideMetrics.length ? currSideMetrics[i] : 0.0f;
-                        sideRates[i] = Math.abs(c - p) / timeDiffSec;
+                        float rate = Math.abs(c - p) / timeDiffSec;
+                        if (rate > 0.001f && !isTransporter) {
+                            Direction side = Direction.values()[i % 6];
+                            boolean hasTarget = (i < 6)
+                                    ? hasAdjacentItemTarget(level, pos, side)
+                                    : (i < 12
+                                            ? hasAdjacentFluidTarget(level, pos, side)
+                                            : MekanismChemicalInspector.hasAdjacentChemicalTarget(level, pos, side));
+                            if (!hasTarget) {
+                                rate = 0.0f;
+                            }
+                        }
+                        sideRates[i] = rate;
                     }
                 }
             }
@@ -734,6 +747,17 @@ public class ServerTelemetrySampler {
                     CompatRegistry.friendlyNameOf(level, pos), itemSlots.length, Arrays.toString(fluidTanks), itemThroughput, fluidThroughput, energyDelta, state);
         }
 
+        DirectionalCapabilityScanner.TargetedResult targetedDiag = (hitFace != null)
+                ? DirectionalCapabilityScanner.scan(
+                        level, pos, hitFace, be,
+                        sideRates[hitFace.ordinal()],
+                        sideRates[6 + hitFace.ordinal()],
+                        sideRates[12 + hitFace.ordinal()],
+                        currentItems, maxItems,
+                        currentFluid, maxFluid,
+                        currentEnergy, maxEnergy)
+                : DirectionalCapabilityScanner.TargetedResult.NONE;
+
         return new TelemetryData(
                 itemThroughput, hasItems,
                 fluidThroughput, hasFluids, fluidName, currentFluid, maxFluid,
@@ -743,7 +767,8 @@ public class ServerTelemetrySampler {
                 state, allSlotCounts, allTankAmounts, sideRates,
                 disabledMask,
                 hasAe2Network, aePowerRate, aePowerDrain, aeSubnetDrain, aeSubnetCount, aeStoredPower, aeMaxPower, aeStabilityState, aeIsCreative, aeUsedChannels, aeMaxChannels,
-                storageCurrent, storageMax, primaryNetRate, logisticsFlags
+                storageCurrent, storageMax, primaryNetRate, logisticsFlags,
+                targetedDiag.face(), targetedDiag.io(), targetedDiag.state(), targetedDiag.throughput()
         );
     }
 
@@ -823,6 +848,29 @@ public class ServerTelemetrySampler {
         lastCleanupMs = now;
         CACHE.entrySet().removeIf(entry -> now - entry.getValue().lastAccessMs > CLEANUP_EXPIRE_MS);
         INERT_BLOCK_CACHE.entrySet().removeIf(entry -> now - entry.getValue() > INERT_EXPIRE_MS);
+    }
+    private static boolean hasAdjacentItemTarget(Level level, BlockPos pos, Direction side) {
+        if (level == null || pos == null || side == null) return false;
+        BlockPos adjacent = pos.relative(side);
+        if (!level.isLoaded(adjacent)) return false;
+        try {
+            ResourceHandler<ItemResource> handler = level.getCapability(Capabilities.Item.BLOCK, adjacent, side.getOpposite());
+            return handler != null && handler.size() > 0;
+        } catch (Throwable ignored) {
+            return false;
+        }
+    }
+
+    private static boolean hasAdjacentFluidTarget(Level level, BlockPos pos, Direction side) {
+        if (level == null || pos == null || side == null) return false;
+        BlockPos adjacent = pos.relative(side);
+        if (!level.isLoaded(adjacent)) return false;
+        try {
+            ResourceHandler<FluidResource> handler = level.getCapability(Capabilities.Fluid.BLOCK, adjacent, side.getOpposite());
+            return handler != null && handler.size() > 0;
+        } catch (Throwable ignored) {
+            return false;
+        }
     }
 }
 

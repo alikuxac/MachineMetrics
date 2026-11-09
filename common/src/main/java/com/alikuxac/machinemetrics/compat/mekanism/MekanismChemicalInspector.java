@@ -248,4 +248,15 @@ public class MekanismChemicalInspector {
                 totalCapacity
         );
     }
+
+    public static boolean hasAdjacentChemicalTarget(Level level, BlockPos pos, Direction side) {
+        if (level == null || pos == null || side == null || !isMekanismLoaded()) return false;
+        try {
+            BlockPos adjPos = pos.relative(side);
+            if (!level.isLoaded(adjPos) || level.isEmptyBlock(adjPos)) return false;
+            return inspectChemicals(level, adjPos, side.getOpposite()).isPresent();
+        } catch (Throwable ignored) {
+            return false;
+        }
+    }
 }

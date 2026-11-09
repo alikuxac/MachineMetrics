@@ -2,6 +2,8 @@ package com.alikuxac.machinemetrics.config;
 
 import net.neoforged.neoforge.common.ModConfigSpec;
 
+import java.util.List;
+
 public class ClientConfig {
 
     public enum HudAnchor {
@@ -24,6 +26,7 @@ public class ClientConfig {
     // HUD Colors
     public static final ModConfigSpec.ConfigValue<String> BACKGROUND_COLOR;
     public static final ModConfigSpec.ConfigValue<String> BORDER_COLOR;
+    public static final ModConfigSpec.ConfigValue<String> PINNED_BORDER_COLOR;
 
     // Granular Element Switches
     public static final ModConfigSpec.BooleanValue SHOW_MACHINE_TITLE;
@@ -47,6 +50,7 @@ public class ClientConfig {
     public static final ModConfigSpec.ConfigValue<String> AE2_POWER_UNIT;
     public static final ModConfigSpec.BooleanValue SHOW_STORAGE_CAPACITY;
     public static final ModConfigSpec.BooleanValue SHOW_TIME_TO_FULL;
+    public static final ModConfigSpec.BooleanValue SHOW_TARGETED_FACE_IO;
 
     // Compact Formatting & Thresholds
     public static final ModConfigSpec.BooleanValue COMPACT_MODE;
@@ -80,6 +84,14 @@ public class ClientConfig {
     public static final ModConfigSpec.ConfigValue<String> COLOR_STATE_CLOGGED;
     public static final ModConfigSpec.ConfigValue<String> COLOR_STATE_OVERLOADED;
     public static final ModConfigSpec.ConfigValue<String> COLOR_STATE_IDLE;
+    public static final ModConfigSpec.ConfigValue<String> COLOR_IO_INPUT;
+    public static final ModConfigSpec.ConfigValue<String> COLOR_IO_OUTPUT;
+    public static final ModConfigSpec.ConfigValue<String> COLOR_IO_BIDIRECTIONAL;
+
+    // Inspection Gate & Zoom
+    public static final ModConfigSpec.BooleanValue REQUIRE_INSPECTION_ITEM;
+    public static final ModConfigSpec.ConfigValue<List<? extends String>> INSPECTION_ITEM_TAGS;
+    public static final ModConfigSpec.DoubleValue SPYGLASS_RAYCAST_DISTANCE;
 
     static {
         ModConfigSpec.Builder builder = new ModConfigSpec.Builder();
@@ -103,104 +115,112 @@ public class ClientConfig {
                 .defineInRange("hud_y_offset", 10, -4000, 4000);
 
         HUD_SCALE = builder
-                .comment("HUD scale multiplier (0.5 to 3.0)")
-                .defineInRange("hudScale", 1.0, 0.5, 3.0);
+                .comment("Scale multiplier for the entire HUD (0.5 to 3.0)")
+                .defineInRange("hud_scale", 1.0, 0.5, 3.0);
 
         BACKGROUND_COLOR = builder
-                .comment("Background color (hex ARGB/RGB)")
-                .define("background_color", "#90000000");
+                .comment("Background color (hex ARGB, default #90000000)")
+                .define("backgroundColor", "#90000000");
 
         BORDER_COLOR = builder
-                .comment("Border color (hex ARGB/RGB)")
-                .define("border_color", "#FF00FFCC");
+                .comment("Border color (hex ARGB, default #FF00FFCC)")
+                .define("borderColor", "#FF00FFCC");
+
+        PINNED_BORDER_COLOR = builder
+                .comment("Border color for pinned telemetry cards (hex ARGB, default #FFFFD700)")
+                .define("pinnedBorderColor", "#FFFFD700");
 
         builder.pop();
 
-        builder.comment("Visible Metrics & Elements").push("elements");
+        builder.comment("Toggle Individual Metric Lines").push("elements");
 
         SHOW_MACHINE_TITLE = builder
-                .comment("Show block name")
+                .comment("Show machine title at top of HUD")
                 .define("show_machine_title", true);
 
         AUTO_HIDE_TITLE_WITH_INFO_MODS = builder
-                .comment("Hide title when Jade/Waila/WTHIT/TOP is present")
+                .comment("Auto-hide machine title if Jade, WTHIT, or TOP is installed to avoid duplication")
                 .define("auto_hide_title_with_info_mods", true);
 
         AUTO_HIDE_REDUNDANT_WITH_INFOHUD = builder
-                .comment("Hide redundant zero-rate metrics when Jade/Waila/WTHIT/TOP is present")
-                .define("auto_hide_redundant_with_info_mods", true);
+                .comment("Auto-hide items, fluids, and energy throughput if Jade, WTHIT, or TOP is active")
+                .define("auto_hide_redundant_with_infohud", false);
 
         SHOW_STATUS_BADGE = builder
-                .comment("Show status (OPTIMAL, IDLE, etc.)")
+                .comment("Show machine status badge [OPTIMAL], [STARVED], [CLOGGED], [OVERLOADED]")
                 .define("show_status_badge", true);
 
         SHOW_ITEMS_THROUGHPUT = builder
-                .comment("Show items throughput (Items/s)")
+                .comment("Show items throughput rate")
                 .define("show_items_throughput", true);
 
         SHOW_FLUIDS_THROUGHPUT = builder
-                .comment("Show fluids throughput (mB/s)")
+                .comment("Show fluids throughput rate")
                 .define("show_fluids_throughput", true);
 
         SHOW_CHEMICALS_THROUGHPUT = builder
-                .comment("Show Mekanism chemicals throughput")
+                .comment("Show Mekanism chemicals throughput rate")
                 .define("show_chemicals_throughput", true);
 
         SHOW_SPEED = builder
-                .comment("Show Create speed (RPM)")
+                .comment("Show kinetic speed (RPM)")
                 .define("show_speed", true);
 
         SHOW_ROTATION_DIRECTION = builder
-                .comment("Show rotation direction (CW/CCW)")
+                .comment("Show kinetic rotation direction (CW/CCW)")
                 .define("show_rotation_direction", true);
 
         SHOW_LOCAL_IMPACT = builder
-                .comment("Show local block stress impact")
-                .define("show_local_impact", false);
+                .comment("Show local kinetic stress impact (SU)")
+                .define("show_local_impact", true);
 
         SHOW_NETWORK_STRESS = builder
-                .comment("Show total network stress & capacity (SU)")
+                .comment("Show total network stress and capacity (SU)")
                 .define("show_network_stress", true);
 
         SHOW_HEADROOM = builder
-                .comment("Show remaining network capacity")
+                .comment("Show remaining network headroom (SU)")
                 .define("show_headroom", true);
 
         SHOW_ENERGY_FE = builder
-                .comment("Show Forge Energy rate (FE/t)")
+                .comment("Show energy flow rate (FE/t)")
                 .define("show_energy_fe", true);
 
         SHOW_SIDES = builder
-                .comment("Show per-side rates when active")
+                .comment("Show per-side metrics breakdown")
                 .define("show_sides", true);
 
         SHOW_AE2_POWER = builder
-                .comment("Show AE2 grid power drain & buffer percentage")
+                .comment("Show AE2 grid stored power, max power, drain rate, and network status")
                 .define("show_ae2_power", true);
 
         SHOW_AE2_STABILITY = builder
-                .comment("Show AE2 grid stability state and brownout warnings")
+                .comment("Show AE2 network stability badge [ONLINE], [BROWNOUT], [OFFLINE]")
                 .define("show_ae2_stability", true);
 
         AUTO_HIDE_AE2_CHANNELS_WITH_INFOHUD = builder
-                .comment("Automatically delegate and hide AE2 channels if Jade/WTHIT is installed")
-                .define("auto_hide_ae2_channels_with_info_mods", true);
+                .comment("Auto-hide AE2 channel count if Jade/TOP provides it")
+                .define("auto_hide_ae2_channels_with_infohud", true);
 
         SHOW_AE2_CHANNELS = builder
-                .comment("Show AE2 node used/max channels (will be hidden if Jade is present and auto-hide is true)")
+                .comment("Show AE2 cable channel usage (used/max channels)")
                 .define("show_ae2_channels", true);
 
         AE2_POWER_UNIT = builder
-                .comment("Display unit for AE2 power: 'AUTO' (syncs with AE2 client option button), 'AE', or 'FE' (1 AE = 2 FE)")
-                .define("ae2_power_unit", "AUTO");
+                .comment("Unit for AE2 power display: AE or FE (2 FE = 1 AE)")
+                .define("ae2_power_unit", "AE");
 
         SHOW_STORAGE_CAPACITY = builder
-                .comment("Show storage capacity progress bar")
+                .comment("Show storage fill percentage and capacity bar for containers and tanks")
                 .define("show_storage_capacity", true);
 
         SHOW_TIME_TO_FULL = builder
                 .comment("Show estimated time until storage is full or empty (ETA)")
                 .define("show_time_to_full", true);
+
+        SHOW_TARGETED_FACE_IO = builder
+                .comment("Show targeted face directional I/O and bottleneck diagnostics")
+                .define("show_targeted_face_io", true);
 
         builder.pop();
 
@@ -322,7 +342,36 @@ public class ClientConfig {
                 .comment("IDLE status color")
                 .define("stateIdleColor", "#AAAAAA");
 
+        COLOR_IO_INPUT = builder
+                .comment("Targeted face [INPUT] badge color")
+                .define("color_io_input", "#4FC3F7");
+
+        COLOR_IO_OUTPUT = builder
+                .comment("Targeted face [OUTPUT] badge color")
+                .define("color_io_output", "#FFA726");
+
+        COLOR_IO_BIDIRECTIONAL = builder
+                .comment("Targeted face [BIDIRECTIONAL] badge color")
+                .define("color_io_bidirectional", "#CE93D8");
+
         builder.pop();
+
+        builder.comment("Inspection Gate & Zoom Mode").push("inspection");
+
+        REQUIRE_INSPECTION_ITEM = builder
+                .comment("Require holding an inspection item (wrench, spyglass, etc.) to view HUD and poll server")
+                .define("requireInspectionItem", false);
+
+        INSPECTION_ITEM_TAGS = builder
+                .comment("List of valid item IDs or item tags (prefixed with #) for inspection requirement")
+                .defineList("inspectionItemTags", List.of("#c:tools/wrench", "minecraft:spyglass"), o -> o instanceof String);
+
+        SPYGLASS_RAYCAST_DISTANCE = builder
+                .comment("Raycast distance (in blocks) when zooming through a Spyglass")
+                .defineInRange("spyglassRaycastDistance", 32.0, 4.0, 64.0);
+
+        builder.pop();
+
         SPEC = builder.build();
     }
 

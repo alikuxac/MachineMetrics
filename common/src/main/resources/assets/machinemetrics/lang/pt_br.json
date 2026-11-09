@@ -1,6 +1,14 @@
 {
-  "key.category.machinemetrics.main": "Machine Metrics",
+  "key.categories.machinemetrics": "Machine Metrics",
   "key.machinemetrics.toggle_hud": "Alternar HUD de Telemetria",
+  "key.machinemetrics.pin_target": "Fixar/Congelar Telemetria do Alvo",
+  "machinemetrics.pin.pinned": "[Machinemetrics] Alvo fixado: %s",
+  "machinemetrics.pin.unpinned": "[Machinemetrics] Alvo desfixado",
+  "machinemetrics.pin.no_target": "[Machinemetrics] Nenhum alvo para fixar",
+  "machinemetrics.pin.lost_destroyed": "[Machinemetrics] Alvo fixado perdido: Bloco destruído ou substituído",
+  "machinemetrics.pin.lost_out_of_range": "[Machinemetrics] Alvo fixado perdido: Fora da distância de renderização",
+  "machinemetrics.pin.lost_dimension": "[Machinemetrics] Alvo fixado perdido: Dimensão alterada",
+  "machinemetrics.pin.badge": "FIXADO",
   "machinemetrics.hud.title": "Telemetry",
   "machinemetrics.hud.detailed_title": "Telemetry HUD",
   "machinemetrics.hud.enabled": "[Machinemetrics] HUD Ativado",
@@ -67,5 +75,9 @@
   "machinemetrics.ae2.state.creative": "CREATIVE",
   "machinemetrics.hud.storage.capacity": "Armazenamento",
   "machinemetrics.hud.storage.full_in": "Cheio em: %s",
-  "machinemetrics.hud.storage.empty_in": "Vazio em: %s"
+  "machinemetrics.hud.storage.empty_in": "Vazio em: %s",
+  "machinemetrics.io.input": "ENTRADA",
+  "machinemetrics.io.output": "SAÍDA",
+  "machinemetrics.io.bidirectional": "E/S",
+  "machinemetrics.config.show_targeted_face_io": "Mostrar E/S da face apontada"
 }

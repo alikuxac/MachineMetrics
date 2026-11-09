@@ -1,9 +1,10 @@
 package com.alikuxac.machinemetrics.network;
 
 import com.alikuxac.machinemetrics.compat.create.CreateKineticInspector;
+import com.alikuxac.machinemetrics.telemetry.DirectionalIo;
 import com.alikuxac.machinemetrics.telemetry.TelemetryData;
-import it.unimi.dsi.fastutil.ints.IntArrayList;
 import net.minecraft.core.BlockPos;
+import net.minecraft.core.Direction;
 import net.minecraft.network.FriendlyByteBuf;
 import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
@@ -48,7 +49,11 @@ public record SyncTelemetryPayload(
         long storageCurrent,
         long storageMax,
         float netRate,
-        byte logisticsFlags
+        byte logisticsFlags,
+        byte targetedFace,
+        byte targetedIoDirection,
+        byte targetedState,
+        float targetedThroughput
 ) implements CustomPacketPayload {
     public static final Type<SyncTelemetryPayload> TYPE = new Type<>(Identifier.fromNamespaceAndPath("machinemetrics", "sync_telemetry"));
 
@@ -61,6 +66,9 @@ public record SyncTelemetryPayload(
 
     public static SyncTelemetryPayload from(BlockPos pos, TelemetryData data, short serverDisabledMask) {
         byte dirByte = data.kineticDirection() != null ? (byte) data.kineticDirection().ordinal() : (byte) 2;
+        byte faceByte = data.targetedFace() != null ? (byte) data.targetedFace().get3DDataValue() : (byte) -1;
+        byte ioByte = data.targetedIo() != null ? data.targetedIo().getId() : (byte) 0;
+        byte stateByte = data.targetedState() != null ? (byte) data.targetedState().ordinal() : (byte) TelemetryData.BottleneckState.IDLE.ordinal();
         return new SyncTelemetryPayload(
                 pos,
                 data.itemThroughput(),
@@ -100,7 +108,11 @@ public record SyncTelemetryPayload(
                 data.storageCurrent(),
                 data.storageMax(),
                 data.netRate(),
-                data.logisticsFlags()
+                data.logisticsFlags(),
+                faceByte,
+                ioByte,
+                stateByte,
+                data.targetedThroughput()
         );
     }
 
@@ -109,6 +121,9 @@ public record SyncTelemetryPayload(
         TelemetryData.BottleneckState state = (machineState >= 0 && machineState < states.length) ? states[machineState] : TelemetryData.BottleneckState.IDLE;
         var dirs = CreateKineticInspector.RotationDirection.values();
         var dir = (kineticDirection >= 0 && kineticDirection < dirs.length) ? dirs[kineticDirection] : CreateKineticInspector.RotationDirection.STATIONARY;
+        Direction face = (targetedFace >= 0 && targetedFace < 6) ? Direction.from3DDataValue(targetedFace) : null;
+        DirectionalIo io = DirectionalIo.fromId(targetedIoDirection);
+        TelemetryData.BottleneckState tState = (targetedState >= 0 && targetedState < states.length) ? states[targetedState] : TelemetryData.BottleneckState.IDLE;
         return new TelemetryData(
                 itemThroughput,
                 hasItems,
@@ -131,9 +146,9 @@ public record SyncTelemetryPayload(
                 hasKinetic,
                 dir,
                 state,
-                new IntArrayList(),
-                new IntArrayList(),
-                sideMetrics != null ? sideMetrics : new float[18],
+                null,
+                null,
+                sideMetrics,
                 serverDisabledMask,
                 hasAe2Network,
                 aePowerRate,
@@ -149,7 +164,11 @@ public record SyncTelemetryPayload(
                 storageCurrent,
                 storageMax,
                 netRate,
-                logisticsFlags
+                logisticsFlags,
+                face,
+                io,
+                tState,
+                targetedThroughput
         );
     }
 
@@ -161,12 +180,13 @@ public record SyncTelemetryPayload(
     public static final int PRESENT_AE2       = 1 << 5;
     public static final int PRESENT_SIDES     = 1 << 6;
     public static final int PRESENT_DISABLED  = 1 << 7;
-    public static final int PRESENT_STORAGE   = 1 << 8;
+    public static final int PRESENT_STORAGE        = 1 << 8;
+    public static final int PRESENT_TARGETED_FACE  = 1 << 9;
 
     public static final int MAX_NAME_LENGTH = 64;
 
     private static final int KNOWN_FLAGS = PRESENT_ITEMS | PRESENT_FLUIDS | PRESENT_ENERGY | PRESENT_KINETIC
-            | PRESENT_CHEMICALS | PRESENT_AE2 | PRESENT_SIDES | PRESENT_DISABLED | PRESENT_STORAGE;
+            | PRESENT_CHEMICALS | PRESENT_AE2 | PRESENT_SIDES | PRESENT_DISABLED | PRESENT_STORAGE | PRESENT_TARGETED_FACE;
 
     private static boolean hasActiveSides(float[] sides) {
         if (sides == null) return false;
@@ -204,6 +224,9 @@ public record SyncTelemetryPayload(
         }
         if (payload.storageMax > 0 || payload.storageCurrent > 0 || (payload.logisticsFlags & TelemetryData.FLAG_LOGISTICS_HAS_STORAGE) != 0 || Math.abs(payload.netRate) > 0.001f) {
             flags |= PRESENT_STORAGE;
+        }
+        if (payload.targetedFace >= 0 || payload.targetedIoDirection != 0 || payload.targetedThroughput > 0.001f) {
+            flags |= PRESENT_TARGETED_FACE;
         }
 
         buf.writeBlockPos(payload.targetPos);
@@ -263,7 +286,7 @@ public record SyncTelemetryPayload(
         if ((flags & PRESENT_SIDES) != 0) {
             int nonZeroMask = 0;
             for (int i = 0; i < 18; i++) {
-                if (payload.sideMetrics != null && i < payload.sideMetrics.length && payload.sideMetrics[i] > 0.01f) {
+                if (payload.sideMetrics[i] > 0.001f) {
                     nonZeroMask |= (1 << i);
                 }
             }
@@ -281,6 +304,13 @@ public record SyncTelemetryPayload(
             buf.writeFloat(payload.netRate);
             buf.writeByte(payload.logisticsFlags);
         }
+
+        if ((flags & PRESENT_TARGETED_FACE) != 0) {
+            buf.writeByte(payload.targetedFace);
+            buf.writeByte(payload.targetedIoDirection);
+            buf.writeByte(payload.targetedState);
+            buf.writeFloat(payload.targetedThroughput);
+        }
     }
 
     private static SyncTelemetryPayload decode(FriendlyByteBuf buf) {
@@ -288,7 +318,10 @@ public record SyncTelemetryPayload(
         byte machineState = buf.readByte();
         int flags = buf.readVarInt() & KNOWN_FLAGS;
 
-        short serverDisabledMask = (flags & PRESENT_DISABLED) != 0 ? buf.readShort() : (short) 0;
+        short serverDisabledMask = 0;
+        if ((flags & PRESENT_DISABLED) != 0) {
+            serverDisabledMask = buf.readShort();
+        }
 
         float itemThroughput = 0.0f;
         boolean hasItems = false;
@@ -388,6 +421,17 @@ public record SyncTelemetryPayload(
             logisticsFlags = buf.readByte();
         }
 
+        byte targetedFace = -1;
+        byte targetedIoDirection = 0;
+        byte targetedState = (byte) TelemetryData.BottleneckState.IDLE.ordinal();
+        float targetedThroughput = 0.0f;
+        if ((flags & PRESENT_TARGETED_FACE) != 0) {
+            targetedFace = buf.readByte();
+            targetedIoDirection = buf.readByte();
+            targetedState = buf.readByte();
+            targetedThroughput = buf.readFloat();
+        }
+
         return new SyncTelemetryPayload(
                 targetPos,
                 itemThroughput,
@@ -427,7 +471,11 @@ public record SyncTelemetryPayload(
                 storageCurrent,
                 storageMax,
                 netRate,
-                logisticsFlags
+                logisticsFlags,
+                targetedFace,
+                targetedIoDirection,
+                targetedState,
+                targetedThroughput
         );
     }
 

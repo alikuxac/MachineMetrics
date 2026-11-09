@@ -355,6 +355,18 @@ public class MetricResolver {
         };
     }
 
+    public static MutableComponent getDirectionalIoComponent(com.alikuxac.machinemetrics.telemetry.DirectionalIo io) {
+        if (io == null) {
+            return Component.empty();
+        }
+        return switch (io) {
+            case INPUT -> Component.translatable("machinemetrics.io.input").withStyle(ChatFormatting.AQUA);
+            case OUTPUT -> Component.translatable("machinemetrics.io.output").withStyle(ChatFormatting.GOLD);
+            case BIDIRECTIONAL -> Component.translatable("machinemetrics.io.bidirectional").withStyle(ChatFormatting.LIGHT_PURPLE);
+            case NONE -> Component.empty();
+        };
+    }
+
     public static String resolveStateLabelWithFormatting(TelemetryData.BottleneckState state) {
         if (state == null) {
             return ChatFormatting.GRAY + Component.translatable("machinemetrics.state.idle").getString();

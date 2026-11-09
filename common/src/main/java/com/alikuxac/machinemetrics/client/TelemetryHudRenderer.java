@@ -16,6 +16,7 @@ import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.network.chat.Component;
+import net.minecraft.network.chat.MutableComponent;
 import net.minecraft.world.phys.BlockHitResult;
 import net.minecraft.world.phys.HitResult;
 
@@ -40,6 +41,13 @@ public class TelemetryHudRenderer {
     private static List<HudLine> cachedLines = null;
     private static String cachedMachineName = null;
 
+    private static BlockPos cachedPinnedLinesPos = null;
+    private static Direction cachedPinnedLinesFace = null;
+    private static int cachedPinnedLinesDataSig = 0;
+    private static int cachedPinnedLinesConfigSig = 0;
+    private static List<HudLine> cachedPinnedLines = null;
+    private static String cachedPinnedMachineName = null;
+
     private static final long LOCAL_SAMPLE_INTERVAL_MS = 100L;
     private static long lastLocalSampleMs = 0L;
     private static BlockPos lastLocalSamplePos = null;
@@ -60,7 +68,11 @@ public class TelemetryHudRenderer {
                 ClientConfig.COLOR_ITEMS != null ? ClientConfig.COLOR_ITEMS.get() : "",
                 ClientConfig.COLOR_FLUIDS != null ? ClientConfig.COLOR_FLUIDS.get() : "",
                 ClientConfig.COLOR_CHEMICALS != null ? ClientConfig.COLOR_CHEMICALS.get() : "",
-                ClientConfig.COLOR_KINETIC != null ? ClientConfig.COLOR_KINETIC.get() : ""
+                ClientConfig.COLOR_KINETIC != null ? ClientConfig.COLOR_KINETIC.get() : "",
+                ClientConfig.SHOW_TARGETED_FACE_IO != null && ClientConfig.SHOW_TARGETED_FACE_IO.get(),
+                ClientConfig.COLOR_IO_INPUT != null ? ClientConfig.COLOR_IO_INPUT.get() : "",
+                ClientConfig.COLOR_IO_OUTPUT != null ? ClientConfig.COLOR_IO_OUTPUT.get() : "",
+                ClientConfig.COLOR_IO_BIDIRECTIONAL != null ? ClientConfig.COLOR_IO_BIDIRECTIONAL.get() : ""
         );
     }
 
@@ -84,7 +96,11 @@ public class TelemetryHudRenderer {
                 data.hasEnergy(),
                 data.hasKinetic(),
                 data.hasAe2Network(),
-                data.serverDisabledMask()
+                data.serverDisabledMask(),
+                data.targetedFace(),
+                data.targetedIo(),
+                data.targetedState(),
+                Float.floatToIntBits(data.targetedThroughput())
         );
     }
 
@@ -113,6 +129,45 @@ public class TelemetryHudRenderer {
         cachedLinesPos = null;
         cachedLinesFace = null;
         cachedMachineName = null;
+        cachedPinnedLines = null;
+        cachedPinnedLinesPos = null;
+        cachedPinnedLinesFace = null;
+        cachedPinnedMachineName = null;
+    }
+
+    private static List<HudLine> attachPinnedBadge(List<HudLine> lines) {
+        if (lines == null || lines.isEmpty()) {
+            return lines;
+        }
+        List<HudLine> result = new ArrayList<>(lines);
+        HudLine first = result.get(0);
+        Component badge = Component.literal("📌 [")
+                .append(Component.translatable("machinemetrics.pin.badge").withStyle(ChatFormatting.GOLD, ChatFormatting.BOLD))
+                .append(Component.literal("] "));
+        Component newHeader = Component.empty().append(badge).append(first.text());
+        result.set(0, new HudLine(newHeader, first.color()));
+        return result;
+    }
+
+    private static List<HudLine> getCachedPinnedLines(String machineName, TelemetryData data, MetricResolver.EtaResult eta,
+                                                      BlockPos pos, Direction face) {
+        int dataSig = computeDataSignature(data);
+        int configSig = computeConfigSignature();
+        if (cachedPinnedLines != null
+                && pos != null && pos.equals(cachedPinnedLinesPos)
+                && face == cachedPinnedLinesFace
+                && dataSig == cachedPinnedLinesDataSig
+                && configSig == cachedPinnedLinesConfigSig) {
+            return cachedPinnedLines;
+        }
+        List<HudLine> rawLines = buildHudLines(machineName, data, eta);
+        List<HudLine> pinnedLines = attachPinnedBadge(rawLines);
+        cachedPinnedLines = pinnedLines;
+        cachedPinnedLinesPos = pos;
+        cachedPinnedLinesFace = face;
+        cachedPinnedLinesDataSig = dataSig;
+        cachedPinnedLinesConfigSig = configSig;
+        return pinnedLines;
     }
 
     private static String getCachedMachineName(Minecraft mc, BlockPos pos) {
@@ -138,24 +193,36 @@ public class TelemetryHudRenderer {
             return;
         }
 
-        HitResult hitResult = mc.hitResult;
-        if (hitResult == null || hitResult.getType() != HitResult.Type.BLOCK) {
-            if (currentHoverPos != null) {
-                ClientTelemetryCache.remove(currentHoverPos);
-                currentHoverPos = null;
-                currentHoverFace = null;
-            }
-            return;
-        }
+        PinnedTargetManager.tick(mc);
+        PinnedTargetManager.pollIfDue(mc);
 
-        BlockHitResult blockHitResult = (BlockHitResult) hitResult;
-        BlockPos targetPos = blockHitResult.getBlockPos();
-        Direction hitFace = blockHitResult.getDirection();
+        boolean isPinned = PinnedTargetManager.isPinned();
+        BlockPos pinnedPos = PinnedTargetManager.getPinnedPos();
+        Direction pinnedFace = PinnedTargetManager.getPinnedFace();
+
+        BlockPos targetPos = null;
+        Direction hitFace = null;
+        if (InspectionGate.canInspect(mc.player)) {
+            HitResult hitResult = InspectionGate.performRaycast(mc);
+            if (hitResult != null && hitResult.getType() == HitResult.Type.BLOCK) {
+                BlockHitResult blockHitResult = (BlockHitResult) hitResult;
+                targetPos = blockHitResult.getBlockPos();
+                hitFace = blockHitResult.getDirection();
+            }
+        }
 
         long now = System.currentTimeMillis();
 
-        if (!targetPos.equals(currentHoverPos) || hitFace != currentHoverFace) {
+        if (targetPos == null) {
             if (currentHoverPos != null) {
+                if (!PinnedTargetManager.isPinned(currentHoverPos)) {
+                    ClientTelemetryCache.remove(currentHoverPos);
+                }
+                currentHoverPos = null;
+                currentHoverFace = null;
+            }
+        } else if (!targetPos.equals(currentHoverPos) || hitFace != currentHoverFace) {
+            if (currentHoverPos != null && !PinnedTargetManager.isPinned(currentHoverPos)) {
                 ClientTelemetryCache.remove(currentHoverPos);
             }
             currentHoverPos = targetPos;
@@ -164,13 +231,13 @@ public class TelemetryHudRenderer {
             invalidateLineCache();
         }
 
-        if (now - hoverStartTimeMs >= 120L) {
+        if (targetPos != null && (now - hoverStartTimeMs >= 120L)) {
             if (now - lastRequestTimeMs >= 200L || !targetPos.equals(lastSentPos) || hitFace != lastSentFace) {
                 lastRequestTimeMs = now;
                 lastSentPos = targetPos;
                 lastSentFace = hitFace;
                 try {
-                    if (mc.getConnection() != null) {
+                    if (mc.getConnection() != null && Services.NETWORK_SENDER != null) {
                         Services.NETWORK_SENDER.sendRequest(targetPos, hitFace);
                     }
                 } catch (Exception ignored) {
@@ -178,33 +245,81 @@ public class TelemetryHudRenderer {
             }
         }
 
-        TelemetryData data = ClientTelemetryCache.get(targetPos);
-        if (data.isEmpty()) {
-            boolean sameTarget = targetPos.equals(lastLocalSamplePos) && hitFace == lastLocalSampleFace;
-            if (sameTarget && lastLocalSampleData != null && (now - lastLocalSampleMs) < LOCAL_SAMPLE_INTERVAL_MS) {
-                data = lastLocalSampleData;
-            } else {
+        int pinnedBorderColor = ClientConfig.parseHexColor(ClientConfig.PINNED_BORDER_COLOR, 0xFFFFD700);
+
+        if (targetPos != null && isPinned && targetPos.equals(pinnedPos)) {
+            TelemetryData data = ClientTelemetryCache.get(targetPos);
+            if (data.isEmpty()) {
                 data = sampler.sample(targetPos, hitFace);
-                lastLocalSampleMs = now;
-                lastLocalSamplePos = targetPos;
-                lastLocalSampleFace = hitFace;
-                lastLocalSampleData = data;
+            }
+            if (data != null && !data.isEmpty()) {
+                String machineName = getCachedMachineName(mc, targetPos);
+                MetricResolver.EtaResult eta = ClientTelemetryCache.getEta(targetPos);
+                List<HudLine> lines = getCachedPinnedLines(machineName, data, eta, targetPos, hitFace);
+                if (!lines.isEmpty()) {
+                    renderAdaptiveHud(graphics, mc, lines, -1, -1, pinnedBorderColor);
+                }
+            }
+            return;
+        }
+
+        int[] hoverBox = null;
+        if (targetPos != null) {
+            TelemetryData data = ClientTelemetryCache.get(targetPos);
+            if (data.isEmpty()) {
+                boolean sameTarget = targetPos.equals(lastLocalSamplePos) && hitFace == lastLocalSampleFace;
+                if (sameTarget && lastLocalSampleData != null && (now - lastLocalSampleMs) < LOCAL_SAMPLE_INTERVAL_MS) {
+                    data = lastLocalSampleData;
+                } else {
+                    data = sampler.sample(targetPos, hitFace);
+                    lastLocalSampleMs = now;
+                    lastLocalSamplePos = targetPos;
+                    lastLocalSampleFace = hitFace;
+                    lastLocalSampleData = data;
+                }
+            }
+
+            if (data != null && !data.isEmpty()) {
+                String machineName = getCachedMachineName(mc, targetPos);
+                MetricResolver.EtaResult eta = ClientTelemetryCache.getEta(targetPos);
+                List<HudLine> lines = getCachedLines(machineName, data, eta, targetPos, hitFace);
+                if (!lines.isEmpty()) {
+                    hoverBox = renderAdaptiveHud(graphics, mc, lines);
+                }
             }
         }
 
-        if (data == null || data.isEmpty()) {
-            return;
+        if (isPinned) {
+            TelemetryData pinnedData = ClientTelemetryCache.get(pinnedPos);
+            if (pinnedData.isEmpty()) {
+                pinnedData = sampler.sample(pinnedPos, pinnedFace);
+            }
+            if (pinnedData != null && !pinnedData.isEmpty()) {
+                String pinnedName = PinnedTargetManager.getPinnedMachineName();
+                if (pinnedName == null) {
+                    pinnedName = getCachedMachineName(mc, pinnedPos);
+                }
+                MetricResolver.EtaResult eta = ClientTelemetryCache.getEta(pinnedPos);
+                List<HudLine> pinnedLines = getCachedPinnedLines(pinnedName, pinnedData, eta, pinnedPos, pinnedFace);
+                if (!pinnedLines.isEmpty()) {
+                    if (hoverBox != null) {
+                        ClientConfig.HudAnchor anchor = ClientConfig.HUD_ANCHOR != null ? ClientConfig.HUD_ANCHOR.get() : ClientConfig.HudAnchor.TOP_LEFT;
+                        int pinnedX = hoverBox[0];
+                        int pinnedY;
+                        if (anchor == ClientConfig.HudAnchor.BOTTOM_LEFT || anchor == ClientConfig.HudAnchor.BOTTOM_RIGHT) {
+                            Font font = mc.font;
+                            int pBoxHeight = (pinnedLines.size() * (font.lineHeight + 3)) + 10;
+                            pinnedY = hoverBox[1] - pBoxHeight - 6;
+                        } else {
+                            pinnedY = hoverBox[1] + hoverBox[3] + 6;
+                        }
+                        renderAdaptiveHud(graphics, mc, pinnedLines, pinnedX, pinnedY, pinnedBorderColor);
+                    } else {
+                        renderAdaptiveHud(graphics, mc, pinnedLines, -1, -1, pinnedBorderColor);
+                    }
+                }
+            }
         }
-
-        String machineName = getCachedMachineName(mc, targetPos);
-        MetricResolver.EtaResult eta = ClientTelemetryCache.getEta(targetPos);
-        List<HudLine> lines = getCachedLines(machineName, data, eta, targetPos, hitFace);
-
-        if (lines.isEmpty()) {
-            return;
-        }
-
-        renderAdaptiveHud(graphics, mc, lines);
     }
 
     public static List<HudLine> buildHudLines(String machineName, TelemetryData data) {
@@ -638,6 +753,34 @@ public class TelemetryHudRenderer {
             }
         }
 
+        if (ClientConfig.SHOW_TARGETED_FACE_IO != null && ClientConfig.SHOW_TARGETED_FACE_IO.get()
+                && data.targetedFace() != null && data.targetedIo() != null && data.targetedIo() != com.alikuxac.machinemetrics.telemetry.DirectionalIo.NONE) {
+            int ioColor = switch (data.targetedIo()) {
+                case INPUT -> ClientConfig.parseHexColor(ClientConfig.COLOR_IO_INPUT, 0x4FC3F7);
+                case OUTPUT -> ClientConfig.parseHexColor(ClientConfig.COLOR_IO_OUTPUT, 0xFFA726);
+                case BIDIRECTIONAL -> ClientConfig.parseHexColor(ClientConfig.COLOR_IO_BIDIRECTIONAL, 0xCE93D8);
+                default -> 0xFFFFFF;
+            };
+
+            MutableComponent faceBadge = Component.literal("▶ [")
+                    .append(Component.literal(data.targetedFace().getName().toUpperCase()).withStyle(ChatFormatting.BOLD))
+                    .append(Component.literal("] ["))
+                    .append(MetricResolver.getDirectionalIoComponent(data.targetedIo()))
+                    .append(Component.literal("]"));
+
+            StringBuilder valSb = new StringBuilder();
+            if (data.targetedThroughput() > 0.001f) {
+                valSb.append(String.format(" %.1f/s", data.targetedThroughput()));
+            }
+            if (data.targetedState() != null
+                    && data.targetedState() != TelemetryData.BottleneckState.IDLE
+                    && data.targetedState() != TelemetryData.BottleneckState.OPTIMAL) {
+                valSb.append(" [").append(MetricResolver.getStateComponent(data.targetedState()).getString()).append("]");
+            }
+            faceBadge.append(Component.literal(valSb.toString()));
+            lines.add(new HudLine(faceBadge, ioColor));
+        }
+
         boolean showSides = ClientConfig.SHOW_SIDES == null || ClientConfig.SHOW_SIDES.get();
         if (showSides && !data.isSidesDisabledByServer() && data.hasActiveSides()) {
             int sideColor = ClientConfig.parseHexColor(ClientConfig.COLOR_SIDES, 0x69F0AE);
@@ -710,6 +853,13 @@ public class TelemetryHudRenderer {
                     float fluidVal = data.getFluidSideRate(dir);
                     float chemVal = data.getChemicalSideRate(dir);
 
+                    boolean isTargetedFace = data.targetedFace() != null && dir == data.targetedFace();
+                    boolean hasTargetedIo = isTargetedFace && (data.targetedThroughput() > 0.001f
+                            || itemVal > 0.01f || fluidVal > 0.01f || (chemVal > 0.01f && isMekanismInstalled));
+                    if (hasTargetedIo) {
+                        continue;
+                    }
+
                     if (itemVal > 0.01f || fluidVal > 0.01f || (chemVal > 0.01f && isMekanismInstalled)) {
                         StringBuilder sideText = new StringBuilder();
                         sideText.append("  └ [").append(dir.getName().toUpperCase()).append("] ");
@@ -773,7 +923,11 @@ public class TelemetryHudRenderer {
         return new int[]{x, y};
     }
 
-    private static void renderAdaptiveHud(GuiGraphicsExtractor graphics, Minecraft mc, List<HudLine> lines) {
+    private static int[] renderAdaptiveHud(GuiGraphicsExtractor graphics, Minecraft mc, List<HudLine> lines) {
+        return renderAdaptiveHud(graphics, mc, lines, -1, -1, -1);
+    }
+
+    private static int[] renderAdaptiveHud(GuiGraphicsExtractor graphics, Minecraft mc, List<HudLine> lines, int forcedX, int forcedY, int customBorderColor) {
         Font font = mc.font;
         int maxLineWidth = 0;
         for (HudLine line : lines) {
@@ -793,9 +947,16 @@ public class TelemetryHudRenderer {
         int screenWidth = mc.getWindow().getGuiScaledWidth();
         int screenHeight = mc.getWindow().getGuiScaledHeight();
 
-        int[] coords = calculateRenderCoordinates(boxWidth, boxHeight, screenWidth, screenHeight);
-        int renderX = coords[0];
-        int renderY = coords[1];
+        int renderX;
+        int renderY;
+        if (forcedX >= 0 && forcedY >= 0) {
+            renderX = forcedX;
+            renderY = forcedY;
+        } else {
+            int[] coords = calculateRenderCoordinates(boxWidth, boxHeight, screenWidth, screenHeight);
+            renderX = coords[0];
+            renderY = coords[1];
+        }
 
         float scale = getHudScale();
 
@@ -803,7 +964,7 @@ public class TelemetryHudRenderer {
         applyHudScale(graphics, renderX, renderY, scale);
 
         int bgColor = ClientConfig.parseHexColor(ClientConfig.BACKGROUND_COLOR, 0x90000000);
-        int borderColor = ClientConfig.parseHexColor(ClientConfig.BORDER_COLOR, 0xFF00FFCC);
+        int borderColor = customBorderColor != -1 ? customBorderColor : ClientConfig.parseHexColor(ClientConfig.BORDER_COLOR, 0xFF00FFCC);
 
         graphics.fill(renderX, renderY, renderX + boxWidth, renderY + boxHeight, bgColor);
         graphics.outline(renderX, renderY, boxWidth, boxHeight, borderColor);
@@ -815,6 +976,7 @@ public class TelemetryHudRenderer {
         }
 
         graphics.pose().popMatrix();
+        return new int[]{renderX, renderY, boxWidth, boxHeight};
     }
 
     public static float getHudScale() {

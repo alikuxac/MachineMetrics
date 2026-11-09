@@ -103,6 +103,9 @@ public class NetworkHandler {
             }
 
             double maxRange = ServerConfig.MAX_REQUEST_RANGE != null ? ServerConfig.MAX_REQUEST_RANGE.get() : 12.0;
+            if (serverPlayer.isScoping()) {
+                maxRange = Math.max(maxRange, 34.0);
+            }
             if (!serverPlayer.blockPosition().closerThan(targetPos, maxRange)) {
                 return;
             }

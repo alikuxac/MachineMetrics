@@ -7,7 +7,9 @@ import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.Font;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
+import net.minecraft.ChatFormatting;
 import net.minecraft.network.chat.Component;
+import net.minecraft.network.chat.MutableComponent;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -54,7 +56,12 @@ public class ClientTelemetryCache {
             return;
         }
         lastSweepMs = now;
-        CACHE.entrySet().removeIf(entry -> now - entry.getValue().receivedTimeMs > EXPIRE_MS);
+        CACHE.entrySet().removeIf(entry -> {
+            if (PinnedTargetManager.isPinned(entry.getKey())) {
+                return false;
+            }
+            return now - entry.getValue().receivedTimeMs > EXPIRE_MS;
+        });
     }
 
     public static void putSynced(BlockPos pos, TelemetryData data) {
@@ -383,6 +390,39 @@ public class ClientTelemetryCache {
             }
         }
 
+        if (data.targetedFace() != null && data.targetedIo() != null && data.targetedIo() != com.alikuxac.machinemetrics.telemetry.DirectionalIo.NONE) {
+            int ioColor = switch (data.targetedIo()) {
+                case INPUT -> ClientConfig.parseHexColor(ClientConfig.COLOR_IO_INPUT, 0x4FC3F7);
+                case OUTPUT -> ClientConfig.parseHexColor(ClientConfig.COLOR_IO_OUTPUT, 0xFFA726);
+                case BIDIRECTIONAL -> ClientConfig.parseHexColor(ClientConfig.COLOR_IO_BIDIRECTIONAL, 0xCE93D8);
+                default -> 0xFFFFFF;
+            };
+
+            MutableComponent faceLabel = Component.literal("▶ [")
+                    .append(Component.literal(data.targetedFace().getName().toUpperCase()).withStyle(ChatFormatting.BOLD))
+                    .append(Component.literal("] ["))
+                    .append(MetricResolver.getDirectionalIoComponent(data.targetedIo()))
+                    .append(Component.literal("]"));
+
+            StringBuilder valSb = new StringBuilder();
+            if (data.targetedThroughput() > 0.001f) {
+                valSb.append(String.format("%.1f/s ", data.targetedThroughput()));
+            }
+            if (data.targetedState() != null
+                    && data.targetedState() != TelemetryData.BottleneckState.IDLE
+                    && data.targetedState() != TelemetryData.BottleneckState.OPTIMAL) {
+                valSb.append("[").append(MetricResolver.getStateComponent(data.targetedState()).getString()).append("]");
+            }
+            String valStr = valSb.toString().trim();
+
+            detailedRows.add(new RenderRow(
+                    faceLabel,
+                    Component.literal(valStr),
+                    ioColor,
+                    font != null ? font.width(valStr) : 0
+            ));
+        }
+
         if (data.hasActiveSides()) {
             Direction[] directions = Direction.values();
             List<Direction> activeItemSides = new ArrayList<>();
@@ -428,9 +468,9 @@ public class ClientTelemetryCache {
                 }
             }
 
-            boolean canGroupAll = (activeItemSides.isEmpty() || (activeItemSides.size() > 1 && allItemRatesEqual)) &&
-                                   (activeFluidSides.isEmpty() || (activeFluidSides.size() > 1 && allFluidRatesEqual)) &&
-                                   (activeChemicalSides.isEmpty() || (activeChemicalSides.size() > 1 && allChemicalRatesEqual)) &&
+            boolean canGroupAll = (activeItemSides.isEmpty() || (activeItemSides.size() == 6 && allItemRatesEqual)) &&
+                                   (activeFluidSides.isEmpty() || (activeFluidSides.size() == 6 && allFluidRatesEqual)) &&
+                                   (activeChemicalSides.isEmpty() || (activeChemicalSides.size() == 6 && allChemicalRatesEqual)) &&
                                    (!activeItemSides.isEmpty() || !activeFluidSides.isEmpty() || !activeChemicalSides.isEmpty());
 
             if (canGroupAll) {
@@ -457,6 +497,13 @@ public class ClientTelemetryCache {
                     float itemVal = data.getItemSideRate(dir);
                     float fluidVal = data.getFluidSideRate(dir);
                     float chemVal = data.getChemicalSideRate(dir);
+
+                    boolean isTargetedFace = data.targetedFace() != null && dir == data.targetedFace();
+                    boolean hasTargetedIo = isTargetedFace && (data.targetedThroughput() > 0.001f
+                            || itemVal > 0.01f || fluidVal > 0.01f || chemVal > 0.01f);
+                    if (hasTargetedIo) {
+                        continue;
+                    }
 
                     if (itemVal > 0.01f || fluidVal > 0.01f || chemVal > 0.01f) {
                         StringBuilder sideText = new StringBuilder();

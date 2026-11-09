@@ -16,5 +16,14 @@ public class KeyBindings {
             CATEGORY
     );
 
+    public static final KeyMapping PIN_TARGET_KEY = new KeyMapping(
+            "key.machinemetrics.pin_target",
+            InputConstants.Type.KEYSYM,
+            GLFW.GLFW_KEY_P,
+            CATEGORY
+    );
+
+    public static final KeyMapping KEY_PIN_TARGET = PIN_TARGET_KEY;
+
     public static boolean hudEnabled = true;
 }

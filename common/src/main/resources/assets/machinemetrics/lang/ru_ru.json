@@ -1,6 +1,14 @@
 {
-  "key.category.machinemetrics.main": "Machine Metrics",
+  "key.categories.machinemetrics": "Machine Metrics",
   "key.machinemetrics.toggle_hud": "Переключить HUD телеметрии",
+  "key.machinemetrics.pin_target": "Закрепить/зафиксировать телеметрию цели",
+  "machinemetrics.pin.pinned": "[Machinemetrics] Цель закреплена: %s",
+  "machinemetrics.pin.unpinned": "[Machinemetrics] Закрепление цели снято",
+  "machinemetrics.pin.no_target": "[Machinemetrics] Нет цели для закрепления",
+  "machinemetrics.pin.lost_destroyed": "[Machinemetrics] Закрепленная цель потеряна: блок разрушен или заменен",
+  "machinemetrics.pin.lost_out_of_range": "[Machinemetrics] Закрепленная цель потеряна: вне зоны прорисовки",
+  "machinemetrics.pin.lost_dimension": "[Machinemetrics] Закрепленная цель потеряна: измерение изменено",
+  "machinemetrics.pin.badge": "ЗАКРЕПЛЕНО",
   "machinemetrics.hud.title": "Telemetry",
   "machinemetrics.hud.detailed_title": "Telemetry HUD",
   "machinemetrics.hud.enabled": "[Machinemetrics] HUD включен",
@@ -67,5 +75,9 @@
   "machinemetrics.ae2.state.creative": "CREATIVE",
   "machinemetrics.hud.storage.capacity": "Вместимость",
   "machinemetrics.hud.storage.full_in": "Заполнится через: %s",
-  "machinemetrics.hud.storage.empty_in": "Опустеет через: %s"
+  "machinemetrics.hud.storage.empty_in": "Опустеет через: %s",
+  "machinemetrics.io.input": "ВХОД",
+  "machinemetrics.io.output": "ВЫХОД",
+  "machinemetrics.io.bidirectional": "ВХОД/ВЫХОД",
+  "machinemetrics.config.show_targeted_face_io": "Показывать ввод/вывод выбранной стороны"
 }
