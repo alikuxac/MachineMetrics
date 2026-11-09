@@ -11,7 +11,11 @@ import com.alikuxac.machinemetrics.compat.storage.SophisticatedStorageAdapter;
 import com.alikuxac.machinemetrics.config.ServerConfig;
 import com.alikuxac.machinemetrics.storage.BlockCapacityReader;
 import com.alikuxac.machinemetrics.storage.BlockCapacityReader.StorageCapacity;
+import com.alikuxac.machinemetrics.telemetry.DirectionalCapabilityScanner;
 import com.alikuxac.machinemetrics.telemetry.TelemetryData;
+import com.alikuxac.machinemetrics.platform.storage.ItemStorage;
+import com.alikuxac.machinemetrics.platform.storage.FluidStorage;
+import com.alikuxac.machinemetrics.platform.storage.StorageAccess;
 import it.unimi.dsi.fastutil.ints.IntArrayList;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.multiplayer.ClientLevel;
@@ -132,7 +136,7 @@ public class NeoForgeTelemetrySampler {
         } else {
             for (Direction side : Direction.values()) {
                     try {
-                        IItemHandler itemHandler = level.getCapability(Capabilities.ItemHandler.BLOCK, pos, side);
+                        ItemStorage itemHandler = StorageAccess.item(level, pos, side);
                         if (itemHandler != null && itemHandler.getSlots() > 0) {
                             int sideCount = 0;
                             for (int i = 0; i < itemHandler.getSlots(); i++) {
@@ -194,11 +198,11 @@ public class NeoForgeTelemetrySampler {
 
         for (Direction side : Direction.values()) {
             try {
-                IFluidHandler fluidHandler = level.getCapability(Capabilities.FluidHandler.BLOCK, pos, side);
+                FluidStorage fluidHandler = StorageAccess.fluid(level, pos, side);
                 if (fluidHandler != null && fluidHandler.getTanks() > 0) {
                     float sideAmount = 0.0f;
                     for (int i = 0; i < fluidHandler.getTanks(); i++) {
-                        sideAmount += fluidHandler.getFluidInTank(i).getAmount();
+                        sideAmount += fluidHandler.getTankAmount(i);
                     }
                     sideMetrics[6 + side.ordinal()] = sideAmount;
                 }
@@ -389,7 +393,19 @@ public class NeoForgeTelemetrySampler {
                     for (int i = 0; i < 18; i++) {
                         float p = i < prevSideMetrics.length ? prevSideMetrics[i] : 0.0f;
                         float c = i < currSideMetrics.length ? currSideMetrics[i] : 0.0f;
-                        sideRates[i] = Math.abs(c - p) / timeDiffSec;
+                        float rate = Math.abs(c - p) / timeDiffSec;
+                        if (rate > 0.001f && !isTransporter) {
+                            Direction side = Direction.values()[i % 6];
+                            boolean hasTarget = (i < 6)
+                                    ? StorageAccess.hasAdjacentItemTarget(level, pos, side)
+                                    : (i < 12
+                                            ? StorageAccess.hasAdjacentFluidTarget(level, pos, side)
+                                            : MekanismChemicalInspector.hasAdjacentChemicalTarget(level, pos, side));
+                            if (!hasTarget) {
+                                rate = 0.0f;
+                            }
+                        }
+                        sideRates[i] = rate;
                     }
                 }
             }
@@ -595,6 +611,17 @@ public class NeoForgeTelemetrySampler {
             logisticsFlags |= TelemetryData.FLAG_LOGISTICS_IS_DRAINING;
         }
 
+        DirectionalCapabilityScanner.TargetedResult targetedDiag = (hitFace != null)
+                ? DirectionalCapabilityScanner.scan(
+                        level, pos, hitFace, be,
+                        sideRates[hitFace.ordinal()],
+                        sideRates[6 + hitFace.ordinal()],
+                        0f,
+                        currentItems, maxItems,
+                        currentFluid, maxFluid,
+                        currentEnergy, maxEnergy)
+                : DirectionalCapabilityScanner.TargetedResult.NONE;
+
         return new TelemetryData(
                 itemThroughput, hasItems,
                 fluidThroughput, hasFluids, fluidName, currentFluid, maxFluid,
@@ -604,7 +631,8 @@ public class NeoForgeTelemetrySampler {
                 state, allSlotCounts, allTankAmounts, sideRates,
                 (short) 0,
                 hasAe2Network, aePowerRate, aePowerDrain, aeSubnetDrain, aeSubnetCount, aeStoredPower, aeMaxPower, aeStabilityState, aeIsCreative, aeUsedChannels, aeMaxChannels,
-                storageCurrent, storageMax, primaryNetRate, logisticsFlags
+                storageCurrent, storageMax, primaryNetRate, logisticsFlags,
+                targetedDiag.face(), targetedDiag.io(), targetedDiag.state(), targetedDiag.throughput()
         );
     }
 

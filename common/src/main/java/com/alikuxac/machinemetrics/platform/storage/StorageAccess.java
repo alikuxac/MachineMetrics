@@ -54,4 +54,28 @@ public final class StorageAccess {
             return null;
         }
     }
+
+    public static boolean hasAdjacentItemTarget(Level level, BlockPos pos, Direction side) {
+        if (level == null || pos == null || side == null) return false;
+        try {
+            BlockPos adjPos = pos.relative(side);
+            if (!level.isLoaded(adjPos) || level.isEmptyBlock(adjPos)) return false;
+            ItemStorage adjStorage = item(level, adjPos, side.getOpposite());
+            return adjStorage != null && adjStorage.getSlots() > 0;
+        } catch (Throwable ignored) {
+            return false;
+        }
+    }
+
+    public static boolean hasAdjacentFluidTarget(Level level, BlockPos pos, Direction side) {
+        if (level == null || pos == null || side == null) return false;
+        try {
+            BlockPos adjPos = pos.relative(side);
+            if (!level.isLoaded(adjPos) || level.isEmptyBlock(adjPos)) return false;
+            FluidStorage adjStorage = fluid(level, adjPos, side.getOpposite());
+            return adjStorage != null && adjStorage.getTanks() > 0;
+        } catch (Throwable ignored) {
+            return false;
+        }
+    }
 }

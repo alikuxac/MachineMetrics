@@ -75,5 +75,9 @@
   "machinemetrics.ae2.state.creative": "CREATIVE",
   "machinemetrics.hud.storage.capacity": "Вместимость",
   "machinemetrics.hud.storage.full_in": "Заполнится через: %s",
-  "machinemetrics.hud.storage.empty_in": "Опустеет через: %s"
+  "machinemetrics.hud.storage.empty_in": "Опустеет через: %s",
+  "machinemetrics.io.input": "ВХОД",
+  "machinemetrics.io.output": "ВЫХОД",
+  "machinemetrics.io.bidirectional": "ВХОД/ВЫХОД",
+  "machinemetrics.config.show_targeted_face_io": "Показывать ввод/вывод выбранной стороны"
 }

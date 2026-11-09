@@ -45,7 +45,11 @@ public record TelemetryData(
         long storageCurrent,
         long storageMax,
         float netRate,
-        byte logisticsFlags
+        byte logisticsFlags,
+        Direction targetedFace,
+        DirectionalIo targetedIo,
+        BottleneckState targetedState,
+        float targetedThroughput
 ) {
     public enum BottleneckState {
         OPTIMAL,
@@ -171,6 +175,63 @@ public record TelemetryData(
         );
     }
 
+    public TelemetryData(
+            float itemThroughput,
+            boolean hasItems,
+            float fluidThroughput,
+            boolean hasFluids,
+            String fluidName,
+            long fluidAmount,
+            long fluidCapacity,
+            float energyDelta,
+            boolean hasEnergy,
+            float chemicalThroughput,
+            boolean hasChemicals,
+            String chemicalName,
+            long chemicalAmount,
+            long chemicalCapacity,
+            float kineticSpeed,
+            float kineticStress,
+            float kineticCapacity,
+            float kineticBlockStress,
+            boolean hasKinetic,
+            RotationDirection kineticDirection,
+            BottleneckState bottleneckState,
+            IntArrayList allSlotCounts,
+            IntArrayList allTankAmounts,
+            float[] sideMetrics,
+            short serverDisabledMask,
+            boolean hasAe2Network,
+            float aePowerRate,
+            float aePowerDrain,
+            float aeSubnetDrain,
+            int aeSubnetCount,
+            double aeStoredPower,
+            double aeMaxPower,
+            byte aeStabilityState,
+            boolean aeIsCreative,
+            int aeUsedChannels,
+            int aeMaxChannels,
+            long storageCurrent,
+            long storageMax,
+            float netRate,
+            byte logisticsFlags
+    ) {
+        this(
+                itemThroughput, hasItems,
+                fluidThroughput, hasFluids, fluidName, fluidAmount, fluidCapacity,
+                energyDelta, hasEnergy,
+                chemicalThroughput, hasChemicals, chemicalName, chemicalAmount, chemicalCapacity,
+                kineticSpeed, kineticStress, kineticCapacity, kineticBlockStress, hasKinetic,
+                kineticDirection, bottleneckState,
+                allSlotCounts, allTankAmounts, sideMetrics,
+                serverDisabledMask,
+                hasAe2Network, aePowerRate, aePowerDrain, aeSubnetDrain, aeSubnetCount, aeStoredPower, aeMaxPower, aeStabilityState, aeIsCreative, aeUsedChannels, aeMaxChannels,
+                storageCurrent, storageMax, netRate, logisticsFlags,
+                null, DirectionalIo.NONE, BottleneckState.IDLE, 0.0f
+        );
+    }
+
     public static final TelemetryData EMPTY = new TelemetryData(
             0.0f, false,
             0.0f, false, "", 0L, 0L,
@@ -183,7 +244,8 @@ public record TelemetryData(
             new float[18],
             (short) 0,
             false, 0f, 0f, 0f, 0, 0.0, 0.0, (byte) 0, false, 0, 0,
-            0L, 0L, 0.0f, (byte) 0
+            0L, 0L, 0.0f, (byte) 0,
+            null, DirectionalIo.NONE, BottleneckState.IDLE, 0.0f
     );
 
     public static TelemetryData empty() {
@@ -280,6 +342,10 @@ public record TelemetryData(
         if (this.chemicalAmount != other.chemicalAmount) return true;
         if (this.chemicalCapacity != other.chemicalCapacity) return true;
 
+        if (this.targetedFace != other.targetedFace) return true;
+        if (this.targetedIo != other.targetedIo) return true;
+        if (this.targetedState != other.targetedState) return true;
+        if (Math.abs(this.targetedThroughput - other.targetedThroughput) > 0.05f) return true;
         if (this.logisticsFlags != other.logisticsFlags) return true;
         if (Math.abs(this.netRate - other.netRate) > 0.05f) return true;
         if (this.storageMax != other.storageMax) return true;

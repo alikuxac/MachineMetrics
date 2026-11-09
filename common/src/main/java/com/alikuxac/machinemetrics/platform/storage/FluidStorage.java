@@ -8,4 +8,12 @@ public interface FluidStorage {
     boolean isTankEmpty(int tank);
 
     long getTankAmount(int tank);
+
+    default boolean canFill() {
+        return false;
+    }
+
+    default boolean canDrain() {
+        return false;
+    }
 }

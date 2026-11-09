@@ -50,6 +50,7 @@ public class ClientConfig {
     public static final Config.Value<String> AE2_POWER_UNIT;
     public static final Config.Value<Boolean> SHOW_STORAGE_CAPACITY;
     public static final Config.Value<Boolean> SHOW_TIME_TO_FULL;
+    public static final Config.Value<Boolean> SHOW_TARGETED_FACE_IO;
 
     // Compact Formatting & Thresholds
     public static final Config.Value<Boolean> COMPACT_MODE;
@@ -83,6 +84,9 @@ public class ClientConfig {
     public static final Config.Value<String> COLOR_STATE_CLOGGED;
     public static final Config.Value<String> COLOR_STATE_OVERLOADED;
     public static final Config.Value<String> COLOR_STATE_IDLE;
+    public static final Config.Value<String> COLOR_IO_INPUT;
+    public static final Config.Value<String> COLOR_IO_OUTPUT;
+    public static final Config.Value<String> COLOR_IO_BIDIRECTIONAL;
 
     // Inspection Gate & Zoom
     public static final Config.Value<Boolean> REQUIRE_INSPECTION_ITEM;
@@ -214,6 +218,10 @@ public class ClientConfig {
                 .comment("Show estimated time until storage is full or empty (ETA)")
                 .define("show_time_to_full", true);
 
+        SHOW_TARGETED_FACE_IO = builder
+                .comment("Show targeted face directional I/O and bottleneck diagnostics")
+                .define("show_targeted_face_io", true);
+
         builder.pop();
 
         builder.comment("Compact Template & Thresholds").push("formatting");
@@ -333,6 +341,18 @@ public class ClientConfig {
         COLOR_STATE_IDLE = builder
                 .comment("IDLE status color")
                 .define("stateIdleColor", "#AAAAAA");
+
+        COLOR_IO_INPUT = builder
+                .comment("Targeted face [INPUT] badge color")
+                .define("color_io_input", "#4FC3F7");
+
+        COLOR_IO_OUTPUT = builder
+                .comment("Targeted face [OUTPUT] badge color")
+                .define("color_io_output", "#FFA726");
+
+        COLOR_IO_BIDIRECTIONAL = builder
+                .comment("Targeted face [BIDIRECTIONAL] badge color")
+                .define("color_io_bidirectional", "#CE93D8");
 
         builder.pop();
 

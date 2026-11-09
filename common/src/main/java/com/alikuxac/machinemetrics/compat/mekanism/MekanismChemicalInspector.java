@@ -3,6 +3,7 @@ package com.alikuxac.machinemetrics.compat.mekanism;
 import com.alikuxac.machinemetrics.compat.Reflect;
 import mekanism.api.chemical.ChemicalStack;
 import mekanism.api.chemical.IChemicalHandler;
+import mekanism.api.chemical.ISidedChemicalHandler;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.world.level.Level;
@@ -62,7 +63,6 @@ public class MekanismChemicalInspector {
         if (holder == null) {
             return null;
         }
-        // ponytail: NeoForge BlockCapability is already the capability; Forge's Capability too.
         String cn = holder.getClass().getName();
         if (cn.endsWith(".capabilities.BlockCapability") || cn.endsWith("common.capabilities.Capability")) {
             return holder;
@@ -135,62 +135,64 @@ public class MekanismChemicalInspector {
 
             IChemicalHandler capabilityHandler = queryCapability(level, pos, side);
             if (capabilityHandler != null) {
-                ChemicalMetricData data = processHandler(capabilityHandler);
+                ChemicalMetricData data = processHandler(capabilityHandler, side);
                 if (data != null) {
                     return Optional.of(data);
                 }
             }
 
             if (be instanceof IChemicalHandler handler) {
-                ChemicalMetricData data = processHandler(handler);
+                ChemicalMetricData data = processHandler(handler, side);
                 if (data != null) {
                     return Optional.of(data);
                 }
             }
 
-            IChemicalHandler unsided = queryCapability(level, pos, null);
-            if (unsided != null && unsided.getChemicalTanks() > 0) {
-                ChemicalMetricData data = processHandler(unsided);
-                if (data != null) {
-                    return Optional.of(data);
+            if (side == null) {
+                IChemicalHandler unsided = queryCapability(level, pos, null);
+                if (unsided != null && unsided.getChemicalTanks() > 0) {
+                    ChemicalMetricData data = processHandler(unsided, null);
+                    if (data != null) {
+                        return Optional.of(data);
+                    }
                 }
-            }
 
-            Set<IChemicalHandler> handlers = Collections.newSetFromMap(new IdentityHashMap<>());
-            long totalAmount = 0L;
-            long totalCapacity = 0L;
-            String displayName = null;
-            String displayKey = null;
-            for (Direction candidate : ALL_SIDES) {
-                IChemicalHandler handler = queryCapability(level, pos, candidate);
-                if (handler != null && handlers.add(handler)) {
-                    int tanks = handler.getChemicalTanks();
-                    for (int i = 0; i < tanks; i++) {
-                        long cap = handler.getChemicalTankCapacity(i);
-                        if (cap > 0) {
-                            totalCapacity += cap;
-                        }
-                        ChemicalStack stack = handler.getChemicalInTank(i);
-                        if (!stack.isEmpty()) {
-                            totalAmount += stack.getAmount();
-                            if (displayName == null) {
-                                displayName = stack.getChemical().getTextComponent().getString();
-                                displayKey = stack.getTranslationKey();
+                Set<IChemicalHandler> handlers = Collections.newSetFromMap(new IdentityHashMap<>());
+                long totalAmount = 0L;
+                long totalCapacity = 0L;
+                String displayName = null;
+                String displayKey = null;
+                for (Direction candidate : ALL_SIDES) {
+                    IChemicalHandler handler = queryCapability(level, pos, candidate);
+                    if (handler != null && handlers.add(handler)) {
+                        int tanks = handler.getChemicalTanks();
+                        for (int i = 0; i < tanks; i++) {
+                            long cap = handler.getChemicalTankCapacity(i);
+                            if (cap > 0) {
+                                totalCapacity += cap;
+                            }
+                            ChemicalStack stack = handler.getChemicalInTank(i);
+                            if (!stack.isEmpty()) {
+                                totalAmount += stack.getAmount();
+                                if (displayName == null) {
+                                    displayName = stack.getChemical().getTextComponent().getString();
+                                    displayKey = stack.getTranslationKey();
+                                }
                             }
                         }
                     }
                 }
-            }
 
-            if (totalCapacity <= 0 && totalAmount <= 0) {
-                return Optional.empty();
+                if (totalCapacity <= 0 && totalAmount <= 0) {
+                    return Optional.empty();
+                }
+                return Optional.of(new ChemicalMetricData(
+                        displayName != null ? displayName : "",
+                        displayKey != null ? displayKey : "",
+                        totalAmount,
+                        totalCapacity
+                ));
             }
-            return Optional.of(new ChemicalMetricData(
-                    displayName != null ? displayName : "",
-                    displayKey != null ? displayKey : "",
-                    totalAmount,
-                    totalCapacity
-            ));
         } catch (Throwable ignored) {
 
         }
@@ -212,8 +214,49 @@ public class MekanismChemicalInspector {
         return mekanismLoadedCache;
     }
 
+    private static ChemicalMetricData processHandler(IChemicalHandler handler, Direction side) {
+        if (handler == null) {
+            return null;
+        }
 
-    private static ChemicalMetricData processHandler(IChemicalHandler handler) {
+        if (side != null && handler instanceof ISidedChemicalHandler sided) {
+            int tanks = sided.getCountChemicalTanks(side);
+            if (tanks <= 0) {
+                return null;
+            }
+
+            long totalAmount = 0L;
+            long totalCapacity = 0L;
+            String displayName = null;
+            String displayKey = null;
+
+            for (int i = 0; i < tanks; i++) {
+                long capacity = sided.getChemicalTankCapacity(i, side);
+                if (capacity > 0) {
+                    totalCapacity += capacity;
+                }
+                ChemicalStack stack = sided.getChemicalInTank(i, side);
+                if (!stack.isEmpty()) {
+                    totalAmount += stack.getAmount();
+                    if (displayName == null) {
+                        displayName = stack.getChemical().getTextComponent().getString();
+                        displayKey = stack.getTranslationKey();
+                    }
+                }
+            }
+
+            if (totalCapacity <= 0 && totalAmount <= 0) {
+                return null;
+            }
+
+            return new ChemicalMetricData(
+                    displayName != null ? displayName : "",
+                    displayKey != null ? displayKey : "",
+                    totalAmount,
+                    totalCapacity
+            );
+        }
+
         int tanks = handler.getChemicalTanks();
         if (tanks <= 0) {
             return null;
@@ -249,5 +292,16 @@ public class MekanismChemicalInspector {
                 totalAmount,
                 totalCapacity
         );
+    }
+
+    public static boolean hasAdjacentChemicalTarget(Level level, BlockPos pos, Direction side) {
+        if (level == null || pos == null || side == null || !isMekanismLoaded()) return false;
+        try {
+            BlockPos adjPos = pos.relative(side);
+            if (!level.isLoaded(adjPos) || level.isEmptyBlock(adjPos)) return false;
+            return inspectChemicals(level, adjPos, side.getOpposite()).isPresent();
+        } catch (Throwable ignored) {
+            return false;
+        }
     }
 }

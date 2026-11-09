@@ -75,6 +75,10 @@
   "machinemetrics.ae2.state.creative": "SÁNG TẠO",
   "machinemetrics.hud.storage.capacity": "Lưu trữ",
   "machinemetrics.hud.storage.full_in": "Đầy sau: %s",
-  "machinemetrics.hud.storage.empty_in": "Hết sau: %s"
+  "machinemetrics.hud.storage.empty_in": "Hết sau: %s",
+  "machinemetrics.io.input": "NHẬN",
+  "machinemetrics.io.output": "XUẤT",
+  "machinemetrics.io.bidirectional": "HAI CHIỀU",
+  "machinemetrics.config.show_targeted_face_io": "Hiển thị hướng I/O mặt đang nhắm"
 }
 

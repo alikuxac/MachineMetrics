@@ -16,6 +16,7 @@ import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.network.chat.Component;
+import net.minecraft.network.chat.MutableComponent;
 import net.minecraft.world.phys.BlockHitResult;
 import net.minecraft.world.phys.HitResult;
 import com.alikuxac.machinemetrics.platform.network.NetworkPlatform;
@@ -69,6 +70,7 @@ public class TelemetryHudRenderer {
                 ClientConfig.COLOR_FLUIDS != null ? ClientConfig.COLOR_FLUIDS.get() : "",
                 ClientConfig.COLOR_CHEMICALS != null ? ClientConfig.COLOR_CHEMICALS.get() : "",
                 ClientConfig.COLOR_KINETIC != null ? ClientConfig.COLOR_KINETIC.get() : "",
+                ClientConfig.SHOW_TARGETED_FACE_IO != null && ClientConfig.SHOW_TARGETED_FACE_IO.get(),
                 ClientConfig.REQUIRE_INSPECTION_ITEM != null && ClientConfig.REQUIRE_INSPECTION_ITEM.get()
         );
     }
@@ -93,7 +95,11 @@ public class TelemetryHudRenderer {
                 data.hasEnergy(),
                 data.hasKinetic(),
                 data.hasAe2Network(),
-                data.serverDisabledMask()
+                data.serverDisabledMask(),
+                data.targetedFace(),
+                data.targetedIo(),
+                data.targetedState(),
+                data.targetedThroughput()
         );
     }
 
@@ -746,6 +752,34 @@ public class TelemetryHudRenderer {
             }
         }
 
+        boolean showTargetedFace = ClientConfig.SHOW_TARGETED_FACE_IO == null || ClientConfig.SHOW_TARGETED_FACE_IO.get();
+        if (showTargetedFace && data.targetedFace() != null && data.targetedIo() != null && data.targetedIo() != com.alikuxac.machinemetrics.telemetry.DirectionalIo.NONE) {
+            int ioColor = switch (data.targetedIo()) {
+                case INPUT -> ClientConfig.parseHexColor(ClientConfig.COLOR_IO_INPUT, 0x4FC3F7);
+                case OUTPUT -> ClientConfig.parseHexColor(ClientConfig.COLOR_IO_OUTPUT, 0xFFA726);
+                case BIDIRECTIONAL -> ClientConfig.parseHexColor(ClientConfig.COLOR_IO_BIDIRECTIONAL, 0xCE93D8);
+                default -> 0xFFFFFF;
+            };
+
+            MutableComponent faceLine = Component.literal("▶ [")
+                    .append(Component.literal(data.targetedFace().getName().toUpperCase()).withStyle(ChatFormatting.BOLD))
+                    .append(Component.literal("] ["))
+                    .append(MetricResolver.getDirectionalIoComponent(data.targetedIo()))
+                    .append(Component.literal("]"));
+
+            if (data.targetedThroughput() > 0.001f) {
+                faceLine.append(Component.literal(String.format(" • %.1f/s", data.targetedThroughput())));
+            }
+
+            if (data.targetedState() != null
+                    && data.targetedState() != TelemetryData.BottleneckState.IDLE
+                    && data.targetedState() != TelemetryData.BottleneckState.OPTIMAL) {
+                faceLine.append(Component.literal(" [")).append(MetricResolver.getStateComponent(data.targetedState())).append(Component.literal("]"));
+            }
+
+            lines.add(new HudLine(faceLine, ioColor));
+        }
+
         boolean showSides = ClientConfig.SHOW_SIDES == null || ClientConfig.SHOW_SIDES.get();
         if (showSides && !data.isSidesDisabledByServer() && data.hasActiveSides()) {
             int sideColor = ClientConfig.parseHexColor(ClientConfig.COLOR_SIDES, 0x69F0AE);
@@ -793,9 +827,9 @@ public class TelemetryHudRenderer {
                 }
             }
 
-            boolean canGroupAll = (activeItemSides.isEmpty() || (activeItemSides.size() > 1 && allItemRatesEqual)) &&
-                                  (activeFluidSides.isEmpty() || (activeFluidSides.size() > 1 && allFluidRatesEqual)) &&
-                                  (activeChemicalSides.isEmpty() || (activeChemicalSides.size() > 1 && allChemicalRatesEqual)) &&
+            boolean canGroupAll = (activeItemSides.isEmpty() || (activeItemSides.size() == 6 && allItemRatesEqual)) &&
+                                  (activeFluidSides.isEmpty() || (activeFluidSides.size() == 6 && allFluidRatesEqual)) &&
+                                  (activeChemicalSides.isEmpty() || (activeChemicalSides.size() == 6 && allChemicalRatesEqual)) &&
                                   (!activeItemSides.isEmpty() || !activeFluidSides.isEmpty() || !activeChemicalSides.isEmpty());
 
             if (canGroupAll) {
@@ -817,6 +851,13 @@ public class TelemetryHudRenderer {
                     float itemVal = data.getItemSideRate(dir);
                     float fluidVal = data.getFluidSideRate(dir);
                     float chemVal = data.getChemicalSideRate(dir);
+
+                    boolean isTargetedFace = data.targetedFace() != null && dir == data.targetedFace();
+                    boolean hasTargetedIo = isTargetedFace && (data.targetedThroughput() > 0.001f
+                            || itemVal > 0.01f || fluidVal > 0.01f || chemVal > 0.01f);
+                    if (hasTargetedIo) {
+                        continue;
+                    }
 
                     if (itemVal > 0.01f || fluidVal > 0.01f || (chemVal > 0.01f && isMekanismInstalled)) {
                         StringBuilder sideText = new StringBuilder();

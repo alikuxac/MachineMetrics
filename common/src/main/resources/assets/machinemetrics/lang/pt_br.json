@@ -75,5 +75,9 @@
   "machinemetrics.ae2.state.creative": "CREATIVE",
   "machinemetrics.hud.storage.capacity": "Armazenamento",
   "machinemetrics.hud.storage.full_in": "Cheio em: %s",
-  "machinemetrics.hud.storage.empty_in": "Vazio em: %s"
+  "machinemetrics.hud.storage.empty_in": "Vazio em: %s",
+  "machinemetrics.io.input": "ENTRADA",
+  "machinemetrics.io.output": "SAÍDA",
+  "machinemetrics.io.bidirectional": "E/S",
+  "machinemetrics.config.show_targeted_face_io": "Mostrar E/S da face apontada"
 }

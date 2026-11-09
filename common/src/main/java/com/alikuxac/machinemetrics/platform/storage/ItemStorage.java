@@ -8,4 +8,12 @@ public interface ItemStorage {
     ItemStack getStackInSlot(int slot);
 
     int getSlotLimit(int slot);
+
+    default boolean canInsert() {
+        return false;
+    }
+
+    default boolean canExtract() {
+        return false;
+    }
 }

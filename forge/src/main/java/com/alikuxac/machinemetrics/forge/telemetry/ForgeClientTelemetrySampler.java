@@ -15,6 +15,7 @@ import com.alikuxac.machinemetrics.platform.storage.ItemStorage;
 import com.alikuxac.machinemetrics.platform.storage.StorageAccess;
 import com.alikuxac.machinemetrics.storage.BlockCapacityReader;
 import com.alikuxac.machinemetrics.storage.BlockCapacityReader.StorageCapacity;
+import com.alikuxac.machinemetrics.telemetry.DirectionalCapabilityScanner;
 import com.alikuxac.machinemetrics.telemetry.TelemetryData;
 import it.unimi.dsi.fastutil.ints.IntArrayList;
 import net.minecraft.client.Minecraft;
@@ -384,7 +385,19 @@ public class ForgeClientTelemetrySampler {
                     for (int i = 0; i < 18; i++) {
                         float p = i < prevSideMetrics.length ? prevSideMetrics[i] : 0.0f;
                         float c = i < currSideMetrics.length ? currSideMetrics[i] : 0.0f;
-                        sideRates[i] = Math.abs(c - p) / timeDiffSec;
+                        float rate = Math.abs(c - p) / timeDiffSec;
+                        if (rate > 0.001f && !isTransporter) {
+                            Direction side = Direction.values()[i % 6];
+                            boolean hasTarget = (i < 6)
+                                    ? StorageAccess.hasAdjacentItemTarget(level, pos, side)
+                                    : (i < 12
+                                            ? StorageAccess.hasAdjacentFluidTarget(level, pos, side)
+                                            : MekanismChemicalInspector.hasAdjacentChemicalTarget(level, pos, side));
+                            if (!hasTarget) {
+                                rate = 0.0f;
+                            }
+                        }
+                        sideRates[i] = rate;
                     }
                 }
             }
@@ -588,6 +601,17 @@ public class ForgeClientTelemetrySampler {
             logisticsFlags |= TelemetryData.FLAG_LOGISTICS_IS_DRAINING;
         }
 
+        DirectionalCapabilityScanner.TargetedResult targetedDiag = (hitFace != null)
+                ? DirectionalCapabilityScanner.scan(
+                        level, pos, hitFace, be,
+                        sideRates[hitFace.ordinal()],
+                        sideRates[6 + hitFace.ordinal()],
+                        0f,
+                        currentItems, maxItems,
+                        currentFluid, maxFluid,
+                        currentEnergy, maxEnergy)
+                : DirectionalCapabilityScanner.TargetedResult.NONE;
+
         return new TelemetryData(
                 itemThroughput, hasItems,
                 fluidThroughput, hasFluids, fluidName, currentFluid, maxFluid,
@@ -597,7 +621,8 @@ public class ForgeClientTelemetrySampler {
                 state, allSlotCounts, allTankAmounts, sideRates,
                 (short) 0,
                 hasAe2Network, aePowerRate, aePowerDrain, aeSubnetDrain, aeSubnetCount, aeStoredPower, aeMaxPower, aeStabilityState, aeIsCreative, aeUsedChannels, aeMaxChannels,
-                storageCurrent, storageMax, primaryNetRate, logisticsFlags
+                storageCurrent, storageMax, primaryNetRate, logisticsFlags,
+                targetedDiag.face(), targetedDiag.io(), targetedDiag.state(), targetedDiag.throughput()
         );
     }
 

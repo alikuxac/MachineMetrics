@@ -17,7 +17,7 @@ import java.util.concurrent.ConcurrentHashMap;
 
 public class NetworkHandler {
 
-    private record SentKey(UUID playerId, BlockPos pos) {}
+    private record SentKey(UUID playerId, BlockPos pos, Direction hitFace) {}
     private record SentEntry(TelemetryData data, long timestampMs) {}
     private record RateWindow(long windowStartMs, int count) {}
 
@@ -144,7 +144,7 @@ public class NetworkHandler {
                     disabledMask |= TelemetryData.MASK_SIDES;
                 }
 
-                SentKey key = new SentKey(serverPlayer.getUUID(), targetPos);
+                SentKey key = new SentKey(serverPlayer.getUUID(), targetPos, hitFace);
                 SentEntry lastSent = LAST_SENT_TO_CLIENT.get(key);
                 if (lastSent == null || data.hasSignificantDelta(lastSent.data) || (now - lastSent.timestampMs() >= 1500L)) {
                     LAST_SENT_TO_CLIENT.put(key, new SentEntry(data, now));

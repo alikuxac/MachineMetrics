@@ -75,5 +75,9 @@
   "machinemetrics.ae2.state.creative": "CREATIVE",
   "machinemetrics.hud.storage.capacity": "存储容量",
   "machinemetrics.hud.storage.full_in": "充满剩余: %s",
-  "machinemetrics.hud.storage.empty_in": "排空剩余: %s"
+  "machinemetrics.hud.storage.empty_in": "排空剩余: %s",
+  "machinemetrics.io.input": "输入",
+  "machinemetrics.io.output": "输出",
+  "machinemetrics.io.bidirectional": "双向",
+  "machinemetrics.config.show_targeted_face_io": "显示准心指向面的输入/输出诊断"
 }
