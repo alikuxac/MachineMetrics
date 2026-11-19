@@ -79,5 +79,17 @@
   "machinemetrics.io.input": "ENTRADA",
   "machinemetrics.io.output": "SALIDA",
   "machinemetrics.io.bidirectional": "E/S",
-  "machinemetrics.config.show_targeted_face_io": "Mostrar E/S de la cara apuntada"
+  "machinemetrics.config.show_targeted_face_io": "Mostrar E/S de la cara apuntada",
+  "machinemetrics.metrics.redstone": "Redstone",
+  "machinemetrics.metrics.redstone.power": "Potencia de señal",
+  "machinemetrics.metrics.redstone.delay": "Retardo",
+  "machinemetrics.metrics.redstone.locked": "Circuito bloqueado",
+  "machinemetrics.metrics.redstone.mode": "Modo",
+  "machinemetrics.metrics.redstone.output": "Salida de señal",
+  "machinemetrics.metrics.redstone.expected": "Salida esperada",
+  "machinemetrics.metrics.crafter.status": "Estado del fabricador",
+  "machinemetrics.metrics.crafter.slots": "Ranuras de fabricación",
+  "machinemetrics.metrics.copper_bulb.state": "Estado de la lámpara",
+  "machinemetrics.metrics.copper_bulb.input": "Entrada de redstone",
+  "machinemetrics.metrics.copper_bulb.t_flip_flop": "Circuito biestable T"
 }

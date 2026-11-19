@@ -79,5 +79,17 @@
   "machinemetrics.io.input": "INPUT",
   "machinemetrics.io.output": "OUTPUT",
   "machinemetrics.io.bidirectional": "I/O",
-  "machinemetrics.config.show_targeted_face_io": "Show Targeted Face I/O"
+  "machinemetrics.config.show_targeted_face_io": "Show Targeted Face I/O",
+  "machinemetrics.metrics.redstone": "Redstone",
+  "machinemetrics.metrics.redstone.power": "Signal Power",
+  "machinemetrics.metrics.redstone.delay": "Delay",
+  "machinemetrics.metrics.redstone.locked": "Circuit Locked",
+  "machinemetrics.metrics.redstone.mode": "Mode",
+  "machinemetrics.metrics.redstone.output": "Signal Output",
+  "machinemetrics.metrics.redstone.expected": "Expected Output",
+  "machinemetrics.metrics.crafter.status": "Crafter State",
+  "machinemetrics.metrics.crafter.slots": "Crafting Slots",
+  "machinemetrics.metrics.copper_bulb.state": "Bulb State",
+  "machinemetrics.metrics.copper_bulb.input": "Redstone Input",
+  "machinemetrics.metrics.copper_bulb.t_flip_flop": "T-Flip-Flop Circuit"
 }

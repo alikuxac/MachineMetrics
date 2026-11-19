@@ -143,6 +143,9 @@ public class NetworkHandler {
                 if (ServerConfig.ALLOW_SIDE_METRICS != null && !ServerConfig.ALLOW_SIDE_METRICS.get()) {
                     disabledMask |= TelemetryData.MASK_SIDES;
                 }
+                if (ServerConfig.ALLOW_REDSTONE != null && !ServerConfig.ALLOW_REDSTONE.get()) {
+                    disabledMask |= TelemetryData.MASK_REDSTONE;
+                }
 
                 SentKey key = new SentKey(serverPlayer.getUUID(), targetPos, hitFace);
                 SentEntry lastSent = LAST_SENT_TO_CLIENT.get(key);

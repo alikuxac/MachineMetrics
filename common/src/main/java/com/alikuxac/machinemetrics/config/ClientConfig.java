@@ -51,6 +51,7 @@ public class ClientConfig {
     public static final Config.Value<Boolean> SHOW_STORAGE_CAPACITY;
     public static final Config.Value<Boolean> SHOW_TIME_TO_FULL;
     public static final Config.Value<Boolean> SHOW_TARGETED_FACE_IO;
+    public static final Config.Value<Boolean> SHOW_REDSTONE;
 
     // Compact Formatting & Thresholds
     public static final Config.Value<Boolean> COMPACT_MODE;
@@ -87,6 +88,9 @@ public class ClientConfig {
     public static final Config.Value<String> COLOR_IO_INPUT;
     public static final Config.Value<String> COLOR_IO_OUTPUT;
     public static final Config.Value<String> COLOR_IO_BIDIRECTIONAL;
+    public static final Config.Value<String> COLOR_REDSTONE_ACTIVE;
+    public static final Config.Value<String> COLOR_REDSTONE_IDLE;
+    public static final Config.Value<String> COLOR_REDSTONE_LOCKED;
 
     // Inspection Gate & Zoom
     public static final Config.Value<Boolean> REQUIRE_INSPECTION_ITEM;
@@ -222,6 +226,10 @@ public class ClientConfig {
                 .comment("Show targeted face directional I/O and bottleneck diagnostics")
                 .define("show_targeted_face_io", true);
 
+        SHOW_REDSTONE = builder
+                .comment("Show Redstone signal levels, repeater delay, comparator output, crafter and bulb state")
+                .define("show_redstone", true);
+
         builder.pop();
 
         builder.comment("Compact Template & Thresholds").push("formatting");
@@ -353,6 +361,18 @@ public class ClientConfig {
         COLOR_IO_BIDIRECTIONAL = builder
                 .comment("Targeted face [BIDIRECTIONAL] badge color")
                 .define("color_io_bidirectional", "#CE93D8");
+
+        COLOR_REDSTONE_ACTIVE = builder
+                .comment("Active redstone signal color")
+                .define("color_redstone_active", "#FF2222");
+
+        COLOR_REDSTONE_IDLE = builder
+                .comment("Idle/unpowered redstone signal color")
+                .define("color_redstone_idle", "#882222");
+
+        COLOR_REDSTONE_LOCKED = builder
+                .comment("Locked repeater/circuit indicator color")
+                .define("color_redstone_locked", "#FFAA00");
 
         builder.pop();
 

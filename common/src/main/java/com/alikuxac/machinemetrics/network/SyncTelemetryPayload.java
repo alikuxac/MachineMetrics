@@ -2,6 +2,7 @@ package com.alikuxac.machinemetrics.network;
 
 import com.alikuxac.machinemetrics.compat.create.CreateKineticInspector;
 import com.alikuxac.machinemetrics.telemetry.DirectionalIo;
+import com.alikuxac.machinemetrics.telemetry.RedstoneData;
 import com.alikuxac.machinemetrics.telemetry.TelemetryData;
 import it.unimi.dsi.fastutil.ints.IntArrayList;
 import net.minecraft.core.BlockPos;
@@ -54,7 +55,8 @@ public record SyncTelemetryPayload(
         byte targetedFace,
         byte targetedIoDirection,
         byte targetedState,
-        float targetedThroughput
+        float targetedThroughput,
+        RedstoneData redstoneData
 ) implements CustomPacketPayload {
     public static final Type<SyncTelemetryPayload> TYPE = new Type<>(ResourceLocation.fromNamespaceAndPath("machinemetrics", "sync_telemetry"));
 
@@ -113,7 +115,8 @@ public record SyncTelemetryPayload(
                 faceByte,
                 ioByte,
                 stateByte,
-                data.targetedThroughput()
+                data.targetedThroughput(),
+                data.redstoneData()
         );
     }
 
@@ -169,7 +172,8 @@ public record SyncTelemetryPayload(
                 face,
                 io,
                 tState,
-                targetedThroughput
+                targetedThroughput,
+                redstoneData
         );
     }
 
@@ -185,11 +189,13 @@ public record SyncTelemetryPayload(
     public static final int PRESENT_DISABLED  = 1 << 7;
     public static final int PRESENT_STORAGE        = 1 << 8;
     public static final int PRESENT_TARGETED_FACE  = 1 << 9;
+    public static final int PRESENT_REDSTONE       = 1 << 10;
 
     public static final int MAX_NAME_LENGTH = 64;
 
     private static final int KNOWN_FLAGS = PRESENT_ITEMS | PRESENT_FLUIDS | PRESENT_ENERGY | PRESENT_KINETIC
-            | PRESENT_CHEMICALS | PRESENT_AE2 | PRESENT_SIDES | PRESENT_DISABLED | PRESENT_STORAGE | PRESENT_TARGETED_FACE;
+            | PRESENT_CHEMICALS | PRESENT_AE2 | PRESENT_SIDES | PRESENT_DISABLED | PRESENT_STORAGE | PRESENT_TARGETED_FACE
+            | PRESENT_REDSTONE;
 
     private static boolean hasActiveSides(float[] sides) {
         if (sides == null) return false;
@@ -230,6 +236,9 @@ public record SyncTelemetryPayload(
         }
         if (payload.targetedFace >= 0 || payload.targetedIoDirection != 0 || payload.targetedThroughput > 0.001f) {
             flags |= PRESENT_TARGETED_FACE;
+        }
+        if (payload.redstoneData != null) {
+            flags |= PRESENT_REDSTONE;
         }
 
         buf.writeBlockPos(payload.targetPos);
@@ -313,6 +322,10 @@ public record SyncTelemetryPayload(
             buf.writeByte(payload.targetedIoDirection);
             buf.writeByte(payload.targetedState);
             buf.writeFloat(payload.targetedThroughput);
+        }
+
+        if ((flags & PRESENT_REDSTONE) != 0 && payload.redstoneData != null) {
+            encodeRedstone(buf, payload.redstoneData);
         }
     }
 
@@ -432,6 +445,11 @@ public record SyncTelemetryPayload(
             targetedThroughput = buf.readFloat();
         }
 
+        RedstoneData redstoneData = null;
+        if ((flags & PRESENT_REDSTONE) != 0) {
+            redstoneData = decodeRedstone(buf);
+        }
+
         return new SyncTelemetryPayload(
                 targetPos,
                 itemThroughput,
@@ -475,8 +493,88 @@ public record SyncTelemetryPayload(
                 targetedFace,
                 targetedIoDirection,
                 targetedState,
-                targetedThroughput
+                targetedThroughput,
+                redstoneData
         );
+    }
+
+    private static void encodeRedstone(FriendlyByteBuf buf, RedstoneData rs) {
+        buf.writeByte(rs.type().ordinal());
+        switch (rs.type()) {
+            case WIRE -> {
+                buf.writeByte(rs.power() & 0x0F);
+            }
+            case REPEATER -> {
+                int packed = ((rs.delay() & 0x07) << 2) | (rs.locked() ? 2 : 0) | (rs.powered() ? 1 : 0);
+                buf.writeByte(packed);
+            }
+            case COMPARATOR -> {
+                int flags = ((rs.comparatorMode() & 0x03) << 2) | (rs.powered() ? 1 : 0);
+                buf.writeByte(flags);
+                int signals = ((rs.power() & 0x0F) << 4) | (rs.expectedOutput() & 0x0F);
+                buf.writeByte(signals);
+                int sources = ((rs.signalSource() & 0x0F) << 4) | (rs.maxSideSignal() & 0x0F);
+                buf.writeByte(sources);
+            }
+            case CRAFTER -> {
+                buf.writeShort(rs.disabledSlotsMask() & 0x01FF);
+                buf.writeShort(rs.occupiedSlotsMask() & 0x01FF);
+                int flags = (rs.crafting() ? 2 : 0) | (rs.powered() ? 1 : 0);
+                buf.writeByte(flags);
+                buf.writeByte(rs.power() & 0x0F);
+            }
+            case COPPER_BULB -> {
+                int flags = (rs.lit() ? 2 : 0) | (rs.powered() ? 1 : 0);
+                buf.writeByte(flags);
+            }
+        }
+    }
+
+    private static RedstoneData decodeRedstone(FriendlyByteBuf buf) {
+        byte typeOrd = buf.readByte();
+        RedstoneData.RedstoneType[] types = RedstoneData.RedstoneType.values();
+        RedstoneData.RedstoneType type = (typeOrd >= 0 && typeOrd < types.length) ? types[typeOrd] : RedstoneData.RedstoneType.WIRE;
+        switch (type) {
+            case WIRE -> {
+                int power = buf.readByte() & 0x0F;
+                return new RedstoneData(type, power, 0, false, power > 0, false, false, RedstoneData.MODE_NONE, 0, 0, 0, 0, 0);
+            }
+            case REPEATER -> {
+                int packed = buf.readByte() & 0xFF;
+                int delay = (packed >> 2) & 0x07;
+                boolean locked = (packed & 2) != 0;
+                boolean powered = (packed & 1) != 0;
+                return new RedstoneData(type, powered ? 15 : 0, delay, locked, powered, false, false, RedstoneData.MODE_NONE, 0, 0, 0, 0, 0);
+            }
+            case COMPARATOR -> {
+                int flags = buf.readByte() & 0xFF;
+                byte mode = (byte) ((flags >> 2) & 0x03);
+                boolean powered = (flags & 1) != 0;
+                int signals = buf.readByte() & 0xFF;
+                int power = (signals >> 4) & 0x0F;
+                int expected = signals & 0x0F;
+                int sources = buf.readByte() & 0xFF;
+                int source = (sources >> 4) & 0x0F;
+                int side = sources & 0x0F;
+                return new RedstoneData(type, power, 0, false, powered, false, false, mode, expected, source, side, 0, 0);
+            }
+            case CRAFTER -> {
+                int disabled = buf.readShort() & 0x01FF;
+                int occupied = buf.readShort() & 0x01FF;
+                int flags = buf.readByte() & 0xFF;
+                boolean crafting = (flags & 2) != 0;
+                boolean powered = (flags & 1) != 0;
+                int signal = buf.readByte() & 0x0F;
+                return new RedstoneData(type, signal, 0, false, powered, false, crafting, RedstoneData.MODE_NONE, 0, 0, 0, disabled, occupied);
+            }
+            case COPPER_BULB -> {
+                int flags = buf.readByte() & 0xFF;
+                boolean lit = (flags & 2) != 0;
+                boolean powered = (flags & 1) != 0;
+                return new RedstoneData(type, lit ? 15 : 0, 0, false, powered, lit, false, RedstoneData.MODE_NONE, 0, 0, 0, 0, 0);
+            }
+        }
+        return null;
     }
 
     @Override

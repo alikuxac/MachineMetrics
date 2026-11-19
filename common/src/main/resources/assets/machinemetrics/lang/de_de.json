@@ -79,5 +79,17 @@
   "machinemetrics.io.input": "EINGANG",
   "machinemetrics.io.output": "AUSGANG",
   "machinemetrics.io.bidirectional": "I/O",
-  "machinemetrics.config.show_targeted_face_io": "Zielgerichtetes Seiten-I/O anzeigen"
+  "machinemetrics.config.show_targeted_face_io": "Zielgerichtetes Seiten-I/O anzeigen",
+  "machinemetrics.metrics.redstone": "Redstone",
+  "machinemetrics.metrics.redstone.power": "Signalstärke",
+  "machinemetrics.metrics.redstone.delay": "Verzögerung",
+  "machinemetrics.metrics.redstone.locked": "Schaltung gesperrt",
+  "machinemetrics.metrics.redstone.mode": "Modus",
+  "machinemetrics.metrics.redstone.output": "Signalausgang",
+  "machinemetrics.metrics.redstone.expected": "Erwarteter Ausgang",
+  "machinemetrics.metrics.crafter.status": "Werkbank-Status",
+  "machinemetrics.metrics.crafter.slots": "Herstellungsplätze",
+  "machinemetrics.metrics.copper_bulb.state": "Kupferlampen-Status",
+  "machinemetrics.metrics.copper_bulb.input": "Redstone-Eingang",
+  "machinemetrics.metrics.copper_bulb.t_flip_flop": "T-Flipflop-Schaltung"
 }

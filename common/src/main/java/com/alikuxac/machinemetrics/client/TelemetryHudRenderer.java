@@ -8,6 +8,7 @@ import com.alikuxac.machinemetrics.compat.mekanism.MekanismChemicalInspector;
 import com.alikuxac.machinemetrics.config.ClientConfig;
 import com.alikuxac.machinemetrics.network.RequestTelemetryPayload;
 import com.alikuxac.machinemetrics.platform.Services.ClientSampler;
+import com.alikuxac.machinemetrics.telemetry.RedstoneData;
 import com.alikuxac.machinemetrics.telemetry.TelemetryData;
 import net.minecraft.ChatFormatting;
 import net.minecraft.client.Minecraft;
@@ -71,6 +72,7 @@ public class TelemetryHudRenderer {
                 ClientConfig.COLOR_CHEMICALS != null ? ClientConfig.COLOR_CHEMICALS.get() : "",
                 ClientConfig.COLOR_KINETIC != null ? ClientConfig.COLOR_KINETIC.get() : "",
                 ClientConfig.SHOW_TARGETED_FACE_IO != null && ClientConfig.SHOW_TARGETED_FACE_IO.get(),
+                ClientConfig.SHOW_REDSTONE != null && ClientConfig.SHOW_REDSTONE.get(),
                 ClientConfig.REQUIRE_INSPECTION_ITEM != null && ClientConfig.REQUIRE_INSPECTION_ITEM.get()
         );
     }
@@ -99,7 +101,8 @@ public class TelemetryHudRenderer {
                 data.targetedFace(),
                 data.targetedIo(),
                 data.targetedState(),
-                data.targetedThroughput()
+                data.targetedThroughput(),
+                data.redstoneData()
         );
     }
 
@@ -378,7 +381,20 @@ public class TelemetryHudRenderer {
             Component stateComp = null;
 
             if (showBadge) {
-                if (data.hasAe2Network() && !data.isAe2DisabledByServer()) {
+                if (data.hasRedstone() && !data.isRedstoneDisabledByServer()) {
+                    RedstoneData rs = data.redstoneData();
+                    stateComp = switch (rs.type()) {
+                        case WIRE -> Component.literal("PWR: " + rs.power()).withStyle(rs.power() > 0 ? ChatFormatting.RED : ChatFormatting.DARK_RED, ChatFormatting.BOLD);
+                        case REPEATER -> rs.locked()
+                                ? Component.literal("🔒 LOCKED").withStyle(ChatFormatting.GOLD, ChatFormatting.BOLD)
+                                : Component.literal(rs.delay() + "T " + (rs.powered() ? "ON" : "OFF")).withStyle(rs.powered() ? ChatFormatting.RED : ChatFormatting.GRAY, ChatFormatting.BOLD);
+                        case COMPARATOR -> Component.literal(rs.comparatorMode() == RedstoneData.MODE_SUBTRACT ? "SUBTRACT" : "COMPARE").withStyle(ChatFormatting.GOLD, ChatFormatting.BOLD);
+                        case CRAFTER -> rs.crafting()
+                                ? Component.literal("CRAFTING").withStyle(ChatFormatting.GREEN, ChatFormatting.BOLD)
+                                : (rs.powered() ? Component.literal("TRIGGERED").withStyle(ChatFormatting.YELLOW, ChatFormatting.BOLD) : Component.literal("IDLE").withStyle(ChatFormatting.GRAY));
+                        case COPPER_BULB -> Component.literal(rs.lit() ? "💡 LIT" : "UNLIT").withStyle(rs.lit() ? ChatFormatting.YELLOW : ChatFormatting.GRAY, ChatFormatting.BOLD);
+                    };
+                } else if (data.hasAe2Network() && !data.isAe2DisabledByServer()) {
                     AE2StabilityState stab = AE2StabilityState.fromOrdinal(data.aeStabilityState());
                     stateComp = switch (stab) {
                         case BROWNOUT -> Component.translatable("machinemetrics.ae2.state.brownout").withStyle(ChatFormatting.RED, ChatFormatting.BOLD);
@@ -748,6 +764,84 @@ public class TelemetryHudRenderer {
                             : Component.translatable("machinemetrics.hud.storage.empty_in", eta.formatted());
                     int etaColor = MetricResolver.getEtaColor(eta.seconds());
                     lines.add(new HudLine(etaComp, etaColor));
+                }
+            }
+        }
+
+        boolean showRedstone = ClientConfig.SHOW_REDSTONE == null || ClientConfig.SHOW_REDSTONE.get();
+        if (showRedstone && data.hasRedstone()) {
+            if (data.isRedstoneDisabledByServer()) {
+                Component rsComp = Component.translatable("machinemetrics.metrics.redstone")
+                        .append(Component.literal(": [")).append(disabledServerComp).append(Component.literal("]"));
+                lines.add(new HudLine(rsComp, disabledColor));
+            } else {
+                int activeColor = ClientConfig.parseHexColor(ClientConfig.COLOR_REDSTONE_ACTIVE, 0xFF2222);
+                int idleColor = ClientConfig.parseHexColor(ClientConfig.COLOR_REDSTONE_IDLE, 0x882222);
+                int lockedColor = ClientConfig.parseHexColor(ClientConfig.COLOR_REDSTONE_LOCKED, 0xFFAA00);
+                RedstoneData rs = data.redstoneData();
+
+                switch (rs.type()) {
+                    case WIRE -> {
+                        Component powerComp = Component.translatable("machinemetrics.metrics.redstone.power")
+                                .append(Component.literal(String.format(": %d / 15", rs.power())));
+                        lines.add(new HudLine(powerComp, rs.power() > 0 ? activeColor : idleColor));
+                    }
+                    case REPEATER -> {
+                        Component delayComp = Component.translatable("machinemetrics.metrics.redstone.delay")
+                                .append(Component.literal(String.format(": %d ticks (%d gt)", rs.delay(), rs.delay() * 2)));
+                        lines.add(new HudLine(delayComp, rs.powered() ? activeColor : idleColor));
+
+                        if (rs.locked()) {
+                            Component lockedComp = Component.literal("🔒 ")
+                                    .append(Component.translatable("machinemetrics.metrics.redstone.locked"));
+                            lines.add(new HudLine(lockedComp, lockedColor));
+                        }
+                    }
+                    case COMPARATOR -> {
+                        String modeStr = rs.comparatorMode() == RedstoneData.MODE_SUBTRACT ? "SUBTRACT" : "COMPARE";
+                        Component modeComp = Component.translatable("machinemetrics.metrics.redstone.mode")
+                                .append(Component.literal(": " + modeStr));
+                        lines.add(new HudLine(modeComp, activeColor));
+
+                        Component outComp = Component.translatable("machinemetrics.metrics.redstone.output")
+                                .append(Component.literal(String.format(": %d / 15", rs.power())));
+                        lines.add(new HudLine(outComp, rs.power() > 0 ? activeColor : idleColor));
+
+                        Component expComp = Component.translatable("machinemetrics.metrics.redstone.expected")
+                                .append(Component.literal(String.format(": %d / 15 (Source: %d, Side: %d)", rs.expectedOutput(), rs.signalSource(), rs.maxSideSignal())));
+                        lines.add(new HudLine(expComp, 0x4FC3F7));
+                    }
+                    case CRAFTER -> {
+                        String statusStr = rs.crafting() ? "Crafting" : (rs.powered() ? "Triggered" : "Idle");
+                        Component stateLine = Component.translatable("machinemetrics.metrics.crafter.status")
+                                .append(Component.literal(": " + statusStr));
+                        lines.add(new HudLine(stateLine, rs.crafting() ? 0x55FF55 : (rs.powered() ? 0xFFFF55 : 0xAAAAAA)));
+
+                        int disabled = rs.countDisabledSlots();
+                        int occupied = rs.countOccupiedSlots();
+                        int activeSlots = 9 - disabled;
+
+                        Component slotLine = Component.translatable("machinemetrics.metrics.crafter.slots")
+                                .append(Component.literal(String.format(": %d / %d active filled (%d disabled)", occupied, activeSlots, disabled)));
+                        lines.add(new HudLine(slotLine, disabled > 0 ? 0xFFA726 : 0x4FC3F7));
+
+                        Component signalLine = Component.translatable("machinemetrics.metrics.redstone.output")
+                                .append(Component.literal(String.format(": %d / 9", rs.power())));
+                        lines.add(new HudLine(signalLine, rs.power() > 0 ? activeColor : idleColor));
+                    }
+                    case COPPER_BULB -> {
+                        Component stateLine = Component.translatable("machinemetrics.metrics.copper_bulb.state")
+                                .append(Component.literal(rs.lit() ? ": LIT (ON)" : ": UNLIT (OFF)"));
+                        lines.add(new HudLine(stateLine, rs.lit() ? 0xFFFF55 : 0x888888));
+
+                        Component inputLine = Component.translatable("machinemetrics.metrics.copper_bulb.input")
+                                .append(Component.literal(rs.powered() ? ": POWERED (ACTIVE)" : ": UNPOWERED (IDLE)"));
+                        lines.add(new HudLine(inputLine, rs.powered() ? activeColor : idleColor));
+
+                        Component modeLine = Component.literal("🔄 ")
+                                .append(Component.translatable("machinemetrics.metrics.copper_bulb.t_flip_flop"));
+                        lines.add(new HudLine(modeLine, 0xCE93D8));
+                    }
                 }
             }
         }

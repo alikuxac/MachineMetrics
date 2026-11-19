@@ -7,10 +7,12 @@ import com.alikuxac.machinemetrics.compat.mekanism.MekanismChemicalInspector;
 import com.alikuxac.machinemetrics.compat.mekanism.MekanismTransporterInspector;
 import com.alikuxac.machinemetrics.compat.storage.DrawerStorageAdapter;
 import com.alikuxac.machinemetrics.compat.storage.SophisticatedStorageAdapter;
+import com.alikuxac.machinemetrics.compat.vanilla.VanillaRedstoneInspector;
 import com.alikuxac.machinemetrics.config.ServerConfig;
 import com.alikuxac.machinemetrics.storage.BlockCapacityReader;
 import com.alikuxac.machinemetrics.storage.BlockCapacityReader.StorageCapacity;
 import com.alikuxac.machinemetrics.telemetry.DirectionalCapabilityScanner;
+import com.alikuxac.machinemetrics.telemetry.RedstoneData;
 import com.alikuxac.machinemetrics.telemetry.TelemetryData;
 import com.alikuxac.machinemetrics.platform.storage.ItemStorage;
 import com.alikuxac.machinemetrics.platform.storage.FluidStorage;
@@ -21,6 +23,7 @@ import net.minecraft.core.Direction;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.entity.BlockEntity;
+import net.minecraft.world.level.block.state.BlockState;
 import net.neoforged.neoforge.capabilities.Capabilities;
 import net.neoforged.neoforge.energy.IEnergyStorage;
 import net.neoforged.neoforge.fluids.capability.IFluidHandler;
@@ -118,11 +121,21 @@ public class ServerTelemetrySampler {
             }
         }
 
+        BlockState blockState = level.getBlockState(pos);
+        boolean allowRedstone = ServerConfig.ALLOW_REDSTONE == null || ServerConfig.ALLOW_REDSTONE.get();
+        boolean isRedstone = allowRedstone && VanillaRedstoneInspector.isRedstoneBlock(blockState);
+
         BlockEntity be = level.getBlockEntity(pos);
         if (be == null) {
+            if (isRedstone) {
+                RedstoneData rsData = VanillaRedstoneInspector.sample(level, pos, blockState, null);
+                return TelemetryData.ofRedstone(rsData);
+            }
             markInert(level, pos, now);
             return TelemetryData.empty();
         }
+
+        RedstoneData rsData = isRedstone ? VanillaRedstoneInspector.sample(level, pos, blockState, be) : null;
 
         boolean allowAe2 = ServerConfig.ALLOW_AE2 == null || ServerConfig.ALLOW_AE2.get();
         boolean isAe2Block = CompatRegistry.isAe2Block(level, pos);
@@ -721,7 +734,8 @@ public class ServerTelemetrySampler {
                 disabledMask,
                 hasAe2Network, aePowerRate, aePowerDrain, aeSubnetDrain, aeSubnetCount, aeStoredPower, aeMaxPower, aeStabilityState, aeIsCreative, aeUsedChannels, aeMaxChannels,
                 storageCurrent, storageMax, primaryNetRate, logisticsFlags,
-                targetedDiag.face(), targetedDiag.io(), targetedDiag.state(), targetedDiag.throughput()
+                targetedDiag.face(), targetedDiag.io(), targetedDiag.state(), targetedDiag.throughput(),
+                rsData
         );
     }
 

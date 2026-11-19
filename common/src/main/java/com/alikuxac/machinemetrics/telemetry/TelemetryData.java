@@ -49,7 +49,8 @@ public record TelemetryData(
         Direction targetedFace,
         DirectionalIo targetedIo,
         BottleneckState targetedState,
-        float targetedThroughput
+        float targetedThroughput,
+        RedstoneData redstoneData
 ) {
     public enum BottleneckState {
         OPTIMAL,
@@ -66,6 +67,7 @@ public record TelemetryData(
     public static final short MASK_CHEMICALS = 1 << 4;
     public static final short MASK_SIDES = 1 << 5;
     public static final short MASK_AE2 = 1 << 6;
+    public static final short MASK_REDSTONE = 1 << 7;
 
     public static final byte FLAG_LOGISTICS_HAS_STORAGE = 1 << 0;
     public static final byte FLAG_LOGISTICS_IS_INFINITE  = 1 << 1;
@@ -228,7 +230,70 @@ public record TelemetryData(
                 serverDisabledMask,
                 hasAe2Network, aePowerRate, aePowerDrain, aeSubnetDrain, aeSubnetCount, aeStoredPower, aeMaxPower, aeStabilityState, aeIsCreative, aeUsedChannels, aeMaxChannels,
                 storageCurrent, storageMax, netRate, logisticsFlags,
-                null, DirectionalIo.NONE, BottleneckState.IDLE, 0.0f
+                null, DirectionalIo.NONE, BottleneckState.IDLE, 0.0f,
+                null
+        );
+    }
+
+    public TelemetryData(
+            float itemThroughput,
+            boolean hasItems,
+            float fluidThroughput,
+            boolean hasFluids,
+            String fluidName,
+            long fluidAmount,
+            long fluidCapacity,
+            float energyDelta,
+            boolean hasEnergy,
+            float chemicalThroughput,
+            boolean hasChemicals,
+            String chemicalName,
+            long chemicalAmount,
+            long chemicalCapacity,
+            float kineticSpeed,
+            float kineticStress,
+            float kineticCapacity,
+            float kineticBlockStress,
+            boolean hasKinetic,
+            RotationDirection kineticDirection,
+            BottleneckState bottleneckState,
+            IntArrayList allSlotCounts,
+            IntArrayList allTankAmounts,
+            float[] sideMetrics,
+            short serverDisabledMask,
+            boolean hasAe2Network,
+            float aePowerRate,
+            float aePowerDrain,
+            float aeSubnetDrain,
+            int aeSubnetCount,
+            double aeStoredPower,
+            double aeMaxPower,
+            byte aeStabilityState,
+            boolean aeIsCreative,
+            int aeUsedChannels,
+            int aeMaxChannels,
+            long storageCurrent,
+            long storageMax,
+            float netRate,
+            byte logisticsFlags,
+            Direction targetedFace,
+            DirectionalIo targetedIo,
+            BottleneckState targetedState,
+            float targetedThroughput
+    ) {
+        this(
+                itemThroughput, hasItems,
+                fluidThroughput, hasFluids, fluidName, fluidAmount, fluidCapacity,
+                energyDelta, hasEnergy,
+                chemicalThroughput, hasChemicals, chemicalName, chemicalAmount, chemicalCapacity,
+                kineticSpeed, kineticStress, kineticCapacity, kineticBlockStress, hasKinetic,
+                kineticDirection, bottleneckState,
+                allSlotCounts, allTankAmounts, sideMetrics,
+                serverDisabledMask,
+                hasAe2Network, aePowerRate, aePowerDrain, aeSubnetDrain, aeSubnetCount, aeStoredPower, aeMaxPower, aeStabilityState, aeIsCreative, aeUsedChannels, aeMaxChannels,
+                storageCurrent, storageMax, netRate, logisticsFlags,
+                targetedFace, targetedIo, targetedState, targetedThroughput,
+                null
         );
     }
 
@@ -245,15 +310,43 @@ public record TelemetryData(
             (short) 0,
             false, 0f, 0f, 0f, 0, 0.0, 0.0, (byte) 0, false, 0, 0,
             0L, 0L, 0.0f, (byte) 0,
-            null, DirectionalIo.NONE, BottleneckState.IDLE, 0.0f
+            null, DirectionalIo.NONE, BottleneckState.IDLE, 0.0f,
+            null
     );
+
+    public static TelemetryData ofRedstone(RedstoneData redstoneData) {
+        return new TelemetryData(
+                0.0f, false,
+                0.0f, false, "", 0L, 0L,
+                0.0f, false,
+                0.0f, false, "", 0L, 0L,
+                0.0f, 0.0f, 0.0f, 0.0f, false,
+                RotationDirection.STATIONARY,
+                BottleneckState.IDLE,
+                new IntArrayList(), new IntArrayList(),
+                new float[18],
+                (short) 0,
+                false, 0f, 0f, 0f, 0, 0.0, 0.0, (byte) 0, false, 0, 0,
+                0L, 0L, 0.0f, (byte) 0,
+                null, DirectionalIo.NONE, BottleneckState.IDLE, 0.0f,
+                redstoneData
+        );
+    }
 
     public static TelemetryData empty() {
         return EMPTY;
     }
 
     public boolean isEmpty() {
-        return !hasItems && !hasFluids && !hasEnergy && !hasChemicals && !hasKinetic && !hasAe2Network && !hasStorage() && serverDisabledMask == 0;
+        return !hasItems && !hasFluids && !hasEnergy && !hasChemicals && !hasKinetic && !hasAe2Network && !hasStorage() && !hasRedstone() && serverDisabledMask == 0;
+    }
+
+    public boolean hasRedstone() {
+        return redstoneData != null;
+    }
+
+    public boolean isRedstoneDisabledByServer() {
+        return (serverDisabledMask & MASK_REDSTONE) != 0;
     }
 
     public boolean isItemsDisabledByServer() {
@@ -358,6 +451,9 @@ public record TelemetryData(
         } else if (this.storageCurrent != other.storageCurrent) {
             return true;
         }
+
+        if ((this.redstoneData == null) != (other.redstoneData == null)) return true;
+        if (this.redstoneData != null && !this.redstoneData.equals(other.redstoneData)) return true;
 
         if (this.sideMetrics != null && other.sideMetrics != null) {
             int len = Math.min(this.sideMetrics.length, other.sideMetrics.length);

@@ -79,5 +79,17 @@
   "machinemetrics.io.input": "输入",
   "machinemetrics.io.output": "输出",
   "machinemetrics.io.bidirectional": "双向",
-  "machinemetrics.config.show_targeted_face_io": "显示准心指向面的输入/输出诊断"
+  "machinemetrics.config.show_targeted_face_io": "显示准心指向面的输入/输出诊断",
+  "machinemetrics.metrics.redstone": "红石",
+  "machinemetrics.metrics.redstone.power": "信号强度",
+  "machinemetrics.metrics.redstone.delay": "延迟",
+  "machinemetrics.metrics.redstone.locked": "电路已锁定",
+  "machinemetrics.metrics.redstone.mode": "模式",
+  "machinemetrics.metrics.redstone.output": "输出信号",
+  "machinemetrics.metrics.redstone.expected": "预期输出",
+  "machinemetrics.metrics.crafter.status": "合成器状态",
+  "machinemetrics.metrics.crafter.slots": "合成槽位",
+  "machinemetrics.metrics.copper_bulb.state": "铜灯状态",
+  "machinemetrics.metrics.copper_bulb.input": "红石输入",
+  "machinemetrics.metrics.copper_bulb.t_flip_flop": "T触发器电路"
 }

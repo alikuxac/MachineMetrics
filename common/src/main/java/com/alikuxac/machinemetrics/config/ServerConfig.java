@@ -14,6 +14,7 @@ public class ServerConfig {
     public static final Config.Value<Boolean> ALLOW_CHEMICALS;
     public static final Config.Value<Boolean> ALLOW_SIDE_METRICS;
     public static final Config.Value<Boolean> ALLOW_AE2;
+    public static final Config.Value<Boolean> ALLOW_REDSTONE;
 
     // Debug
     public static final Config.Value<Boolean> DEBUG_LOGGING;
@@ -56,6 +57,10 @@ public class ServerConfig {
         ALLOW_AE2 = builder
                 .comment("Allow sending Applied Energistics 2 grid power and stability metrics to clients")
                 .define("allow_ae2_telemetry", true);
+
+        ALLOW_REDSTONE = builder
+                .comment("Allow sending Redstone and vanilla automation metrics to clients")
+                .define("allow_redstone_telemetry", true);
 
         builder.pop();
 

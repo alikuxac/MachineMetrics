@@ -79,6 +79,18 @@
   "machinemetrics.io.input": "NHẬN",
   "machinemetrics.io.output": "XUẤT",
   "machinemetrics.io.bidirectional": "HAI CHIỀU",
-  "machinemetrics.config.show_targeted_face_io": "Hiển thị hướng I/O mặt đang nhắm"
+  "machinemetrics.config.show_targeted_face_io": "Hiển thị hướng I/O mặt đang nhắm",
+  "machinemetrics.metrics.redstone": "Đá đỏ",
+  "machinemetrics.metrics.redstone.power": "Cường độ tín hiệu",
+  "machinemetrics.metrics.redstone.delay": "Độ trễ",
+  "machinemetrics.metrics.redstone.locked": "Mạch bị khóa",
+  "machinemetrics.metrics.redstone.mode": "Chế độ",
+  "machinemetrics.metrics.redstone.output": "Tín hiệu ngõ ra",
+  "machinemetrics.metrics.redstone.expected": "Ngõ ra dự kiến",
+  "machinemetrics.metrics.crafter.status": "Trạng thái máy chế tạo",
+  "machinemetrics.metrics.crafter.slots": "Ô chế tạo",
+  "machinemetrics.metrics.copper_bulb.state": "Trạng thái bóng đèn",
+  "machinemetrics.metrics.copper_bulb.input": "Tín hiệu đá đỏ",
+  "machinemetrics.metrics.copper_bulb.t_flip_flop": "Mạch T-Flip-Flop"
 }
 

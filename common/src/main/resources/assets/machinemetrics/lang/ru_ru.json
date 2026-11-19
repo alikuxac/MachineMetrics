@@ -79,5 +79,17 @@
   "machinemetrics.io.input": "ВХОД",
   "machinemetrics.io.output": "ВЫХОД",
   "machinemetrics.io.bidirectional": "ВХОД/ВЫХОД",
-  "machinemetrics.config.show_targeted_face_io": "Показывать ввод/вывод выбранной стороны"
+  "machinemetrics.config.show_targeted_face_io": "Показывать ввод/вывод выбранной стороны",
+  "machinemetrics.metrics.redstone": "Редстоун",
+  "machinemetrics.metrics.redstone.power": "Сила сигнала",
+  "machinemetrics.metrics.redstone.delay": "Задержка",
+  "machinemetrics.metrics.redstone.locked": "Схема заблокирована",
+  "machinemetrics.metrics.redstone.mode": "Режим",
+  "machinemetrics.metrics.redstone.output": "Выходной сигнал",
+  "machinemetrics.metrics.redstone.expected": "Ожидаемый сигнал",
+  "machinemetrics.metrics.crafter.status": "Состояние сборщика",
+  "machinemetrics.metrics.crafter.slots": "Слоты сборки",
+  "machinemetrics.metrics.copper_bulb.state": "Состояние лампы",
+  "machinemetrics.metrics.copper_bulb.input": "Входной сигнал",
+  "machinemetrics.metrics.copper_bulb.t_flip_flop": "Т-триггерная схема"
 }
