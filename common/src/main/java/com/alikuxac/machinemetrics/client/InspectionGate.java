@@ -1,7 +1,9 @@
 package com.alikuxac.machinemetrics.client;
 
+import com.alikuxac.machinemetrics.compat.kubejs.KubeJsBridge;
 import com.alikuxac.machinemetrics.config.ClientConfig;
 import net.minecraft.client.Minecraft;
+import net.minecraft.core.BlockPos;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.resources.ResourceLocation;
@@ -28,6 +30,10 @@ public final class InspectionGate {
             return false;
         }
         return matchesInspectionItem(player.getMainHandItem()) || matchesInspectionItem(player.getOffhandItem());
+    }
+
+    public static boolean canInspect(Player player, BlockPos targetPos) {
+        return KubeJsBridge.shouldInspect(player, targetPos) && canInspect(player);
     }
 
     public static boolean matchesInspectionItem(ItemStack stack) {

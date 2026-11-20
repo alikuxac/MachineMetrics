@@ -29,4 +29,6 @@ tasks.withType(JavaCompile).configureEach {
 dependencies {
     compileOnly "mekanism:Mekanism:${rootProject.mekanism_version}:api"
     compileOnly "org.appliedenergistics:appliedenergistics2:${rootProject.ae2_version}:api"
+    compileOnly("dev.latvian.mods:kubejs-neoforge:${rootProject.kubejs_version}") { transitive = false }
+    compileOnly("dev.latvian.mods:rhino:${rootProject.rhino_version}") { transitive = false }
 }

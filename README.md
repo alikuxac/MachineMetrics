@@ -34,6 +34,7 @@ Machine Metrics is a client-side and server-synced telemetry HUD for Minecraft. 
 - **Create:** Kinetic speed (RPM), rotation direction, network stress, capacity (SU), overstress warning, and headroom.
 - **Mekanism:** Chemical throughput and tank capacities (Gases, Infuse Types, Pigments, Slurries).
 - **Tooltip Mods:** Automatically hides the block title line when Jade, Waila, WTHIT, or The One Probe is installed.
+- **KubeJS (optional):** Soft dependency for KubeJS 2101.x on 1.21.1 (built against `2101.7.2`). See the [KubeJS Integration Guide](docs/kubejs-integration.md) for custom HUD metrics and stage gating.
 
 ---
 

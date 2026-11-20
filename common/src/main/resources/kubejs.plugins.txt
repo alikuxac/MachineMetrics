@@ -1,0 +1,2 @@
+# Machine Metrics KubeJS plugin. KubeJS discovers this file only when it is installed.
+com.alikuxac.machinemetrics.compat.kubejs.MachineMetricsKubeJsPlugin kubejs

@@ -2,6 +2,8 @@ package com.alikuxac.machinemetrics.client;
 
 import com.alikuxac.machinemetrics.compat.ae2.AE2NetworkInspector;
 import com.alikuxac.machinemetrics.compat.ae2.AE2NetworkInspector.AE2StabilityState;
+import com.alikuxac.machinemetrics.compat.kubejs.KubeJsBridge;
+import com.alikuxac.machinemetrics.compat.kubejs.MetricLine;
 import com.alikuxac.machinemetrics.compat.create.CreateKineticInspector;
 import com.alikuxac.machinemetrics.compat.infohud.InfoHudDetector;
 import com.alikuxac.machinemetrics.compat.mekanism.MekanismChemicalInspector;
@@ -137,6 +139,19 @@ public class TelemetryHudRenderer {
         cachedPinnedMachineName = null;
     }
 
+    private static List<HudLine> withCustomMetrics(List<HudLine> lines, BlockPos pos, Direction face) {
+        List<MetricLine> custom = KubeJsBridge.collectMetrics(Minecraft.getInstance().level, pos, face);
+        if (custom.isEmpty()) {
+            return lines;
+        }
+        List<HudLine> result = new ArrayList<>(lines);
+        for (MetricLine line : custom) {
+            String text = line.value().isEmpty() ? line.label() : line.label() + ": " + line.value();
+            result.add(new HudLine(Component.literal(text), line.color()));
+        }
+        return result;
+    }
+
     private static List<HudLine> attachPinnedBadge(List<HudLine> lines) {
         if (lines == null || lines.isEmpty()) {
             return lines;
@@ -213,6 +228,10 @@ public class TelemetryHudRenderer {
             }
         }
 
+        if (!KubeJsBridge.shouldInspect(mc.player, targetPos)) {
+            return;
+        }
+
         long now = System.currentTimeMillis();
 
         if (targetPos == null) {
@@ -254,13 +273,15 @@ public class TelemetryHudRenderer {
             if (data.isEmpty()) {
                 data = sampler.sample(targetPos, hitFace);
             }
+            List<HudLine> lines = new ArrayList<>();
             if (data != null && !data.isEmpty()) {
                 String machineName = getCachedMachineName(mc, targetPos);
                 MetricResolver.EtaResult eta = ClientTelemetryCache.getEta(targetPos);
-                List<HudLine> lines = getCachedPinnedLines(machineName, data, eta, targetPos, hitFace);
-                if (!lines.isEmpty()) {
-                    renderAdaptiveHud(graphics, mc, lines, -1, -1, pinnedBorderColor);
-                }
+                lines = getCachedPinnedLines(machineName, data, eta, targetPos, hitFace);
+            }
+            lines = withCustomMetrics(lines, targetPos, hitFace);
+            if (!lines.isEmpty()) {
+                renderAdaptiveHud(graphics, mc, lines, -1, -1, pinnedBorderColor);
             }
             return;
         }
@@ -281,13 +302,15 @@ public class TelemetryHudRenderer {
                 }
             }
 
+            List<HudLine> lines = new ArrayList<>();
             if (data != null && !data.isEmpty()) {
                 String machineName = getCachedMachineName(mc, targetPos);
                 MetricResolver.EtaResult eta = ClientTelemetryCache.getEta(targetPos);
-                List<HudLine> lines = getCachedLines(machineName, data, eta, targetPos, hitFace);
-                if (!lines.isEmpty()) {
-                    hoverBox = renderAdaptiveHud(graphics, mc, lines);
-                }
+                lines = getCachedLines(machineName, data, eta, targetPos, hitFace);
+            }
+            lines = withCustomMetrics(lines, targetPos, hitFace);
+            if (!lines.isEmpty()) {
+                hoverBox = renderAdaptiveHud(graphics, mc, lines);
             }
         }
 
@@ -296,29 +319,31 @@ public class TelemetryHudRenderer {
             if (pinnedData.isEmpty()) {
                 pinnedData = sampler.sample(pinnedPos, pinnedFace);
             }
+            List<HudLine> pinnedLines = new ArrayList<>();
             if (pinnedData != null && !pinnedData.isEmpty()) {
                 String pinnedName = PinnedTargetManager.getPinnedMachineName();
                 if (pinnedName == null) {
                     pinnedName = getCachedMachineName(mc, pinnedPos);
                 }
                 MetricResolver.EtaResult eta = ClientTelemetryCache.getEta(pinnedPos);
-                List<HudLine> pinnedLines = getCachedPinnedLines(pinnedName, pinnedData, eta, pinnedPos, pinnedFace);
-                if (!pinnedLines.isEmpty()) {
-                    if (hoverBox != null) {
-                        ClientConfig.HudAnchor anchor = ClientConfig.HUD_ANCHOR != null ? ClientConfig.HUD_ANCHOR.get() : ClientConfig.HudAnchor.TOP_LEFT;
-                        int pinnedX = hoverBox[0];
-                        int pinnedY;
-                        if (anchor == ClientConfig.HudAnchor.BOTTOM_LEFT || anchor == ClientConfig.HudAnchor.BOTTOM_RIGHT) {
-                            Font font = mc.font;
-                            int pBoxHeight = (pinnedLines.size() * (font.lineHeight + 3)) + 10;
-                            pinnedY = hoverBox[1] - pBoxHeight - 6;
-                        } else {
-                            pinnedY = hoverBox[1] + hoverBox[3] + 6;
-                        }
-                        renderAdaptiveHud(graphics, mc, pinnedLines, pinnedX, pinnedY, pinnedBorderColor);
+                pinnedLines = getCachedPinnedLines(pinnedName, pinnedData, eta, pinnedPos, pinnedFace);
+            }
+            pinnedLines = withCustomMetrics(pinnedLines, pinnedPos, pinnedFace);
+            if (!pinnedLines.isEmpty()) {
+                if (hoverBox != null) {
+                    ClientConfig.HudAnchor anchor = ClientConfig.HUD_ANCHOR != null ? ClientConfig.HUD_ANCHOR.get() : ClientConfig.HudAnchor.TOP_LEFT;
+                    int pinnedX = hoverBox[0];
+                    int pinnedY;
+                    if (anchor == ClientConfig.HudAnchor.BOTTOM_LEFT || anchor == ClientConfig.HudAnchor.BOTTOM_RIGHT) {
+                        Font font = mc.font;
+                        int pBoxHeight = (pinnedLines.size() * (font.lineHeight + 3)) + 10;
+                        pinnedY = hoverBox[1] - pBoxHeight - 6;
                     } else {
-                        renderAdaptiveHud(graphics, mc, pinnedLines, -1, -1, pinnedBorderColor);
+                        pinnedY = hoverBox[1] + hoverBox[3] + 6;
                     }
+                    renderAdaptiveHud(graphics, mc, pinnedLines, pinnedX, pinnedY, pinnedBorderColor);
+                } else {
+                    renderAdaptiveHud(graphics, mc, pinnedLines, -1, -1, pinnedBorderColor);
                 }
             }
         }

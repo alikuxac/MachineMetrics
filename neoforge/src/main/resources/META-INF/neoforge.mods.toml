@@ -35,3 +35,10 @@ A high-tech standalone client-side HUD mod displaying real-time machine telemetr
     versionRange="${minecraft_version_range}"
     ordering="NONE"
     side="BOTH"
+
+[[dependencies.machinemetrics]]
+    modId="kubejs"
+    type="optional"
+    versionRange="[2001,)"
+    ordering="NONE"
+    side="CLIENT"
