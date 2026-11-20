@@ -18,6 +18,7 @@ public class ClientConfig {
 
     // HUD General
     public static final Config.Value<Boolean> HUD_ENABLED;
+    public static final Config.Value<Boolean> ENABLE_IN_WORLD_BOUNDING_BOX;
     public static final Config.Value<HudAnchor> HUD_ANCHOR;
     public static final Config.Value<Integer> HUD_X_OFFSET;
     public static final Config.Value<Integer> HUD_Y_OFFSET;
@@ -389,6 +390,14 @@ public class ClientConfig {
         SPYGLASS_RAYCAST_DISTANCE = builder
                 .comment("Raycast distance (in blocks) when zooming through a Spyglass")
                 .defineInRange("spyglassRaycastDistance", 32.0, 4.0, 64.0);
+
+        builder.pop();
+
+        builder.comment("In-World Bounding Box Cue").push("inWorldBoundingBox");
+
+        ENABLE_IN_WORLD_BOUNDING_BOX = builder
+                .comment("Recolor the block selection outline using cached machine telemetry state")
+                .define("enableInWorldBoundingBox", true);
 
         builder.pop();
 
