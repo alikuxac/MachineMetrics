@@ -3,6 +3,7 @@ package com.alikuxac.machinemetrics.forge;
 import com.alikuxac.machinemetrics.config.ServerConfig;
 import com.alikuxac.machinemetrics.forge.client.ForgeClientInit;
 import com.alikuxac.machinemetrics.forge.platform.ForgeConfigFactory;
+import com.alikuxac.machinemetrics.forge.platform.ForgeConfigReload;
 import com.alikuxac.machinemetrics.forge.platform.ForgeNetworkPlatform;
 import com.alikuxac.machinemetrics.forge.platform.ForgeStorageLookup;
 import com.alikuxac.machinemetrics.forge.telemetry.ForgeServerTelemetrySampler;
@@ -25,6 +26,7 @@ public class MachinemetricsForge {
 
     public MachinemetricsForge(FMLJavaModLoadingContext context) {
         ForgeConfigFactory.install();
+        ForgeConfigReload.install();
         ForgeStorageLookup.install();
         ForgeNetworkPlatform.install();
         NetworkPlatform.setRegistrationHook(NetworkHandler::register);

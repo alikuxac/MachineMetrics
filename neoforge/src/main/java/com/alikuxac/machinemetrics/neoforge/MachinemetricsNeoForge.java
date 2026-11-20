@@ -3,6 +3,7 @@ package com.alikuxac.machinemetrics.neoforge;
 import com.alikuxac.machinemetrics.config.ServerConfig;
 import com.alikuxac.machinemetrics.neoforge.client.NeoForgeClientInit;
 import com.alikuxac.machinemetrics.neoforge.platform.NeoForgeConfigFactory;
+import com.alikuxac.machinemetrics.neoforge.platform.NeoForgeConfigReload;
 import com.alikuxac.machinemetrics.neoforge.platform.NeoForgeNetworkPlatform;
 import com.alikuxac.machinemetrics.neoforge.platform.NeoForgeStorageLookup;
 import com.alikuxac.machinemetrics.neoforge.telemetry.ServerTelemetrySampler;
@@ -25,6 +26,7 @@ public class MachinemetricsNeoForge {
 
     public MachinemetricsNeoForge(IEventBus modEventBus, ModContainer modContainer) {
         NeoForgeConfigFactory.install();
+        NeoForgeConfigReload.install();
         NeoForgeStorageLookup.install();
         NeoForgeNetworkPlatform.install();
         NetworkPlatform.setRegistrationHook(NetworkHandler::register);

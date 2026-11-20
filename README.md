@@ -50,7 +50,8 @@ Machine Metrics is a client-side and server-synced telemetry HUD for Minecraft. 
 
 ### Controls & Configuration
 
-- **Toggle HUD:** `H` (changeable in `Options -> Controls -> Key Binds`).
+- **Toggle HUD:** `H` (changeable in `Options -> Controls -> Key Binds`) or `/mm hud toggle`.
+- **Commands:** See the [Command Reference](docs/commands.md) for HUD, pinning, diagnostics, and server administration.
 - **Open HUD Editor:**
   - In Main Menu: Go to `Mods` -> select `Machine Metrics` -> click **Config**.
   - In-Game: Press `ESC` and click **Machinemetrics HUD** in the top right.

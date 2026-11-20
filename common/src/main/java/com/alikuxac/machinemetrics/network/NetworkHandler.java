@@ -5,6 +5,7 @@ import com.alikuxac.machinemetrics.config.ServerConfig;
 import com.alikuxac.machinemetrics.platform.Services;
 import com.alikuxac.machinemetrics.platform.network.NetworkPlatform;
 import com.alikuxac.machinemetrics.telemetry.TelemetryData;
+import com.alikuxac.machinemetrics.telemetry.TelemetryRuntime;
 import net.minecraft.core.Direction;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
@@ -23,7 +24,6 @@ public class NetworkHandler {
 
     private static final Map<SentKey, SentEntry> LAST_SENT_TO_CLIENT = new ConcurrentHashMap<>();
     private static final Map<UUID, RateWindow> RATE_LIMITS = new ConcurrentHashMap<>();
-    // ponytail: entries only need to live long enough for the next request; evict anything idle.
     private static final long SENT_ENTRY_EXPIRE_MS = 10000L;
     private static final long RATE_WINDOW_MS = 1000L;
     private static final int MAX_SENT_ENTRIES = 4096;
@@ -120,9 +120,15 @@ public class NetworkHandler {
                 if (!allowRequest(serverPlayer.getUUID(), now, maxPerSecond)) {
                     return;
                 }
+                if (!TelemetryRuntime.allowInterval(serverPlayer.getUUID(), now)) {
+                    return;
+                }
+                TelemetryRuntime.noteRequest(serverPlayer.getUUID());
 
                 Direction hitFace = payload.hitFace();
+                long scanStartNanos = System.nanoTime();
                 TelemetryData data = Services.SERVER_SAMPLER.sample(serverLevel, targetPos, hitFace);
+                long scanNanos = System.nanoTime() - scanStartNanos;
 
                 short disabledMask = 0;
                 if (ServerConfig.ALLOW_ITEMS != null && !ServerConfig.ALLOW_ITEMS.get()) {
@@ -154,6 +160,7 @@ public class NetworkHandler {
                     enforceSentEntryCap(now);
                     SyncTelemetryPayload response = SyncTelemetryPayload.from(targetPos, data, disabledMask);
                     context.reply(response);
+                    TelemetryRuntime.noteReply(scanNanos);
                 }
             }
         });

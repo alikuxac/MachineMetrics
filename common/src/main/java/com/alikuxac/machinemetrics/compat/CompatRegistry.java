@@ -130,6 +130,21 @@ public final class CompatRegistry {
         return pathOf(level, pos).toLowerCase(java.util.Locale.ROOT).contains(fragment.toLowerCase(java.util.Locale.ROOT));
     }
 
+    public static boolean isModLoaded(String modId) {
+        if (modId == null || modId.isEmpty()) {
+            return false;
+        }
+        for (String className : new String[]{"net.neoforged.fml.ModList", "net.minecraftforge.fml.ModList"}) {
+            try {
+                Class<?> modListClass = Class.forName(className);
+                Object modList = modListClass.getMethod("get").invoke(null);
+                return (Boolean) modListClass.getMethod("isLoaded", String.class).invoke(modList, modId);
+            } catch (Throwable ignored) {
+            }
+        }
+        return false;
+    }
+
     private static BlockState blockStateOf(Level level, BlockPos pos) {
         if (level == null || pos == null) {
             return null;
