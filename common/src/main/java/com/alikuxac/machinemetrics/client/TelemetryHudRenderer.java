@@ -259,7 +259,7 @@ public class TelemetryHudRenderer {
                 lastSentFace = hitFace;
                 try {
                     if (mc.getConnection() != null) {
-                        NetworkPlatform.sendToServer(new RequestTelemetryPayload(targetPos, hitFace));
+                        NetworkPlatform.sendToServer(new RequestTelemetryPayload(targetPos, hitFace, targetPos.equals(pinnedPos)));
                     }
                 } catch (Exception ignored) {
                 }

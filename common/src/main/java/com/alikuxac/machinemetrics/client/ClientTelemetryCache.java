@@ -115,6 +115,18 @@ public class ClientTelemetryCache {
         }
     }
 
+    public static void touch(BlockPos pos) {
+        if (pos == null) {
+            return;
+        }
+        Entry entry = CACHE.get(pos);
+        if (entry == null) {
+            return;
+        }
+        CACHE.put(pos, new Entry(entry.data(), entry.renderData(), System.currentTimeMillis(),
+                entry.smoothedNetRate(), entry.etaResult()));
+    }
+
     public static TelemetryData get(BlockPos pos) {
         Entry entry = getEntry(pos);
         return entry != null ? entry.data : TelemetryData.empty();

@@ -7,8 +7,10 @@ import com.alikuxac.machinemetrics.platform.network.NetworkPlatform;
 import com.alikuxac.machinemetrics.telemetry.TelemetryData;
 import com.alikuxac.machinemetrics.telemetry.TelemetryRuntime;
 import net.minecraft.core.Direction;
+import net.minecraft.resources.ResourceKey;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.world.level.Level;
 
 import net.minecraft.core.BlockPos;
 
@@ -18,14 +20,15 @@ import java.util.concurrent.ConcurrentHashMap;
 
 public class NetworkHandler {
 
-    private record SentKey(UUID playerId, BlockPos pos, Direction hitFace) {}
-    private record SentEntry(TelemetryData data, long timestampMs) {}
+    private record SentKey(UUID playerId, ResourceKey<Level> dimension, BlockPos pos, Direction hitFace) {}
+    private record SentEntry(TelemetryData data, byte stateHash, long timestampMs) {}
     private record RateWindow(long windowStartMs, int count) {}
 
     private static final Map<SentKey, SentEntry> LAST_SENT_TO_CLIENT = new ConcurrentHashMap<>();
     private static final Map<UUID, RateWindow> RATE_LIMITS = new ConcurrentHashMap<>();
     private static final long SENT_ENTRY_EXPIRE_MS = 10000L;
     private static final long RATE_WINDOW_MS = 1000L;
+    private static final long FULL_RESYNC_INTERVAL_MS = 1500L;
     private static final int MAX_SENT_ENTRIES = 4096;
     private static volatile long lastCleanupMs = 0L;
 
@@ -90,6 +93,13 @@ public class NetworkHandler {
                 SyncTelemetryPayload.STREAM_CODEC,
                 NetworkHandler::handleSyncPayload
         );
+
+        registrar.playToClient(
+                TelemetryHeartbeatPayload.class,
+                TelemetryHeartbeatPayload.TYPE,
+                TelemetryHeartbeatPayload.STREAM_CODEC,
+                NetworkHandler::handleHeartbeatPayload
+        );
     }
 
     private static void handleRequestPayload(RequestTelemetryPayload payload, NetworkPlatform.Context context) {
@@ -101,9 +111,15 @@ public class NetworkHandler {
                     return;
                 }
 
+                boolean pinned = payload.pinned();
                 double maxRange = ServerConfig.MAX_REQUEST_RANGE != null ? ServerConfig.MAX_REQUEST_RANGE.get() : 12.0;
-                if (serverPlayer.isScoping()) {
+                if (serverPlayer.isScoping() && !pinned) {
                     maxRange = Math.max(maxRange, 34.0);
+                }
+                if (pinned) {
+                    double maxPinnedDistance = ServerConfig.MAX_PINNED_DISTANCE != null
+                            ? ServerConfig.MAX_PINNED_DISTANCE.get() : 12.0;
+                    maxRange = Math.min(maxRange, maxPinnedDistance);
                 }
                 if (!serverPlayer.blockPosition().closerThan(targetPos, maxRange)) {
                     return;
@@ -111,7 +127,12 @@ public class NetworkHandler {
 
                 ServerLevel serverLevel = serverPlayer.serverLevel();
                 if (!serverLevel.isLoaded(targetPos)) {
-                    return;
+                    boolean allowUnloaded = pinned && ServerConfig.ALLOW_PINNED_IN_UNLOADED_CHUNKS != null
+                            && ServerConfig.ALLOW_PINNED_IN_UNLOADED_CHUNKS.get();
+                    if (!allowUnloaded) {
+                        return;
+                    }
+                    serverLevel.getChunkAt(targetPos);
                 }
 
                 long now = System.currentTimeMillis();
@@ -153,15 +174,22 @@ public class NetworkHandler {
                     disabledMask |= TelemetryData.MASK_REDSTONE;
                 }
 
-                SentKey key = new SentKey(serverPlayer.getUUID(), targetPos, hitFace);
+                byte stateHash = data.stateHash();
+                SentKey key = new SentKey(serverPlayer.getUUID(), serverLevel.dimension(), targetPos, hitFace);
                 SentEntry lastSent = LAST_SENT_TO_CLIENT.get(key);
-                if (lastSent == null || data.hasSignificantDelta(lastSent.data) || (now - lastSent.timestampMs() >= 1500L)) {
-                    LAST_SENT_TO_CLIENT.put(key, new SentEntry(data, now));
-                    enforceSentEntryCap(now);
-                    SyncTelemetryPayload response = SyncTelemetryPayload.from(targetPos, data, disabledMask);
-                    context.reply(response);
+                boolean unchanged = lastSent != null && lastSent.stateHash() == stateHash
+                        && !data.hasSignificantDelta(lastSent.data);
+                if (unchanged && now - lastSent.timestampMs() < FULL_RESYNC_INTERVAL_MS) {
+                    context.reply(new TelemetryHeartbeatPayload(targetPos));
                     TelemetryRuntime.noteReply(scanNanos);
+                    return;
                 }
+
+                LAST_SENT_TO_CLIENT.put(key, new SentEntry(data, stateHash, now));
+                enforceSentEntryCap(now);
+                SyncTelemetryPayload response = SyncTelemetryPayload.from(targetPos, data, disabledMask);
+                context.reply(response);
+                TelemetryRuntime.noteReply(scanNanos);
             }
         });
     }
@@ -169,6 +197,12 @@ public class NetworkHandler {
     private static void handleSyncPayload(SyncTelemetryPayload payload, NetworkPlatform.Context context) {
         context.enqueueWork(() -> {
             ClientTelemetryCache.putSynced(payload.targetPos(), payload.toTelemetryData());
+        });
+    }
+
+    private static void handleHeartbeatPayload(TelemetryHeartbeatPayload payload, NetworkPlatform.Context context) {
+        context.enqueueWork(() -> {
+            ClientTelemetryCache.touch(payload.targetPos());
         });
     }
 }

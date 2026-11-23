@@ -1,5 +1,6 @@
 package com.alikuxac.machinemetrics.neoforge.client;
 
+import com.alikuxac.machinemetrics.client.ClientTelemetryCache;
 import com.alikuxac.machinemetrics.client.HudPositionScreen;
 import com.alikuxac.machinemetrics.client.KeyBindings;
 import com.alikuxac.machinemetrics.client.PinnedTargetManager;
@@ -12,6 +13,7 @@ import net.minecraft.network.chat.Component;
 import net.neoforged.api.distmarker.Dist;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.common.EventBusSubscriber;
+import net.neoforged.neoforge.client.event.ClientPlayerNetworkEvent;
 import net.neoforged.neoforge.client.event.InputEvent;
 import net.neoforged.neoforge.client.event.ScreenEvent;
 
@@ -36,6 +38,18 @@ public class NeoForgeClientEventHandler {
                 }
             }
         }
+    }
+
+    @SubscribeEvent
+    public static void onLoggingOut(ClientPlayerNetworkEvent.LoggingOut event) {
+        PinnedTargetManager.unpin();
+        ClientTelemetryCache.clear();
+    }
+
+    @SubscribeEvent
+    public static void onPlayerClone(ClientPlayerNetworkEvent.Clone event) {
+        PinnedTargetManager.unpin();
+        ClientTelemetryCache.clear();
     }
 
     @SubscribeEvent

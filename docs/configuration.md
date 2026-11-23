@@ -260,15 +260,20 @@ Servers control which telemetry data is sampled and transmitted to connected cli
   max_request_range = 12.0
   # Max telemetry requests processed per player per second (0 = unlimited, range: 0 to 200)
   max_requests_per_second = 20
+  # Max distance (blocks) for pinned-target polling; the tighter of this and max_request_range applies
+  max_pinned_distance = 12.0
+  # Allow polling pinned targets in unloaded chunks (false prevents remote chunk loading)
+  allow_pinned_in_unloaded_chunks = false
 ```
 
 ### Request Validation
 
 The server validates every telemetry request before sampling:
-- **Range check**: requests for blocks farther than `max_request_range` from the player are ignored.
-- **Loaded check**: requests for unloaded positions are ignored.
+- **Range check**: requests for blocks farther than `max_request_range` from the player are ignored. Pinned-target polling is additionally capped by `max_pinned_distance` and does not benefit from the spyglass range extension.
+- **Loaded check**: requests for unloaded positions are ignored. A pinned request only forces its chunk to load when `allow_pinned_in_unloaded_chunks` is explicitly enabled.
 - **Rate limit**: each player is limited to `max_requests_per_second` per one-second window, applied before capability sampling.
-- **Cache scope**: server-side delta caching is keyed per `(player, block position)`.
+- **Cache scope**: server-side delta caching is keyed per `(player, dimension, block position, face)`.
+- **Delta heartbeat**: the server fingerprints each sampled state. Unchanged machines receive a compact heartbeat (a one-byte marker plus the target position) that refreshes the client cache instead of a full telemetry payload; a full payload is still resent periodically and whenever the fingerprint or significant values change.
 
 ### Behavior when disabled
 

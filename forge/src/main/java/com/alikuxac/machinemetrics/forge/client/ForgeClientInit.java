@@ -30,6 +30,8 @@ public class ForgeClientInit {
         modBus.addListener(ForgeHudRenderer::onAddLayers);
 
         MinecraftForge.EVENT_BUS.addListener(ForgeHighlightHandler::onRenderHighlight);
+        MinecraftForge.EVENT_BUS.addListener(ForgeClientEventHandler::onLoggingOut);
+        MinecraftForge.EVENT_BUS.addListener(ForgeClientEventHandler::onPlayerClone);
     }
 
     private static void registerKeyMappings(RegisterKeyMappingsEvent event) {

@@ -23,6 +23,8 @@ public class ServerConfig {
     public static final Config.Value<Double> STORAGE_SYNC_DEADBAND_PERCENT;
     public static final Config.Value<Double> MAX_REQUEST_RANGE;
     public static final Config.Value<Integer> MAX_REQUESTS_PER_SECOND;
+    public static final Config.Value<Double> MAX_PINNED_DISTANCE;
+    public static final Config.Value<Boolean> ALLOW_PINNED_IN_UNLOADED_CHUNKS;
 
     static {
         Config.Builder builder = Config.builder();
@@ -85,6 +87,16 @@ public class ServerConfig {
         MAX_REQUESTS_PER_SECOND = builder
                 .comment("Maximum telemetry request packets processed per player per second (0 = unlimited)")
                 .defineInRange("max_requests_per_second", 20, 0, 200);
+
+        MAX_PINNED_DISTANCE = builder
+                .comment("Maximum distance (in blocks) a player may keep a pinned target polled. "
+                        + "The tighter of max_request_range and this value is used for pinned requests.")
+                .defineInRange("max_pinned_distance", 12.0, 1.0, 64.0);
+
+        ALLOW_PINNED_IN_UNLOADED_CHUNKS = builder
+                .comment("Allow pinned targets in unloaded chunks. Disabled by default to prevent "
+                        + "remote chunk loading and cross-chunk capability polling on dedicated servers.")
+                .define("allow_pinned_in_unloaded_chunks", false);
 
         builder.pop();
         SPEC = builder.build();

@@ -1,5 +1,6 @@
 package com.alikuxac.machinemetrics.forge.client;
 
+import com.alikuxac.machinemetrics.client.ClientTelemetryCache;
 import com.alikuxac.machinemetrics.client.HudPositionScreen;
 import com.alikuxac.machinemetrics.client.KeyBindings;
 import com.alikuxac.machinemetrics.client.PinnedTargetManager;
@@ -9,6 +10,7 @@ import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.screens.PauseScreen;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.network.chat.Component;
+import net.minecraftforge.client.event.ClientPlayerNetworkEvent;
 import net.minecraftforge.client.event.InputEvent;
 import net.minecraftforge.client.event.ScreenEvent;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
@@ -33,6 +35,18 @@ public class ForgeClientEventHandler {
                 }
             }
         }
+    }
+
+    @SubscribeEvent
+    public static void onLoggingOut(ClientPlayerNetworkEvent.LoggingOut event) {
+        PinnedTargetManager.unpin();
+        ClientTelemetryCache.clear();
+    }
+
+    @SubscribeEvent
+    public static void onPlayerClone(ClientPlayerNetworkEvent.Clone event) {
+        PinnedTargetManager.unpin();
+        ClientTelemetryCache.clear();
     }
 
     @SubscribeEvent

@@ -150,7 +150,7 @@ public final class PinnedTargetManager {
         if (now - lastPollTimeMs >= POLL_INTERVAL_MS) {
             lastPollTimeMs = now;
             try {
-                NetworkPlatform.sendToServer(new RequestTelemetryPayload(pinnedPos, pinnedFace));
+                NetworkPlatform.sendToServer(new RequestTelemetryPayload(pinnedPos, pinnedFace, true));
             } catch (Exception ignored) {
             }
         }

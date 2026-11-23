@@ -400,6 +400,96 @@ public record TelemetryData(
         return false;
     }
 
+    private static final int FNV_OFFSET_BASIS = 0x811C9DC5;
+    private static final int FNV_PRIME = 0x01000193;
+
+    private static int hashInt(int hash, int value) {
+        for (int shift = 0; shift < 32; shift += 8) {
+            hash = (hash ^ ((value >>> shift) & 0xFF)) * FNV_PRIME;
+        }
+        return hash;
+    }
+
+    private static int hashLong(int hash, long value) {
+        for (int shift = 0; shift < 64; shift += 8) {
+            hash = (hash ^ (int) ((value >>> shift) & 0xFFL)) * FNV_PRIME;
+        }
+        return hash;
+    }
+
+    private static int hashFloat(int hash, float value) {
+        return hashInt(hash, Float.floatToIntBits(value));
+    }
+
+    private static int hashDouble(int hash, double value) {
+        return hashLong(hash, Double.doubleToLongBits(value));
+    }
+
+    private static int hashBoolean(int hash, boolean value) {
+        return hashInt(hash, value ? 1 : 0);
+    }
+
+    private static int hashString(int hash, String value) {
+        return hashInt(hash, value != null ? value.hashCode() : 0);
+    }
+
+    /**
+     * Compact fingerprint of the fields carried by {@code SyncTelemetryPayload}.
+     * The server uses it as a cheap first check for an unchanged machine before
+     * falling back to the detailed deadband comparison and full payload encoding.
+     */
+    public byte stateHash() {
+        int hash = FNV_OFFSET_BASIS;
+        hash = hashFloat(hash, itemThroughput);
+        hash = hashBoolean(hash, hasItems);
+        hash = hashFloat(hash, fluidThroughput);
+        hash = hashBoolean(hash, hasFluids);
+        hash = hashString(hash, fluidName);
+        hash = hashLong(hash, fluidAmount);
+        hash = hashLong(hash, fluidCapacity);
+        hash = hashFloat(hash, energyDelta);
+        hash = hashBoolean(hash, hasEnergy);
+        hash = hashFloat(hash, chemicalThroughput);
+        hash = hashBoolean(hash, hasChemicals);
+        hash = hashString(hash, chemicalName);
+        hash = hashLong(hash, chemicalAmount);
+        hash = hashLong(hash, chemicalCapacity);
+        hash = hashFloat(hash, kineticSpeed);
+        hash = hashFloat(hash, kineticStress);
+        hash = hashFloat(hash, kineticCapacity);
+        hash = hashFloat(hash, kineticBlockStress);
+        hash = hashBoolean(hash, hasKinetic);
+        hash = hashInt(hash, kineticDirection != null ? kineticDirection.ordinal() : -1);
+        hash = hashInt(hash, bottleneckState != null ? bottleneckState.ordinal() : -1);
+        if (sideMetrics != null) {
+            for (float sideMetric : sideMetrics) {
+                hash = hashFloat(hash, sideMetric);
+            }
+        }
+        hash = hashInt(hash, serverDisabledMask);
+        hash = hashBoolean(hash, hasAe2Network);
+        hash = hashFloat(hash, aePowerRate);
+        hash = hashFloat(hash, aePowerDrain);
+        hash = hashFloat(hash, aeSubnetDrain);
+        hash = hashInt(hash, aeSubnetCount);
+        hash = hashDouble(hash, aeStoredPower);
+        hash = hashDouble(hash, aeMaxPower);
+        hash = hashInt(hash, aeStabilityState);
+        hash = hashBoolean(hash, aeIsCreative);
+        hash = hashInt(hash, aeUsedChannels);
+        hash = hashInt(hash, aeMaxChannels);
+        hash = hashLong(hash, storageCurrent);
+        hash = hashLong(hash, storageMax);
+        hash = hashFloat(hash, netRate);
+        hash = hashInt(hash, logisticsFlags);
+        hash = hashInt(hash, targetedFace != null ? targetedFace.get3DDataValue() : -1);
+        hash = hashInt(hash, targetedIo != null ? targetedIo.getId() : 0);
+        hash = hashInt(hash, targetedState != null ? targetedState.ordinal() : -1);
+        hash = hashFloat(hash, targetedThroughput);
+        hash = hashInt(hash, redstoneData != null ? redstoneData.hashCode() : 0);
+        return (byte) ((hash >>> 24) ^ (hash >>> 16) ^ (hash >>> 8) ^ hash);
+    }
+
     public boolean hasSignificantDelta(TelemetryData other) {
         if (other == null) return true;
         if (this.serverDisabledMask != other.serverDisabledMask) return true;
