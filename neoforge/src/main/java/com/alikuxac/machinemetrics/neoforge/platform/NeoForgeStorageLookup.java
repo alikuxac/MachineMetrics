@@ -110,6 +110,7 @@ public final class NeoForgeStorageLookup implements StorageAccess.Lookup {
             @Override public long getTankCapacity(int tank) { return handler.getTankCapacity(tank); }
             @Override public boolean isTankEmpty(int tank) { return handler.getFluidInTank(tank).isEmpty(); }
             @Override public long getTankAmount(int tank) { return handler.getFluidInTank(tank).getAmount(); }
+            @Override public String getTankName(int tank) { return handler.getFluidInTank(tank).getHoverName().getString(); }
             @Override public boolean canDrain() {
                 return !handler.drain(1, IFluidHandler.FluidAction.SIMULATE).isEmpty();
             }

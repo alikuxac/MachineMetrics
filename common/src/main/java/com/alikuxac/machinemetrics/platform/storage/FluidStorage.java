@@ -9,6 +9,10 @@ public interface FluidStorage {
 
     long getTankAmount(int tank);
 
+    default String getTankName(int tank) {
+        return "";
+    }
+
     default boolean canFill() {
         return false;
     }
