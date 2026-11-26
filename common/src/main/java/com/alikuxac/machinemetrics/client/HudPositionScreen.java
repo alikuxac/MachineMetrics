@@ -10,6 +10,7 @@ import com.alikuxac.machinemetrics.telemetry.TelemetryData;
 import it.unimi.dsi.fastutil.ints.IntArrayList;
 import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.gui.components.AbstractSliderButton;
 import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.network.chat.Component;
@@ -17,6 +18,7 @@ import com.alikuxac.machinemetrics.platform.config.Config;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 
 public class HudPositionScreen extends Screen {
 
@@ -29,6 +31,7 @@ public class HudPositionScreen extends Screen {
     private Button anchorButton;
     private Button presetButton;
     private Button titleToggleButton;
+    private Button compactNumbersButton;
 
     private enum PresetType {
         FULL_DIAGNOSTIC("machinemetrics.preset.full_diagnostic"),
@@ -182,6 +185,78 @@ public class HudPositionScreen extends Screen {
         addRenderableWidget(Button.builder(Component.translatable("gui.done"), b -> {
             onClose();
         }).bounds(this.width - 70, 8, 60, 20).build());
+
+        int sliderWidth = Math.min(140, (this.width - 20) / 2);
+        int sliderGap = 10;
+        int sliderY = this.height - 78;
+        int leftSliderX = this.width / 2 - sliderWidth - sliderGap / 2;
+        int rightSliderX = this.width / 2 + sliderGap / 2;
+        addRenderableWidget(createScaleSlider(leftSliderX, sliderY, sliderWidth));
+        addRenderableWidget(createOpacitySlider(rightSliderX, sliderY, sliderWidth));
+
+        compactNumbersButton = Button.builder(getCompactNumbersButtonText(), b -> toggleCompactNumbers())
+                .bounds(this.width / 2 - 90, this.height - 54, 180, 20)
+                .build();
+        addRenderableWidget(compactNumbersButton);
+    }
+
+    private AbstractSliderButton createScaleSlider(int x, int y, int width) {
+        double scale = ClientConfig.HUD_SCALE != null ? ClientConfig.HUD_SCALE.get() : 1.0;
+        return new AbstractSliderButton(x, y, width, 20, getScaleSliderText(scale), (scale - 0.5) / 2.5) {
+            @Override
+            protected void updateMessage() {
+                double scale = Math.round((0.5 + this.value * 2.5) * 20.0) / 20.0;
+                setMessage(getScaleSliderText(scale));
+            }
+
+            @Override
+            protected void applyValue() {
+                if (ClientConfig.HUD_SCALE != null) {
+                    double scale = Math.round((0.5 + this.value * 2.5) * 20.0) / 20.0;
+                    ClientConfig.HUD_SCALE.set(scale);
+                }
+            }
+        };
+    }
+
+    private AbstractSliderButton createOpacitySlider(int x, int y, int width) {
+        int opacity = ClientConfig.BACKGROUND_OPACITY != null ? ClientConfig.BACKGROUND_OPACITY.get() : 144;
+        return new AbstractSliderButton(x, y, width, 20, getOpacitySliderText(opacity), opacity / 255.0) {
+            @Override
+            protected void updateMessage() {
+                setMessage(getOpacitySliderText((int) Math.round(this.value * 255.0)));
+            }
+
+            @Override
+            protected void applyValue() {
+                if (ClientConfig.BACKGROUND_OPACITY != null) {
+                    ClientConfig.BACKGROUND_OPACITY.set((int) Math.round(this.value * 255.0));
+                }
+            }
+        };
+    }
+
+    private Component getScaleSliderText(double scale) {
+        return Component.translatable("machinemetrics.hud.scale", String.format(Locale.ROOT, "%.2f", scale));
+    }
+
+    private Component getOpacitySliderText(int opacity) {
+        return Component.translatable("machinemetrics.hud.opacity", Math.round(opacity * 100.0 / 255.0));
+    }
+
+    private Component getCompactNumbersButtonText() {
+        boolean compact = ClientConfig.COMPACT_NUMBERS == null || ClientConfig.COMPACT_NUMBERS.get();
+        return Component.translatable("machinemetrics.hud.compact_numbers",
+                Component.translatable(compact ? "machinemetrics.hud.value.on" : "machinemetrics.hud.value.off"));
+    }
+
+    private void toggleCompactNumbers() {
+        if (ClientConfig.COMPACT_NUMBERS != null) {
+            ClientConfig.COMPACT_NUMBERS.set(!ClientConfig.COMPACT_NUMBERS.get());
+        }
+        if (compactNumbersButton != null) {
+            compactNumbersButton.setMessage(getCompactNumbersButtonText());
+        }
     }
 
     private Component getTitleButtonText(boolean showTitle) {
@@ -435,7 +510,9 @@ public class HudPositionScreen extends Screen {
         int renderX = coords[0];
         int renderY = coords[1];
 
-        int bgColor = ClientConfig.parseHexColor(ClientConfig.BACKGROUND_COLOR, 0x90000000);
+        int bgColor = HudDisplayFormatting.applyOpacity(
+                ClientConfig.parseHexColor(ClientConfig.BACKGROUND_COLOR, 0x90000000),
+                ClientConfig.BACKGROUND_OPACITY != null ? ClientConfig.BACKGROUND_OPACITY.get() : 144);
         int borderColor = isDragging ? 0xFFFFFFFF : ClientConfig.parseHexColor(ClientConfig.BORDER_COLOR, 0xFF00FFCC);
 
         float scale = getHudScale();

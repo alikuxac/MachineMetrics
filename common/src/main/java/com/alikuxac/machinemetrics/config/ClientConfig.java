@@ -23,6 +23,7 @@ public class ClientConfig {
     public static final Config.Value<Integer> HUD_X_OFFSET;
     public static final Config.Value<Integer> HUD_Y_OFFSET;
     public static final Config.Value<Double> HUD_SCALE;
+    public static final Config.Value<Integer> BACKGROUND_OPACITY;
 
     // HUD Colors
     public static final Config.Value<String> BACKGROUND_COLOR;
@@ -56,6 +57,7 @@ public class ClientConfig {
 
     // Compact Formatting & Thresholds
     public static final Config.Value<Boolean> COMPACT_MODE;
+    public static final Config.Value<Boolean> COMPACT_NUMBERS;
     public static final Config.Value<String> COMPACT_TEMPLATE;
     public static final Config.Value<Double> STORAGE_WARNING_THRESHOLD;
     public static final Config.Value<Double> STORAGE_CRITICAL_THRESHOLD;
@@ -122,6 +124,10 @@ public class ClientConfig {
         HUD_SCALE = builder
                 .comment("HUD scale multiplier (0.5 to 3.0)")
                 .defineInRange("hudScale", 1.0, 0.5, 3.0);
+
+        BACKGROUND_OPACITY = builder
+                .comment("HUD background opacity (0 to 255)")
+                .defineInRange("background_opacity", 144, 0, 255);
 
         BACKGROUND_COLOR = builder
                 .comment("Background color (hex ARGB/RGB)")
@@ -238,6 +244,10 @@ public class ClientConfig {
         COMPACT_MODE = builder
                 .comment("Enable single-line compact HUD")
                 .define("compact_mode", false);
+
+        COMPACT_NUMBERS = builder
+                .comment("Abbreviate large numbers in the HUD")
+                .define("compact_numbers", true);
 
         COMPACT_TEMPLATE = builder
                 .comment("Placeholders: {name}, {speed}, {dir}, {stress}, {cap}, {headroom}, {load_pct}, {state}, {items}, {fluids}, {storage}, {eta}")

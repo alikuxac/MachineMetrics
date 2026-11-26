@@ -1085,7 +1085,9 @@ public class TelemetryHudRenderer {
             graphics.pose().translate(-renderX, -renderY, 0);
         }
 
-        int bgColor = ClientConfig.parseHexColor(ClientConfig.BACKGROUND_COLOR, 0x90000000);
+        int bgColor = HudDisplayFormatting.applyOpacity(
+                ClientConfig.parseHexColor(ClientConfig.BACKGROUND_COLOR, 0x90000000),
+                ClientConfig.BACKGROUND_OPACITY != null ? ClientConfig.BACKGROUND_OPACITY.get() : 144);
         int borderColor = overrideBorderColor != -1 ? overrideBorderColor
                 : ClientConfig.parseHexColor(ClientConfig.BORDER_COLOR, 0xFF00FFCC);
 

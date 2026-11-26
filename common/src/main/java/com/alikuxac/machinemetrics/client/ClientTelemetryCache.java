@@ -599,48 +599,24 @@ public class ClientTelemetryCache {
 
     private static String formatItemRate(float rate) {
         if (rate <= 0.001f) return Component.translatable("machinemetrics.metrics.none").getString();
-        if (rate < 1.0f) {
-            return String.format("%.2f /s", rate);
-        } else {
-            return String.format("%.1f /s", rate);
-        }
+        boolean compact = ClientConfig.COMPACT_NUMBERS == null || ClientConfig.COMPACT_NUMBERS.get();
+        return MetricResolver.formatItemRate(rate, compact);
     }
 
     private static String formatEnergyRate(float rate) {
-        float abs = Math.abs(rate);
-        if (abs <= 0.001f) return Component.translatable("machinemetrics.metrics.none").getString();
-        String prefix = rate > 0 ? "+" : (rate < 0 ? "-" : "");
-        if (abs >= 1_000_000f) {
-            return String.format("%s%.2f MFE/t", prefix, abs / 1_000_000f);
-        } else if (abs >= 1_000f) {
-            return String.format("%s%.1f kFE/t", prefix, abs / 1_000f);
-        } else if (abs < 1.0f) {
-            return String.format("%s%.2f FE/t", prefix, abs);
-        } else {
-            return String.format("%s%.0f FE/t", prefix, abs);
-        }
+        return MetricResolver.formatEnergyRate(rate);
     }
 
     private static String formatFluidRate(float rate) {
         if (rate <= 0.001f) return Component.translatable("machinemetrics.metrics.none").getString();
-        if (rate >= 1_000f) {
-            return String.format("%.2f B/s", rate / 1_000f);
-        } else if (rate < 1.0f) {
-            return String.format("%.2f mB/s", rate);
-        } else {
-            return String.format("%.1f mB/s", rate);
-        }
+        boolean compact = ClientConfig.COMPACT_NUMBERS == null || ClientConfig.COMPACT_NUMBERS.get();
+        return MetricResolver.formatFluidRate(rate, compact);
     }
 
     private static String formatChemicalRate(float rate) {
         if (rate <= 0.001f) return Component.translatable("machinemetrics.metrics.none").getString();
-        if (rate >= 1_000f) {
-            return String.format("%.2f B/s", rate / 1_000f);
-        } else if (rate < 1.0f) {
-            return String.format("%.2f mB/s", rate);
-        } else {
-            return String.format("%.1f mB/s", rate);
-        }
+        boolean compact = ClientConfig.COMPACT_NUMBERS == null || ClientConfig.COMPACT_NUMBERS.get();
+        return MetricResolver.formatFluidRate(rate, compact);
     }
 }
 

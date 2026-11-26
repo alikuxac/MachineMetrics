@@ -19,11 +19,21 @@ import java.util.Optional;
 public class MetricResolver {
 
     public static String formatCompactNumber(float value) {
+        boolean compact = ClientConfig.COMPACT_NUMBERS == null || ClientConfig.COMPACT_NUMBERS.get();
+        return formatCompactNumber(value, compact);
+    }
+
+    public static String formatCompactNumber(float value, boolean compact) {
         if (Float.isNaN(value)) {
             return "0";
         }
         if (Float.isInfinite(value)) {
             return "∞";
+        }
+        if (!compact) {
+            return Math.abs(value) < 1.0f
+                    ? String.format(Locale.ROOT, "%.1f", value)
+                    : String.format(Locale.ROOT, "%,.0f", value);
         }
         float abs = Math.abs(value);
         if (abs >= 1_000_000_000f) {
@@ -40,10 +50,15 @@ public class MetricResolver {
     }
 
     public static String formatCompactNumber(long value) {
+        boolean compact = ClientConfig.COMPACT_NUMBERS == null || ClientConfig.COMPACT_NUMBERS.get();
+        return formatCompactNumber(value, compact);
+    }
+
+    public static String formatCompactNumber(long value, boolean compact) {
         if (value >= (Long.MAX_VALUE / 2) || value < 0) {
             return "∞";
         }
-        return formatCompactNumber((float) value);
+        return compact ? formatCompactNumber((float) value, true) : String.format(Locale.ROOT, "%,d", value);
     }
 
     public static String formatStorageNumber(long value, boolean isInfinite) {
@@ -281,7 +296,15 @@ public class MetricResolver {
     }
 
     public static String formatItemRate(float rate) {
+        boolean compact = ClientConfig.COMPACT_NUMBERS == null || ClientConfig.COMPACT_NUMBERS.get();
+        return formatItemRate(rate, compact);
+    }
+
+    public static String formatItemRate(float rate, boolean compact) {
         if (rate <= 0.001f) return "0.0 /s";
+        if (!compact && rate >= 1_000f) {
+            return String.format(Locale.ROOT, "%,.1f /s", rate);
+        }
         if (rate < 1.0f) {
             return String.format(Locale.ROOT, "%.2f /s", rate);
         } else {
@@ -290,13 +313,18 @@ public class MetricResolver {
     }
 
     public static String formatFluidRate(float rate) {
+        boolean compact = ClientConfig.COMPACT_NUMBERS == null || ClientConfig.COMPACT_NUMBERS.get();
+        return formatFluidRate(rate, compact);
+    }
+
+    public static String formatFluidRate(float rate, boolean compact) {
         if (rate <= 0.001f) return "0.0 mB/s";
-        if (rate >= 1_000f) {
+        if (compact && rate >= 1_000f) {
             return String.format(Locale.ROOT, "%.2f B/s", rate / 1_000f);
         } else if (rate < 1.0f) {
             return String.format(Locale.ROOT, "%.2f mB/s", rate);
         } else {
-            return String.format(Locale.ROOT, "%.1f mB/s", rate);
+            return String.format(Locale.ROOT, compact ? "%.1f mB/s" : "%,.1f mB/s", rate);
         }
     }
 
@@ -304,11 +332,31 @@ public class MetricResolver {
         return formatFluidRate(rate);
     }
 
+    public static String formatEnergyRate(float rate) {
+        boolean compact = ClientConfig.COMPACT_NUMBERS == null || ClientConfig.COMPACT_NUMBERS.get();
+        return formatEnergyRate(rate, compact);
+    }
+
+    public static String formatEnergyRate(float rate, boolean compact) {
+        float abs = Math.abs(rate);
+        if (abs <= 0.001f) return net.minecraft.network.chat.Component.translatable("machinemetrics.metrics.none").getString();
+        String prefix = rate > 0 ? "+" : (rate < 0 ? "-" : "");
+        if (compact && abs >= 1_000_000f) {
+            return String.format(Locale.ROOT, "%s%.2f MFE/t", prefix, abs / 1_000_000f);
+        } else if (compact && abs >= 1_000f) {
+            return String.format(Locale.ROOT, "%s%.1f kFE/t", prefix, abs / 1_000f);
+        } else if (abs < 1.0f) {
+            return String.format(Locale.ROOT, "%s%.2f FE/t", prefix, abs);
+        }
+        return String.format(Locale.ROOT, compact ? "%s%.0f FE/t" : "%s%,.0f FE/t", prefix, abs);
+    }
+
     public static String formatVolume(long millibuckets) {
         if (millibuckets < 0) {
             return "0 mB";
         }
-        if (millibuckets >= 1_000L) {
+        boolean compact = ClientConfig.COMPACT_NUMBERS == null || ClientConfig.COMPACT_NUMBERS.get();
+        if (compact && millibuckets >= 1_000L) {
             return String.format(Locale.ROOT, "%.2f B", millibuckets / 1_000.0);
         }
         return String.format(Locale.ROOT, "%,d mB", millibuckets);
