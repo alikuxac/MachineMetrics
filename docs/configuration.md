@@ -4,11 +4,36 @@ Machine Metrics splits configuration between client HUD options and server telem
 
 ---
 
-## In-Game HUD Editor
+## In-Game Configuration
+
+The client configuration screen is available from the loader's Mods menu:
+
+1. Open `Mods` from the main menu.
+2. Select `Machine Metrics`.
+3. Click **Config**.
+
+The screen exposes the most frequently adjusted HUD and telemetry switches:
+
+| Control | Setting |
+| :--- | :--- |
+| **Telemetry HUD** | Enable or disable the HUD overlay. |
+| **Machine title** | Show the targeted block or machine name. |
+| **Status badge** | Show the `OPTIMAL`, `STARVED`, `CLOGGED`, or `IDLE` status line. |
+| **Compact mode** | Render the HUD as a single compact line. |
+| **Compact numbers** | Abbreviate large values such as `1.2M`. |
+| **Items / Fluids / Chemicals** | Toggle the corresponding throughput metrics. |
+| **Energy / Speed / Network** | Toggle energy and Create kinetic metrics. |
+| **Storage / Time to full** | Toggle the storage bar and ETA line. |
+| **Targeted Face I/O / Redstone / ME Power** | Toggle those diagnostic lines. |
+
+Use **Position & Layout** to open the HUD position editor from the settings screen. Changes made in either screen are saved when the screen closes. The pause-menu **Machinemetrics HUD** button and `/mm hud position` continue to open the position editor directly.
+
+## HUD Position Editor
 
 Configure HUD placement and presets directly in-game without editing config files:
-- **Main Menu**: Open `Mods` > select `Machine Metrics` > click **Config**.
-- **In-Game**: Open the pause menu (`ESC`) and click **Machinemetrics HUD** in the top-right corner.
+- **Mods menu**: Open `Machine Metrics` > **Config** and then click **Position & Layout**.
+- **Pause menu**: Open the pause menu (`ESC`) and click **Machinemetrics HUD** in the top-right corner.
+- **Command**: Run `/mm hud position`.
 
 ### Controls
 
@@ -20,6 +45,8 @@ Configure HUD placement and presets directly in-game without editing config file
 | **Block Name** | Click toggle | Toggles the targeted block name line on or off. |
 | **Preset** | Click button | Applies a layout preset. |
 | **Pin Target** | Press Key (`H`) | Pins or unpins the targeted machine telemetry overlay on screen. |
+
+Advanced client options such as colors, warning thresholds, inspection-item gating, spyglass distance, and compact templates remain available in `config/machinemetrics-client.toml`. The in-game screen does not replace those TOML sections.
 
 ### Presets
 

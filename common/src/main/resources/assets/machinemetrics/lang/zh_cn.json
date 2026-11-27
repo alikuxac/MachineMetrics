@@ -131,5 +131,11 @@
   "machinemetrics.compat.mod.mekanism": "Mekanism",
   "machinemetrics.compat.mod.sophisticatedstorage": "Sophisticated Storage",
   "machinemetrics.compat.mod.functionalstorage": "Functional Storage",
-  "machinemetrics.compat.mod.storagedrawers": "Storage Drawers"
+  "machinemetrics.compat.mod.storagedrawers": "Storage Drawers",
+  "machinemetrics.screen.config": "Machine Metrics 设置",
+  "machinemetrics.config.open_position_editor": "位置与布局",
+  "machinemetrics.config.compact_mode": "紧凑模式",
+  "machinemetrics.config.show_machine_title": "机器名称",
+  "machinemetrics.config.show_status_badge": "状态标记",
+  "machinemetrics.config.show_time_to_full": "填满所需时间"
 }

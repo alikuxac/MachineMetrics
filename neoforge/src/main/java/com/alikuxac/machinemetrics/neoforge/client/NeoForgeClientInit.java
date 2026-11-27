@@ -1,6 +1,6 @@
 package com.alikuxac.machinemetrics.neoforge.client;
 
-import com.alikuxac.machinemetrics.client.HudPositionScreen;
+import com.alikuxac.machinemetrics.client.MachineMetricsConfigScreen;
 import com.alikuxac.machinemetrics.client.KeyBindings;
 import com.alikuxac.machinemetrics.config.ClientConfig;
 import net.neoforged.bus.api.IEventBus;
@@ -16,7 +16,7 @@ public class NeoForgeClientInit {
         modContainer.registerConfig(ModConfig.Type.CLIENT, (ModConfigSpec) ClientConfig.SPEC.nativeSpec());
         modContainer.registerExtensionPoint(
                 IConfigScreenFactory.class,
-                (container, screen) -> new HudPositionScreen(screen)
+                (container, screen) -> new MachineMetricsConfigScreen(screen)
         );
         modEventBus.addListener(NeoForgeClientInit::registerKeyMappings);
     }

@@ -1,6 +1,6 @@
 package com.alikuxac.machinemetrics.forge.client;
 
-import com.alikuxac.machinemetrics.client.HudPositionScreen;
+import com.alikuxac.machinemetrics.client.MachineMetricsConfigScreen;
 import com.alikuxac.machinemetrics.client.KeyBindings;
 import com.alikuxac.machinemetrics.config.ClientConfig;
 import com.alikuxac.machinemetrics.forge.platform.ForgeConfigFactory;
@@ -22,7 +22,7 @@ public class ForgeClientInit {
         modContainer.registerExtensionPoint(
                 ConfigScreenHandler.ConfigScreenFactory.class,
                 () -> new ConfigScreenHandler.ConfigScreenFactory(
-                        (mc, parent) -> new HudPositionScreen(parent))
+                        (mc, parent) -> new MachineMetricsConfigScreen(parent))
         );
 
         IEventBus modBus = context.getModEventBus();

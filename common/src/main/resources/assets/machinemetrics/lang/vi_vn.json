@@ -131,6 +131,12 @@
   "machinemetrics.compat.mod.mekanism": "Mekanism",
   "machinemetrics.compat.mod.sophisticatedstorage": "Sophisticated Storage",
   "machinemetrics.compat.mod.functionalstorage": "Functional Storage",
-  "machinemetrics.compat.mod.storagedrawers": "Storage Drawers"
+  "machinemetrics.compat.mod.storagedrawers": "Storage Drawers",
+  "machinemetrics.screen.config": "Cài đặt Machine Metrics",
+  "machinemetrics.config.open_position_editor": "Vị trí & bố cục",
+  "machinemetrics.config.compact_mode": "Chế độ gọn",
+  "machinemetrics.config.show_machine_title": "Tên máy",
+  "machinemetrics.config.show_status_badge": "Nhãn trạng thái",
+  "machinemetrics.config.show_time_to_full": "Thời gian đến khi đầy"
 }
 

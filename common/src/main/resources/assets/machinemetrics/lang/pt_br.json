@@ -131,5 +131,11 @@
   "machinemetrics.compat.mod.mekanism": "Mekanism",
   "machinemetrics.compat.mod.sophisticatedstorage": "Sophisticated Storage",
   "machinemetrics.compat.mod.functionalstorage": "Functional Storage",
-  "machinemetrics.compat.mod.storagedrawers": "Storage Drawers"
+  "machinemetrics.compat.mod.storagedrawers": "Storage Drawers",
+  "machinemetrics.screen.config": "Configurações do Machine Metrics",
+  "machinemetrics.config.open_position_editor": "Posição e layout",
+  "machinemetrics.config.compact_mode": "Modo compacto",
+  "machinemetrics.config.show_machine_title": "Título da máquina",
+  "machinemetrics.config.show_status_badge": "Emblema de status",
+  "machinemetrics.config.show_time_to_full": "Tempo até encher"
 }
